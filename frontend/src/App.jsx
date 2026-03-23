@@ -436,7 +436,10 @@ function LoginModal({ onClose, onDemo }) {
       const { error } = await signUp(email, password);
       setLoading(false);
       if (error) setMsg({ text: error.message, type: "error" });
-      else setMsg({ text: "Account created! You can now sign in.", type: "success" });
+      else {
+        setMsg({ text: "Account created! You can now sign in.", type: "success" });
+        fetch("/api/auth/welcome-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,name:email.split("@")[0]})}).catch(()=>{});
+      }
     } else {
       const { error } = await signIn(email, password);
       setLoading(false);
@@ -1365,6 +1368,11 @@ function DetectionLibrary({detections, onDelete, onUpdate, onBuildOn, onSendToTr
   const[elasticToken,setElasticToken]=useState(LS.get("elastic_token",""));
   const[soarUrl,setSoarUrl]=useState(LS.get("soar_url",""));
   const[soarToken,setSoarToken]=useState(LS.get("soar_token",""));
+  const[githubToken,setGithubToken]=useState(LS.get("github_token",""));
+  const[githubRepo,setGithubRepo]=useState(LS.get("github_repo",""));
+  const[sigmaModal,setSigmaModal]=useState(null);
+  const[sigmaContent,setSigmaContent]=useState("");
+  const[loadingSigma,setLoadingSigma]=useState(false);
 
   const filtered=detections.filter(d=>
     (!search||d.name.toLowerCase().includes(search.toLowerCase())||d.threat?.toLowerCase().includes(search.toLowerCase()))
@@ -1539,6 +1547,44 @@ Return ONLY valid JSON:
     setPushing(false);
   }
 
+  async function pushToGitHub(det){
+    const token=githubToken||prompt("GitHub personal access token:");
+    const repoFull=githubRepo||prompt("GitHub repo (owner/repo format):");
+    if(!token||!repoFull){setPushResult("error:GitHub token and repo required.");return;}
+    const parts=repoFull.split("/");
+    if(parts.length<2){setPushResult("error:Repo must be in owner/repo format.");return;}
+    const [owner,repo]=parts;
+    LS.set("github_token",token);LS.set("github_repo",repoFull);
+    setGithubToken(token);setGithubRepo(repoFull);
+    setPushing(true);setPushResult("");
+    try{
+      const res=await fetch("/api/github/push",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({token,repo,owner,detection:{name:det.name,query:det.query,tactic:det.tactic,severity:det.severity,queryType:det.queryType,tool:det.tool,threat:det.threat||det.description||""}})
+      });
+      const data=await res.json();
+      if(data.success){setPushResult("success:Detection pushed to GitHub. View at: "+data.url);}
+      else{setPushResult("error:"+(data.error||"GitHub push failed."));}
+    }catch(e){setPushResult("error:Request failed: "+e.message);}
+    setPushing(false);
+  }
+
+  async function exportSigmaAI(det){
+    setSigmaModal(det);setSigmaContent("");setLoadingSigma(true);
+    try{
+      const res=await fetch("/api/sigma/export",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({detection:{name:det.name,query:det.query,tactic:det.tactic,technique:det.technique||"",severity:det.severity,queryType:det.queryType,tool:det.tool,threat:det.threat||det.description||""}})
+      });
+      const data=await res.json();
+      if(data.sigma){setSigmaContent(data.sigma);}
+      else{setSigmaContent("Error: "+(data.error||"Sigma export failed."));}
+    }catch(e){setSigmaContent("Error: "+e.message);}
+    setLoadingSigma(false);
+  }
+
   async function generateTicket(det){
     setGeneratingTicket(true);setTicketModal(det);setTicketContent("");
     try{const txt=await callClaude([{role:"user",content:"Write a JIRA/ServiceNow ticket for deploying this detection rule.\n\nDetection: "+det.name+"\nSeverity: "+det.severity+"\nTactic: "+det.tactic+"\nPlatform: "+det.queryType+"\nQuery:\n"+det.query+"\n\nInclude: Summary, Description, Acceptance Criteria, Testing Steps, Rollback Plan. Keep it concise."}],"SOC engineer.",1000);
@@ -1631,6 +1677,7 @@ level: ${(det.severity||"medium").toLowerCase()}
               <button style={{...S.btn(),padding:"5px 11px",fontSize:11}} onClick={e=>{e.stopPropagation();enrichDetection(det);}} disabled={enriching===det.id}>{enriching===det.id?<><Spinner/>Enriching...</>:"Enrich"}</button>
               <button style={{...S.btn(),padding:"5px 11px",fontSize:11}} onClick={e=>{e.stopPropagation();exportDet(det,"query");}}>Export</button>
               <button style={{...S.btn(),padding:"5px 11px",fontSize:11}} onClick={e=>{e.stopPropagation();exportSigma(det);}}>SIGMA</button>
+              <button style={{...S.btn(),padding:"5px 11px",fontSize:11,borderColor:"#24292e",color:"#adbac7"}} onClick={e=>{e.stopPropagation();exportSigmaAI(det);}}>&#931; Sigma</button>
             </div>
 
             {/* BETA actions */}
@@ -1720,8 +1767,8 @@ level: ${(det.severity||"medium").toLowerCase()}
 
             {/* Platform tabs */}
             <div style={{display:"flex",gap:6,marginBottom:20}}>
-              {[{id:"splunk",label:"Splunk",color:"#ff5733"},{id:"elastic",label:"Elastic",color:"#f4bd19"},{id:"soar",label:"SOAR / Webhook",color:THEME.success}].map(p=>(
-                <button key={p.id} style={{...S.btn(pushModal.tab===p.id?"p":""),padding:"7px 14px",fontSize:12,borderColor:pushModal.tab===p.id?p.color+"88":THEME.border,color:pushModal.tab===p.id?p.color:THEME.textDim}} onClick={()=>setPushModal({...pushModal,tab:p.id})}>{p.label}</button>
+              {[{id:"splunk",label:"Splunk",color:"#ff5733"},{id:"elastic",label:"Elastic",color:"#f4bd19"},{id:"soar",label:"SOAR / Webhook",color:THEME.success},{id:"github",label:"GitHub",color:"#adbac7"}].map(p=>(
+                <button key={p.id} style={{...S.btn(pushModal.tab===p.id?"p":""),padding:"7px 14px",fontSize:12,borderColor:pushModal.tab===p.id?p.color+"88":THEME.border,color:pushModal.tab===p.id?p.color:THEME.textDim,background:pushModal.tab===p.id&&p.id==="github"?"#24292e":undefined}} onClick={()=>setPushModal({...pushModal,tab:p.id})}>{p.label}</button>
               ))}
             </div>
 
@@ -1761,8 +1808,39 @@ level: ${(det.severity||"medium").toLowerCase()}
               </div>
             )}
 
+            {/* GitHub config */}
+            {pushModal.tab==="github"&&(
+              <div>
+                <div style={{fontSize:12,color:THEME.textMid,marginBottom:14,lineHeight:1.6}}>Creates or updates a file at <code style={{fontFamily:"monospace",background:"rgba(255,255,255,0.05)",padding:"2px 5px",borderRadius:4}}>detections/{"{tactic}/{name}.{ext}"}</code> in your GitHub repo.</div>
+                <label style={S.label}>Personal Access Token</label>
+                <input style={{...S.input,marginBottom:10,fontFamily:"monospace"}} type="password" value={githubToken} onChange={e=>setGithubToken(e.target.value)} placeholder="ghp_..."/>
+                <label style={S.label}>Repository (owner/repo)</label>
+                <input style={{...S.input,marginBottom:14}} value={githubRepo} onChange={e=>setGithubRepo(e.target.value)} placeholder="myorg/detection-rules"/>
+                <button style={{...S.btn("p"),width:"100%",padding:"10px",background:"#24292e",borderColor:"#444c56"}} onClick={()=>pushToGitHub(pushModal.det)} disabled={pushing}>{pushing?<><Spinner/>Pushing to GitHub...</>:"Push to GitHub"}</button>
+              </div>
+            )}
             {pushResult&&<StatusBar msg={statusMsg||pushResult} type={statusType==="success"?"success":"error"}/>}
             <button style={{...S.btn(),width:"100%",padding:"8px",marginTop:10,fontSize:12}} onClick={()=>{setPushModal(null);setPushResult("");}}>Close</button>
+          </div>
+        </div>
+      )}
+
+      {/* Sigma Modal */}
+      {sigmaModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.82)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,backdropFilter:"blur(6px)"}} onClick={()=>{setSigmaModal(null);setSigmaContent("");}}>
+          <div style={{background:"linear-gradient(145deg,#0c1220,#080d18)",border:"1px solid "+THEME.borderBright,borderRadius:16,padding:32,width:"100%",maxWidth:620,maxHeight:"80vh",overflow:"auto",boxShadow:"0 32px 80px rgba(0,0,0,0.7)"}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:10,fontWeight:800,color:"#adbac7",letterSpacing:"0.15em",marginBottom:6}}>SIGMA RULE EXPORT</div>
+            <div style={{fontSize:17,fontWeight:900,color:THEME.text,marginBottom:16}}>{sigmaModal.name}</div>
+            {loadingSigma?<div style={{textAlign:"center",padding:40,color:THEME.textDim}}><Spinner/> Converting to Sigma...</div>:(
+              <div style={{position:"relative"}}>
+                <div style={S.code}>{sigmaContent}</div>
+                <div style={{position:"absolute",top:8,right:8}}><CopyBtn text={sigmaContent}/></div>
+              </div>
+            )}
+            {!loadingSigma&&sigmaContent&&!sigmaContent.startsWith("Error")&&(
+              <button style={{...S.btn(),padding:"8px 16px",marginTop:10,fontSize:12}} onClick={()=>{const blob=new Blob([sigmaContent],{type:"text/plain"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=(sigmaModal.name||"detection").replace(/\s+/g,"_")+".yml";a.click();}}>Download .yml</button>
+            )}
+            <button style={{...S.btn(),width:"100%",padding:"8px",marginTop:10,fontSize:12}} onClick={()=>{setSigmaModal(null);setSigmaContent("");}}>Close</button>
           </div>
         </div>
       )}
@@ -2624,8 +2702,8 @@ function AutopilotTab({ user, detections, onSaveDetection, onNav }) {
     }
     const savedDraftsData = LS.get("autopilot_drafts", []);
     setDrafts(savedDraftsData);
-    // Fetch real enabled state from Supabase (source of truth for cron)
     if (user) {
+      // Load settings from Supabase
       supabase.from("autopilot_settings").select("enabled,siem_tool").eq("user_id", user.id).single()
         .then(({ data }) => {
           if (data) {
@@ -2633,6 +2711,25 @@ function AutopilotTab({ user, detections, onSaveDetection, onNav }) {
             setSiemTool(data.siem_tool || "splunk");
             const cur = LS.get("autopilot_settings", {});
             LS.set("autopilot_settings", Object.assign({}, cur, { enabled: data.enabled, siemTool: data.siem_tool }));
+          }
+        });
+      // Load background cron drafts from Supabase (these won't be in localStorage)
+      supabase.from("autopilot_drafts")
+        .select("*").eq("user_id", user.id).eq("status", "pending")
+        .order("created_at", { ascending: false }).limit(30)
+        .then(({ data }) => {
+          if (data && data.length > 0) {
+            const local = LS.get("autopilot_drafts", []);
+            const merged = [...data, ...local];
+            const deduped = [...new Map(merged.map(d => [d.cve_id, d])).values()].slice(0, 30);
+            setDrafts(deduped);
+            LS.set("autopilot_drafts", deduped);
+            // Notify if there are new cron-generated drafts not seen before
+            const seenIds = new Set(local.map(d => d.cve_id));
+            const newFromCron = data.filter(d => !seenIds.has(d.cve_id));
+            if (newFromCron.length > 0) {
+              setMsg(newFromCron.length + " new detection draft" + (newFromCron.length > 1 ? "s" : "") + " generated by Autopilot — review below.");
+            }
           }
         });
     }
@@ -2971,6 +3068,26 @@ function UserSettingsTab({ user, onSignOut }) {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* GitHub Integration */}
+      <div style={S.card}>
+        <div style={S.cardTitle}>🐙 GitHub Integration</div>
+        <div style={{fontSize:11,color:THEME.textDim,marginBottom:14,lineHeight:1.6}}>
+          Store your GitHub token and repo to enable one-click detection push from the Library.
+        </div>
+        <label style={S.label}>Personal Access Token</label>
+        <input style={{...S.input,marginBottom:10,fontFamily:"'JetBrains Mono',monospace",fontSize:11}}
+          type="password"
+          placeholder="ghp_..."
+          value={LS.get("github_token","")}
+          onChange={e=>{LS.set("github_token",e.target.value);}}/>
+        <label style={S.label}>Repository (owner/repo)</label>
+        <input style={S.input}
+          placeholder="myorg/detection-rules"
+          defaultValue={LS.get("github_repo","")}
+          onChange={e=>LS.set("github_repo",e.target.value)}/>
+        <div style={{marginTop:8,fontSize:11,color:THEME.textDim}}>Token needs <code style={{fontFamily:"monospace"}}>repo</code> scope. Detections are pushed to <code style={{fontFamily:"monospace"}}>detections/{"<tactic>/<name>.ext"}</code></div>
       </div>
 
       {/* Save Button */}
