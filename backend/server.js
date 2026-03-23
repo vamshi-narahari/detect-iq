@@ -453,10 +453,71 @@ app.get("/api/mitre/techniques", async (req, res) => {
 });
 setTimeout(() => loadMitreTechniques().catch(e => console.error("[MITRE] Warm failed:", e.message)), 10000);
 
+// ── /api/siem/data-requirements — AI analysis of detection data needs ────────
+app.post("/api/siem/data-requirements", express.json(), async (req, res) => {
+  const { name, query, queryType, tactic, severity, platform } = req.body;
+  if (!query) return res.status(400).json({ error: "query required" });
+
+  const platformPrompts = {
+    elastic: `You are a detection engineering expert for Elastic Security. Analyze this ${queryType||"KQL"} detection query and return ONLY this JSON:
+{
+  "index_patterns": ["Elastic index patterns needed, e.g. logs-endpoint.events.*, winlogbeat-*, filebeat-*"],
+  "data_streams": ["Elastic data streams, e.g. logs-endpoint.events.process-*"],
+  "required_fields": [{"field": "field_name", "ecs_mapping": "ECS equivalent or null", "description": "what it is"}],
+  "ecs_categories": ["ECS event categories, e.g. process, network, authentication, file"],
+  "integrations": ["Elastic Agent integrations needed, e.g. endpoint, windows, system, network_traffic"],
+  "beats": ["Beats modules needed, e.g. winlogbeat, filebeat, auditbeat, packetbeat"],
+  "normalization_steps": ["step 1", "step 2"],
+  "data_sources": ["specific log sources needed"],
+  "notes": "important caveats about data availability or ECS mapping gaps"
+}`,
+    soar: `You are a detection engineering expert. Analyze this detection and return ONLY this JSON describing what data a SOAR platform needs to process it:
+{
+  "required_fields": [{"field": "field_name", "description": "what it is", "example": "example value"}],
+  "recommended_playbook_actions": ["action 1 e.g. Enrich IP with VirusTotal", "action 2"],
+  "data_sources": ["specific log sources needed"],
+  "triage_checklist": ["check 1", "check 2"],
+  "escalation_criteria": ["when to escalate e.g. risk_score > 2"],
+  "false_positive_filters": ["common FP scenario 1", "common FP scenario 2"],
+  "notes": "important caveats for SOAR automation"
+}`,
+    splunk: `You are a detection engineering expert for Splunk. Analyze this ${queryType||"SPL"} detection query and return ONLY this JSON:
+{
+  "indexes": ["Splunk index names referenced or recommended, e.g. windows, main, sysmon"],
+  "sourcetypes": ["sourcetypes referenced or needed"],
+  "required_fields": [{"field": "field_name", "cim_mapping": "CIM equivalent or null", "description": "what it is"}],
+  "cim_datamodels": ["CIM data models needed, e.g. Endpoint, Network_Traffic, Authentication"],
+  "normalization_steps": ["step 1", "step 2"],
+  "data_sources": ["specific log sources needed, e.g. Windows Security Event Log, IIS logs"],
+  "ta_recommendations": ["Splunk TA names that provide this data, e.g. Splunk_TA_windows"],
+  "notes": "important caveats about data availability or common gaps"
+}`
+  };
+
+  const systemPrompt = platformPrompts[platform] || platformPrompts.splunk;
+  const prompt = `${systemPrompt}
+
+Detection: ${name}
+Tactic: ${tactic||"Unknown"}
+Severity: ${severity||"Unknown"}
+Query:
+${query}`;
+  try {
+    const result = await callClaude([{ role: "user", content: prompt }], "Detection engineering data requirements analyst. Return only valid JSON.", 1000);
+    const m = result.match(/\{[\s\S]*\}/);
+    if (!m) return res.status(500).json({ error: "Could not parse AI response" });
+    res.json(JSON.parse(m[0]));
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── /api/siem/push/* — server-side proxy to avoid browser CORS issues ─────────
 app.post("/api/siem/push/splunk", express.json(), async (req, res) => {
-  const { url, token, name, query, severity, description } = req.body;
-  if (!url || !token) return res.status(400).json({ error: "url and token required" });
+  const { url, token, authMode, username, password, name, query, severity, description } = req.body;
+  if (!url) return res.status(400).json({ error: "url required" });
+  if (authMode === "basic" && (!username || !password)) return res.status(400).json({ error: "username and password required" });
+  if (authMode !== "basic" && !token) return res.status(400).json({ error: "token required" });
   try {
     const target = url.replace(/\/$/, "") + "/services/saved/searches";
     const body = new URLSearchParams({
@@ -466,9 +527,12 @@ app.post("/api/siem/push/splunk", express.json(), async (req, res) => {
       "dispatch.earliest_time": "-15m", "dispatch.latest_time": "now",
       "is_scheduled": "1", "cron_schedule": "*/15 * * * *",
     });
+    const authHeader = authMode === "basic"
+      ? "Basic " + Buffer.from(`${username}:${password}`).toString("base64")
+      : "Bearer " + token;
     const r = await fetch(target, {
       method: "POST",
-      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/x-www-form-urlencoded" },
+      headers: { "Authorization": authHeader, "Content-Type": "application/x-www-form-urlencoded" },
       body: body.toString(),
     });
     const text = await r.text();

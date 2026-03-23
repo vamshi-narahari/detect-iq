@@ -1364,6 +1364,13 @@ function DetectionLibrary({detections, onDelete, onUpdate, onBuildOn, onSendToTr
   const[generatingTicket,setGeneratingTicket]=useState(false);
   const[splunkUrl,setSplunkUrl]=useState(LS.get("splunk_url",""));
   const[splunkToken,setSplunkToken]=useState(LS.get("splunk_token",""));
+  const[splunkUser,setSplunkUser]=useState(LS.get("splunk_user",""));
+  const[splunkPass,setSplunkPass]=useState(LS.get("splunk_pass",""));
+  const[splunkAuthMode,setSplunkAuthMode]=useState(LS.get("splunk_auth_mode","token")); // "token" | "basic"
+  const[dataReqs,setDataReqs]=useState(null);
+  const[loadingDataReqs,setLoadingDataReqs]=useState(false);
+  const[indexOverride,setIndexOverride]=useState("");
+  const[sourcetypeOverride,setSourcetypeOverride]=useState("");
   const[elasticUrl,setElasticUrl]=useState(LS.get("elastic_url",""));
   const[elasticToken,setElasticToken]=useState(LS.get("elastic_token",""));
   const[soarUrl,setSoarUrl]=useState(LS.get("soar_url",""));
@@ -1440,36 +1447,102 @@ Return ONLY valid JSON:
     setEnriching(null);
   }
 
+  // ── Parse indexes/sourcetypes from SPL query ─────────────────────────────
+  function parseQueryDataRefs(query){
+    if(!query) return {indexes:[],sourcetypes:[]};
+    const idxMatches = [...query.matchAll(/index\s*=\s*["']?(\S+?)["']?(?:\s|$|\))/gi)].map(m=>m[1].replace(/['"]/g,""));
+    const stMatches = [
+      ...[...query.matchAll(/sourcetype\s*=\s*["']?([^\s,)]+)["']?/gi)].map(m=>m[1].replace(/['"]/g,"")),
+      ...(query.match(/sourcetype\s+IN\s*\(([^)]+)\)/i)?.[1]||"").split(",").map(s=>s.trim().replace(/['"]/g,"")).filter(Boolean)
+    ];
+    return {indexes:[...new Set(idxMatches)],sourcetypes:[...new Set(stMatches)]};
+  }
+
+  async function analyzeDataRequirements(det,platform="splunk"){
+    setLoadingDataReqs(true);setDataReqs(null);
+    try{
+      const res=await fetch("/api/siem/data-requirements",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:det.name,query:det.query,queryType:det.queryType,tactic:det.tactic,severity:det.severity,platform})});
+      const data=await res.json();
+      if(data.error) setDataReqs({error:data.error});
+      else {
+        setDataReqs(data);
+        if(data.indexes?.length) setIndexOverride(data.indexes.join(", "));
+        if(data.sourcetypes?.length) setSourcetypeOverride(data.sourcetypes.join(", "));
+      }
+    }catch(e){setDataReqs({error:e.message});}
+    setLoadingDataReqs(false);
+  }
+
   // ── Real push functions ───────────────────────────────────────────────────
+  function isOnPremUrl(url){
+    if(!url) return false;
+    try{
+      const h = new URL(url).hostname;
+      return h==="localhost"||h==="127.0.0.1"||h.endsWith(".local")||
+        /^10\./.test(h)||/^192\.168\./.test(h)||/^172\.(1[6-9]|2\d|3[01])\./.test(h);
+    }catch{return false;}
+  }
+
   async function pushToSplunk(det){
     const url = splunkUrl || prompt("Splunk URL (e.g. https://your-splunk:8089):");
-    const token = splunkToken || prompt("Splunk management API token (not HEC):");
-    if(!url||!token){setPushResult("error:Splunk URL and token required.");return;}
-    LS.set("splunk_url",url);LS.set("splunk_token",token);
-    setSplunkUrl(url);setSplunkToken(token);
+    if(splunkAuthMode==="basic"){
+      if(!url||!splunkUser||!splunkPass){setPushResult("error:Splunk URL, username and password required.");return;}
+    } else {
+      if(!url||!splunkToken){setPushResult("error:Splunk URL and token required.");return;}
+    }
+    LS.set("splunk_url",url);
+    setSplunkUrl(url);
     setPushing(true);setPushResult("");
     try{
-      // Proxy through backend to avoid CORS restrictions
-      const res = await fetch("/api/siem/push/splunk",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          url,token,
-          name:det.name,
-          query:det.query,
-          severity:det.severity,
-          description:det.threat||det.description||"",
-          tactic:det.tactic,queryType:det.queryType
-        })
-      });
-      const data = await res.json();
-      if(data.success){
-        setPushResult("success:"+data.message);
+      if(isOnPremUrl(url)){
+        // On-prem: call directly from browser (server can't reach local hostnames)
+        const sev = det.severity==="critical"?"1":det.severity==="high"?"2":det.severity==="medium"?"3":"4";
+        const body = new URLSearchParams({
+          name: det.name,
+          search: det.query||"",
+          "dispatch.earliest_time":"-24h@h",
+          "dispatch.latest_time":"now",
+          "alert_type":"number of events",
+          "alert_comparator":"greater than",
+          "alert_threshold":"0",
+          "alert.severity": sev,
+          "is_scheduled":"1",
+          "cron_schedule":"*/15 * * * *",
+          "description": det.threat||det.description||""
+        });
+        const authHeader = splunkAuthMode==="basic"
+          ? "Basic "+btoa(`${splunkUser}:${splunkPass}`)
+          : `Bearer ${splunkToken}`;
+        const res = await fetch(`${url.replace(/\/$/,"")}/services/saved/searches`,{
+          method:"POST",
+          headers:{"Authorization":authHeader,"Content-Type":"application/x-www-form-urlencoded"},
+          body:body.toString()
+        });
+        if(res.ok||res.status===201){
+          setPushResult("success:Detection pushed to Splunk (on-prem) as saved search.");
+        } else {
+          const txt = await res.text().catch(()=>"");
+          if(res.status===409) setPushResult("success:Saved search already exists in Splunk (no change needed).");
+          else if(res.status===401) setPushResult("error:Splunk rejected the token — check it has saved search creation rights.");
+          else setPushResult("error:Splunk returned "+res.status+(txt?": "+txt.slice(0,200):""));
+        }
       } else {
-        setPushResult("error:"+(data.error||"Push failed. Check your Splunk URL (must be the management API port, usually 8089) and token."));
+        // Cloud/remote: proxy through backend
+        const res = await fetch("/api/siem/push/splunk",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({url,token:splunkToken,authMode:splunkAuthMode,username:splunkUser,password:splunkPass,name:det.name,query:det.query,severity:det.severity,description:det.threat||det.description||"",tactic:det.tactic,queryType:det.queryType})
+        });
+        const data = await res.json();
+        if(data.success) setPushResult("success:"+data.message);
+        else setPushResult("error:"+(data.error||"Push failed. Check your Splunk URL and credentials."));
       }
     }catch(e){
-      setPushResult("error:Request failed: "+e.message);
+      if(e.message.includes("Failed to fetch")||e.message.includes("NetworkError")){
+        setPushResult("error:Could not reach Splunk. If CORS is blocking, add DetectIQ's origin to Splunk's web.conf: crossOriginSharingPolicy = *");
+      } else {
+        setPushResult("error:"+e.message);
+      }
     }
     setPushing(false);
   }
@@ -1482,27 +1555,42 @@ Return ONLY valid JSON:
     setElasticUrl(url);setElasticToken(token);
     setPushing(true);setPushResult("");
     try{
-      // Proxy through backend to avoid CORS restrictions
-      const res = await fetch("/api/siem/push/elastic",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          url,token,
-          name:det.name,
-          query:det.query,
-          severity:det.severity,
-          description:det.threat||det.description||det.name,
-          tactic:det.tactic,queryType:det.queryType
-        })
-      });
-      const data = await res.json();
-      if(data.success){
-        setPushResult("success:"+data.message);
+      if(isOnPremUrl(url)){
+        // On-prem: call directly from browser
+        const sev = det.severity==="critical"?"critical":det.severity==="high"?"high":det.severity==="medium"?"medium":"low";
+        const langMap = {kql:"kuery",eql:"eql",esql:"esql"};
+        const lang = langMap[det.queryType?.toLowerCase()]||"kuery";
+        const rule = {name:det.name,description:det.threat||det.description||det.name,risk_score:sev==="critical"?99:sev==="high"?73:sev==="medium"?47:21,severity:sev,type:"query",query:det.query||"",language:lang,index:["logs-*","*"],enabled:false};
+        const res = await fetch(`${url.replace(/\/$/,"")}/api/detection_engine/rules`,{
+          method:"POST",
+          headers:{"Authorization":`ApiKey ${token}`,"Content-Type":"application/json","kbn-xsrf":"detectiq"},
+          body:JSON.stringify(rule)
+        });
+        if(res.ok||res.status===200){
+          setPushResult("success:Detection rule created in Elastic Security (on-prem, disabled for review).");
+        } else {
+          const txt = await res.text().catch(()=>"");
+          if(res.status===409) setPushResult("success:Rule already exists in Elastic (no change needed).");
+          else if(res.status===401) setPushResult("error:Elastic rejected the API key — ensure it has Security write permissions.");
+          else setPushResult("error:Elastic returned "+res.status+(txt?": "+txt.slice(0,200):""));
+        }
       } else {
-        setPushResult("error:"+(data.error||"Push failed. Check your Kibana URL and API key (Base64 of id:api_key from Management → API Keys)."));
+        // Cloud/remote: proxy through backend
+        const res = await fetch("/api/siem/push/elastic",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({url,token,name:det.name,query:det.query,severity:det.severity,description:det.threat||det.description||det.name,tactic:det.tactic,queryType:det.queryType})
+        });
+        const data = await res.json();
+        if(data.success) setPushResult("success:"+data.message);
+        else setPushResult("error:"+(data.error||"Push failed. Check your Kibana URL and API key."));
       }
     }catch(e){
-      setPushResult("error:Request failed: "+e.message);
+      if(e.message.includes("Failed to fetch")||e.message.includes("NetworkError")){
+        setPushResult("error:Could not reach Elastic. For on-prem, enable CORS in Kibana: server.cors.enabled: true in kibana.yml");
+      } else {
+        setPushResult("error:"+e.message);
+      }
     }
     setPushing(false);
   }
@@ -1683,7 +1771,7 @@ level: ${(det.severity||"medium").toLowerCase()}
             {/* BETA actions */}
             <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",padding:"8px 10px",background:"rgba(124,85,255,0.04)",borderRadius:8,border:"1px solid "+THEME.purple+"22"}} onClick={e=>e.stopPropagation()}>
               <span style={{...S.badge(THEME.purple),fontSize:9,marginRight:4}}>BETA</span>
-              <button style={{...S.btn(),padding:"5px 11px",fontSize:11,borderColor:THEME.purple+"44",color:THEME.purple}} onClick={e=>{e.stopPropagation();setPushModal({det,tab:"splunk"});setPushResult("");}}>Push to Splunk</button>
+              <button style={{...S.btn(),padding:"5px 11px",fontSize:11,borderColor:THEME.purple+"44",color:THEME.purple}} onClick={e=>{e.stopPropagation();setPushModal({det,tab:"splunk"});setPushResult("");setDataReqs(null);setIndexOverride("");setSourcetypeOverride("");}}>Push to Splunk</button>
               <button style={{...S.btn(),padding:"5px 11px",fontSize:11,borderColor:THEME.purple+"44",color:THEME.purple}} onClick={e=>{e.stopPropagation();setPushModal({det,tab:"elastic"});setPushResult("");}}>Push to Elastic</button>
               <button style={{...S.btn(),padding:"5px 11px",fontSize:11,borderColor:THEME.purple+"44",color:THEME.purple}} onClick={e=>{e.stopPropagation();setPushModal({det,tab:"soar"});setPushResult("");}}>Push to SOAR</button>
               <button style={{...S.btn(),padding:"5px 11px",fontSize:11,borderColor:THEME.purple+"44",color:THEME.purple}} onClick={e=>{e.stopPropagation();generateTicket(det);}}>Create Ticket</button>
@@ -1761,45 +1849,255 @@ level: ${(det.severity||"medium").toLowerCase()}
       {/* Push Modal */}
       {pushModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.82)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,backdropFilter:"blur(6px)"}} onClick={()=>{setPushModal(null);setPushResult("");}}>
-          <div style={{background:"linear-gradient(145deg,#0c1220,#080d18)",border:"1px solid "+THEME.borderBright,borderRadius:16,padding:32,width:"100%",maxWidth:560,boxShadow:"0 32px 80px rgba(0,0,0,0.7)"}} onClick={e=>e.stopPropagation()}>
+          <div style={{background:"linear-gradient(145deg,#0c1220,#080d18)",border:"1px solid "+THEME.borderBright,borderRadius:16,padding:32,width:"100%",maxWidth:560,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 32px 80px rgba(0,0,0,0.7)"}} onClick={e=>e.stopPropagation()}>
             <div style={{fontSize:10,fontWeight:800,color:THEME.purple,letterSpacing:"0.15em",marginBottom:6}}>BETA — PUSH TO PLATFORM</div>
             <div style={{fontSize:17,fontWeight:900,color:THEME.text,marginBottom:16}}>{pushModal.det.name}</div>
 
             {/* Platform tabs */}
             <div style={{display:"flex",gap:6,marginBottom:20}}>
               {[{id:"splunk",label:"Splunk",color:"#ff5733"},{id:"elastic",label:"Elastic",color:"#f4bd19"},{id:"soar",label:"SOAR / Webhook",color:THEME.success},{id:"github",label:"GitHub",color:"#adbac7"}].map(p=>(
-                <button key={p.id} style={{...S.btn(pushModal.tab===p.id?"p":""),padding:"7px 14px",fontSize:12,borderColor:pushModal.tab===p.id?p.color+"88":THEME.border,color:pushModal.tab===p.id?p.color:THEME.textDim,background:pushModal.tab===p.id&&p.id==="github"?"#24292e":undefined}} onClick={()=>setPushModal({...pushModal,tab:p.id})}>{p.label}</button>
+                <button key={p.id} style={{...S.btn(pushModal.tab===p.id?"p":""),padding:"7px 14px",fontSize:12,borderColor:pushModal.tab===p.id?p.color+"88":THEME.border,color:pushModal.tab===p.id?p.color:THEME.textDim,background:pushModal.tab===p.id&&p.id==="github"?"#24292e":undefined}} onClick={()=>{setPushModal({...pushModal,tab:p.id});setDataReqs(null);setIndexOverride("");setSourcetypeOverride("");}}>{p.label}</button>
               ))}
             </div>
 
             {/* Splunk config */}
             {pushModal.tab==="splunk"&&(
               <div>
-                <div style={{fontSize:12,color:THEME.textMid,marginBottom:14,lineHeight:1.6}}>Creates a saved search with 15-min schedule and alerting via Splunk REST API.</div>
+                <div style={{fontSize:12,color:THEME.textMid,marginBottom:10,lineHeight:1.6}}>Creates a saved search with 15-min schedule and alerting via Splunk REST API.</div>
+
+                {/* Data Requirements Section */}
+                {(()=>{
+                  const det=pushModal.det;
+                  const parsed=parseQueryDataRefs(det?.query);
+                  return(
+                    <div style={{background:"rgba(0,212,255,0.04)",border:"1px solid rgba(0,212,255,0.15)",borderRadius:8,padding:"12px 14px",marginBottom:14}}>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                        <div style={{fontSize:11,fontWeight:700,color:THEME.accent,letterSpacing:"0.08em"}}>DATA REQUIREMENTS</div>
+                        <button style={{...S.btn(),padding:"3px 10px",fontSize:10,borderColor:THEME.accent+"44",color:THEME.accent}} onClick={()=>analyzeDataRequirements(det)} disabled={loadingDataReqs}>
+                          {loadingDataReqs?<><Spinner/>Analyzing...</>:"AI Analyze"}
+                        </button>
+                      </div>
+
+                      {/* Auto-parsed from query */}
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                        <div>
+                          <div style={{...S.label,marginBottom:4}}>Indexes{parsed.indexes.length?"":" (auto-detect)"}</div>
+                          <input style={{...S.input,fontSize:11}} value={indexOverride||parsed.indexes.join(", ")} onChange={e=>setIndexOverride(e.target.value)} placeholder="e.g. windows, main, *"/>
+                        </div>
+                        <div>
+                          <div style={{...S.label,marginBottom:4}}>Sourcetypes{parsed.sourcetypes.length?"":" (auto-detect)"}</div>
+                          <input style={{...S.input,fontSize:11}} value={sourcetypeOverride||parsed.sourcetypes.join(", ")} onChange={e=>setSourcetypeOverride(e.target.value)} placeholder="e.g. WinEventLog:Security"/>
+                        </div>
+                      </div>
+
+                      {/* AI Analysis results */}
+                      {dataReqs&&!dataReqs.error&&(
+                        <div style={{borderTop:"1px solid rgba(0,212,255,0.1)",paddingTop:10,marginTop:4}}>
+                          {dataReqs.cim_datamodels?.length>0&&(
+                            <div style={{marginBottom:8}}>
+                              <div style={{...S.label,marginBottom:4}}>CIM Data Models</div>
+                              <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                                {dataReqs.cim_datamodels.map((m,i)=><span key={i} style={{...S.badge(THEME.accent),fontSize:9}}>{m}</span>)}
+                              </div>
+                            </div>
+                          )}
+                          {dataReqs.data_sources?.length>0&&(
+                            <div style={{marginBottom:8}}>
+                              <div style={{...S.label,marginBottom:4}}>Required Data Sources</div>
+                              <div style={{fontSize:11,color:THEME.textMid,lineHeight:1.6}}>{dataReqs.data_sources.join(" · ")}</div>
+                            </div>
+                          )}
+                          {dataReqs.ta_recommendations?.length>0&&(
+                            <div style={{marginBottom:8}}>
+                              <div style={{...S.label,marginBottom:4}}>Recommended Splunk TAs</div>
+                              <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                                {dataReqs.ta_recommendations.map((t,i)=><span key={i} style={{...S.badge(THEME.purple),fontSize:9}}>{t}</span>)}
+                              </div>
+                            </div>
+                          )}
+                          {dataReqs.required_fields?.length>0&&(
+                            <div style={{marginBottom:8}}>
+                              <div style={{...S.label,marginBottom:4}}>Required Fields</div>
+                              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:3}}>
+                                {dataReqs.required_fields.slice(0,8).map((f,i)=>(
+                                  <div key={i} style={{fontSize:10,color:THEME.textMid,background:"rgba(255,255,255,0.03)",borderRadius:4,padding:"3px 6px"}}>
+                                    <span style={{color:THEME.text,fontFamily:"monospace"}}>{f.field}</span>
+                                    {f.cim_mapping&&<span style={{color:THEME.accent}}> → {f.cim_mapping}</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {dataReqs.normalization_steps?.length>0&&(
+                            <details style={{marginTop:4}}>
+                              <summary style={{fontSize:11,color:THEME.textDim,cursor:"pointer",padding:"2px 0"}}>Normalization Steps</summary>
+                              <ol style={{margin:"6px 0 0 16px",padding:0,fontSize:11,color:THEME.textMid,lineHeight:1.8}}>
+                                {dataReqs.normalization_steps.map((s,i)=><li key={i}>{s}</li>)}
+                              </ol>
+                            </details>
+                          )}
+                          {dataReqs.notes&&<div style={{fontSize:11,color:"#f5a023",marginTop:6,lineHeight:1.5}}>{dataReqs.notes}</div>}
+                        </div>
+                      )}
+                      {dataReqs?.error&&<div style={{fontSize:11,color:THEME.danger}}>{dataReqs.error}</div>}
+                    </div>
+                  );
+                })()}
                 <label style={S.label}>Splunk URL</label>
                 <input style={{...S.input,marginBottom:10}} value={splunkUrl} onChange={e=>setSplunkUrl(e.target.value)} placeholder="https://your-splunk:8089"/>
-                <label style={S.label}>API Token (Bearer)</label>
-                <input style={{...S.input,marginBottom:14,fontFamily:"monospace"}} type="password" value={splunkToken} onChange={e=>setSplunkToken(e.target.value)} placeholder="Splunk HEC or management token"/>
-                <button style={{...S.btn("p"),width:"100%",padding:"10px"}} onClick={()=>pushToSplunk(pushModal.det)} disabled={pushing}>{pushing?<><Spinner/>Pushing to Splunk...</>:"Push to Splunk"}</button>
+                {/* Auth mode toggle */}
+                <div style={{display:"flex",gap:6,marginBottom:10}}>
+                  {["token","basic"].map(m=>(
+                    <button key={m} style={{...S.btn(splunkAuthMode===m?"p":""),padding:"4px 12px",fontSize:11}} onClick={()=>{setSplunkAuthMode(m);LS.set("splunk_auth_mode",m);}}>
+                      {m==="token"?"API Token":"Username / Password"}
+                    </button>
+                  ))}
+                </div>
+                {splunkAuthMode==="token"?(
+                  <>
+                    <label style={S.label}>API Token (Bearer)</label>
+                    <input style={{...S.input,marginBottom:12,fontFamily:"monospace"}} type="password" value={splunkToken} onChange={e=>{setSplunkToken(e.target.value);LS.set("splunk_token",e.target.value);}} placeholder="Token from Settings → Tokens"/>
+                  </>
+                ):(
+                  <>
+                    <label style={S.label}>Username</label>
+                    <input style={{...S.input,marginBottom:8}} value={splunkUser} onChange={e=>{setSplunkUser(e.target.value);LS.set("splunk_user",e.target.value);}} placeholder="admin"/>
+                    <label style={S.label}>Password</label>
+                    <input style={{...S.input,marginBottom:12,fontFamily:"monospace"}} type="password" value={splunkPass} onChange={e=>{setSplunkPass(e.target.value);LS.set("splunk_pass",e.target.value);}} placeholder="Splunk password"/>
+                  </>
+                )}
+                {splunkUrl&&isOnPremUrl(splunkUrl)&&(
+                  <div style={{fontSize:11,color:"#f5a023",background:"rgba(245,160,35,0.06)",border:"1px solid rgba(245,160,35,0.2)",borderRadius:6,padding:"7px 10px",marginBottom:12,lineHeight:1.6}}>
+                    On-prem URL detected — direct push may fail due to browser network restrictions. Use cURL below if the button fails.
+                  </div>
+                )}
+                <button style={{...S.btn("p"),width:"100%",padding:"10px",marginBottom:8}} onClick={()=>pushToSplunk(pushModal.det)} disabled={pushing}>{pushing?<><Spinner/>Pushing to Splunk...</>:"Push to Splunk"}</button>
+                {(()=>{
+                  const det=pushModal.det;
+                  const sev=det?.severity==="critical"?"1":det?.severity==="high"?"2":det?.severity==="medium"?"3":"4";
+                  const q=(det?.query||"").replace(/\\/g,"\\\\").replace(/"/g,'\\"');
+                  const desc=(det?.threat||det?.description||"").replace(/\\/g,"\\\\").replace(/"/g,'\\"');
+                  const authFlag=splunkAuthMode==="basic"
+                    ?`-u "${splunkUser||"admin"}:${splunkPass||"<PASSWORD>"}"`
+                    :`-H "Authorization: Bearer ${splunkToken||"<YOUR_TOKEN>"}"`;
+                  const cmd=`curl -k -X POST "${(splunkUrl||"https://splunk:8089").replace(/\/$/,"")}/services/saved/searches" \\\n  ${authFlag} \\\n  -H "Content-Type: application/x-www-form-urlencoded" \\\n  --data-urlencode "name=${det?.name||"detection"}" \\\n  --data-urlencode "search=${q}" \\\n  --data-urlencode "description=${desc}" \\\n  --data-urlencode "dispatch.earliest_time=-24h@h" \\\n  --data-urlencode "dispatch.latest_time=now" \\\n  --data-urlencode "is_scheduled=1" \\\n  --data-urlencode "cron_schedule=*/15 * * * *" \\\n  --data-urlencode "alert_type=number of events" \\\n  --data-urlencode "alert_comparator=greater than" \\\n  --data-urlencode "alert_threshold=0" \\\n  --data-urlencode "alert.severity=${sev}"`;
+                  return(
+                    <details style={{marginTop:4}}>
+                      <summary style={{fontSize:11,color:THEME.textDim,cursor:"pointer",userSelect:"none",padding:"4px 0"}}>cURL alternative (on-prem / manual)</summary>
+                      <pre style={{background:"#0a0d14",border:"1px solid "+THEME.border,borderRadius:8,padding:"10px",fontSize:10,color:THEME.textMid,overflowX:"auto",overflowY:"auto",maxHeight:160,lineHeight:1.7,whiteSpace:"pre-wrap",wordBreak:"break-all",margin:"8px 0"}}>{cmd}</pre>
+                      <button style={{...S.btn(),width:"100%",padding:"8px",fontSize:11}} onClick={()=>{navigator.clipboard.writeText(cmd);setPushResult("success:cURL command copied — paste it in your terminal.");}}>Copy cURL</button>
+                    </details>
+                  );
+                })()}
               </div>
             )}
 
             {/* Elastic config */}
             {pushModal.tab==="elastic"&&(
               <div>
-                <div style={{fontSize:12,color:THEME.textMid,marginBottom:14,lineHeight:1.6}}>Creates a detection rule in Elastic Security via Kibana API. Rule is created as disabled for review.</div>
+                <div style={{fontSize:12,color:THEME.textMid,marginBottom:10,lineHeight:1.6}}>Creates a detection rule in Elastic Security via Kibana API. Rule is created as disabled for review.</div>
+
+                {/* Elastic Data Requirements */}
+                {(()=>{
+                  const det=pushModal.det;
+                  const dr=dataReqs;
+                  return(
+                    <div style={{background:"rgba(244,189,25,0.04)",border:"1px solid rgba(244,189,25,0.15)",borderRadius:8,padding:"12px 14px",marginBottom:14}}>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                        <div style={{fontSize:11,fontWeight:700,color:"#f4bd19",letterSpacing:"0.08em"}}>DATA REQUIREMENTS</div>
+                        <button style={{...S.btn(),padding:"3px 10px",fontSize:10,borderColor:"#f4bd1944",color:"#f4bd19"}} onClick={()=>analyzeDataRequirements(det,"elastic")} disabled={loadingDataReqs}>
+                          {loadingDataReqs?<><Spinner/>Analyzing...</>:"AI Analyze"}
+                        </button>
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:dr?8:0}}>
+                        <div>
+                          <div style={{...S.label,marginBottom:4}}>Index Patterns</div>
+                          <input style={{...S.input,fontSize:11}} value={indexOverride} onChange={e=>setIndexOverride(e.target.value)} placeholder="logs-endpoint.events.*, winlogbeat-*"/>
+                        </div>
+                        <div>
+                          <div style={{...S.label,marginBottom:4}}>Data Streams</div>
+                          <input style={{...S.input,fontSize:11}} value={sourcetypeOverride} onChange={e=>setSourcetypeOverride(e.target.value)} placeholder="logs-endpoint.events.process-*"/>
+                        </div>
+                      </div>
+                      {dr&&!dr.error&&(
+                        <div style={{borderTop:"1px solid rgba(244,189,25,0.1)",paddingTop:10,marginTop:4}}>
+                          {dr.ecs_categories?.length>0&&<div style={{marginBottom:8}}><div style={{...S.label,marginBottom:4}}>ECS Event Categories</div><div style={{display:"flex",flexWrap:"wrap",gap:4}}>{dr.ecs_categories.map((c,i)=><span key={i} style={{...S.badge("#f4bd19"),fontSize:9}}>{c}</span>)}</div></div>}
+                          {dr.integrations?.length>0&&<div style={{marginBottom:8}}><div style={{...S.label,marginBottom:4}}>Elastic Agent Integrations</div><div style={{display:"flex",flexWrap:"wrap",gap:4}}>{dr.integrations.map((t,i)=><span key={i} style={{...S.badge(THEME.purple),fontSize:9}}>{t}</span>)}</div></div>}
+                          {dr.beats?.length>0&&<div style={{marginBottom:8}}><div style={{...S.label,marginBottom:4}}>Beats Modules</div><div style={{display:"flex",flexWrap:"wrap",gap:4}}>{dr.beats.map((b,i)=><span key={i} style={{...S.badge(THEME.success),fontSize:9}}>{b}</span>)}</div></div>}
+                          {dr.required_fields?.length>0&&<div style={{marginBottom:8}}><div style={{...S.label,marginBottom:4}}>Required Fields (ECS)</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:3}}>{dr.required_fields.slice(0,8).map((f,i)=><div key={i} style={{fontSize:10,color:THEME.textMid,background:"rgba(255,255,255,0.03)",borderRadius:4,padding:"3px 6px"}}><span style={{color:THEME.text,fontFamily:"monospace"}}>{f.field}</span>{f.ecs_mapping&&<span style={{color:"#f4bd19"}}> → {f.ecs_mapping}</span>}</div>)}</div></div>}
+                          {dr.data_sources?.length>0&&<div style={{marginBottom:8}}><div style={{...S.label,marginBottom:4}}>Data Sources</div><div style={{fontSize:11,color:THEME.textMid,lineHeight:1.6}}>{dr.data_sources.join(" · ")}</div></div>}
+                          {dr.normalization_steps?.length>0&&<details style={{marginTop:4}}><summary style={{fontSize:11,color:THEME.textDim,cursor:"pointer",padding:"2px 0"}}>Normalization Steps</summary><ol style={{margin:"6px 0 0 16px",padding:0,fontSize:11,color:THEME.textMid,lineHeight:1.8}}>{dr.normalization_steps.map((s,i)=><li key={i}>{s}</li>)}</ol></details>}
+                          {dr.notes&&<div style={{fontSize:11,color:"#f5a023",marginTop:6,lineHeight:1.5}}>{dr.notes}</div>}
+                        </div>
+                      )}
+                      {dr?.error&&<div style={{fontSize:11,color:THEME.danger}}>{dr.error}</div>}
+                    </div>
+                  );
+                })()}
+
                 <label style={S.label}>Kibana URL</label>
                 <input style={{...S.input,marginBottom:10}} value={elasticUrl} onChange={e=>setElasticUrl(e.target.value)} placeholder="https://your-kibana:5601"/>
                 <label style={S.label}>API Key (base64 id:key)</label>
-                <input style={{...S.input,marginBottom:14,fontFamily:"monospace"}} type="password" value={elasticToken} onChange={e=>setElasticToken(e.target.value)} placeholder="Elastic API key"/>
-                <button style={{...S.btn("p"),width:"100%",padding:"10px"}} onClick={()=>pushToElastic(pushModal.det)} disabled={pushing}>{pushing?<><Spinner/>Pushing to Elastic...</>:"Push to Elastic"}</button>
+                <input style={{...S.input,marginBottom:12,fontFamily:"monospace"}} type="password" value={elasticToken} onChange={e=>setElasticToken(e.target.value)} placeholder="Elastic API key"/>
+                {elasticUrl&&isOnPremUrl(elasticUrl)&&(
+                  <div style={{fontSize:11,color:"#f5a023",background:"rgba(245,160,35,0.06)",border:"1px solid rgba(245,160,35,0.2)",borderRadius:6,padding:"7px 10px",marginBottom:12,lineHeight:1.6}}>
+                    On-prem URL detected — direct push may fail due to browser network restrictions. Use cURL below if the button fails.
+                  </div>
+                )}
+                <button style={{...S.btn("p"),width:"100%",padding:"10px",marginBottom:8}} onClick={()=>pushToElastic(pushModal.det)} disabled={pushing}>{pushing?<><Spinner/>Pushing to Elastic...</>:"Push to Elastic"}</button>
+                {(()=>{
+                  const det=pushModal.det;
+                  const sev=det?.severity==="critical"?"critical":det?.severity==="high"?"high":det?.severity==="medium"?"medium":"low";
+                  const langMap={kql:"kuery",eql:"eql",esql:"esql"};
+                  const lang=langMap[det?.queryType?.toLowerCase()]||"kuery";
+                  const idxPatterns=indexOverride?indexOverride.split(",").map(s=>s.trim()).filter(Boolean):["logs-*","*"];
+                  const rule=JSON.stringify({name:det?.name,description:det?.threat||det?.description||det?.name,risk_score:sev==="critical"?99:sev==="high"?73:sev==="medium"?47:21,severity:sev,type:"query",query:det?.query||"",language:lang,index:idxPatterns,enabled:false},null,2);
+                  const safeRule=rule.replace(/'/g,"'\\''");
+                  const cmd=`curl -k -X POST "${(elasticUrl||"https://kibana:5601").replace(/\/$/,"")}/api/detection_engine/rules" \\\n  -H "Authorization: ApiKey ${elasticToken||"<YOUR_API_KEY>"}" \\\n  -H "Content-Type: application/json" \\\n  -H "kbn-xsrf: detectiq" \\\n  -d '${safeRule}'`;
+                  return(
+                    <details style={{marginTop:4}}>
+                      <summary style={{fontSize:11,color:THEME.textDim,cursor:"pointer",userSelect:"none",padding:"4px 0"}}>cURL alternative (on-prem / manual)</summary>
+                      <pre style={{background:"#0a0d14",border:"1px solid "+THEME.border,borderRadius:8,padding:"10px",fontSize:10,color:THEME.textMid,overflowX:"auto",overflowY:"auto",maxHeight:160,lineHeight:1.7,whiteSpace:"pre-wrap",wordBreak:"break-all",margin:"8px 0"}}>{cmd}</pre>
+                      <button style={{...S.btn(),width:"100%",padding:"8px",fontSize:11}} onClick={()=>{navigator.clipboard.writeText(cmd);setPushResult("success:cURL command copied — paste it in your terminal.");}}>Copy cURL</button>
+                    </details>
+                  );
+                })()}
               </div>
             )}
 
             {/* SOAR config */}
             {pushModal.tab==="soar"&&(
               <div>
-                <div style={{fontSize:12,color:THEME.textMid,marginBottom:14,lineHeight:1.6}}>Sends a structured JSON payload to any SOAR webhook — Splunk SOAR, Palo Alto XSOAR, Tines, n8n, Make, or any HTTP trigger.</div>
+                <div style={{fontSize:12,color:THEME.textMid,marginBottom:10,lineHeight:1.6}}>Sends a structured JSON payload to any SOAR webhook — Splunk SOAR, Palo Alto XSOAR, Tines, n8n, Make, or any HTTP trigger.</div>
+
+                {/* SOAR Data Requirements */}
+                {(()=>{
+                  const det=pushModal.det;
+                  const dr=dataReqs;
+                  return(
+                    <div style={{background:"rgba(0,232,122,0.04)",border:"1px solid rgba(0,232,122,0.15)",borderRadius:8,padding:"12px 14px",marginBottom:14}}>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                        <div style={{fontSize:11,fontWeight:700,color:THEME.success,letterSpacing:"0.08em"}}>PLAYBOOK REQUIREMENTS</div>
+                        <button style={{...S.btn(),padding:"3px 10px",fontSize:10,borderColor:THEME.success+"44",color:THEME.success}} onClick={()=>analyzeDataRequirements(det,"soar")} disabled={loadingDataReqs}>
+                          {loadingDataReqs?<><Spinner/>Analyzing...</>:"AI Analyze"}
+                        </button>
+                      </div>
+                      {!dr&&<div style={{fontSize:11,color:THEME.textDim}}>Click AI Analyze to get recommended playbook actions, triage checklist, and false positive filters for this detection.</div>}
+                      {dr&&!dr.error&&(
+                        <div>
+                          {dr.recommended_playbook_actions?.length>0&&<div style={{marginBottom:8}}><div style={{...S.label,marginBottom:4}}>Recommended Playbook Actions</div><ol style={{margin:"4px 0 0 16px",padding:0,fontSize:11,color:THEME.textMid,lineHeight:1.8}}>{dr.recommended_playbook_actions.map((a,i)=><li key={i}>{a}</li>)}</ol></div>}
+                          {dr.triage_checklist?.length>0&&<div style={{marginBottom:8}}><div style={{...S.label,marginBottom:4}}>Triage Checklist</div><ol style={{margin:"4px 0 0 16px",padding:0,fontSize:11,color:THEME.textMid,lineHeight:1.8}}>{dr.triage_checklist.map((c,i)=><li key={i}>{c}</li>)}</ol></div>}
+                          {dr.escalation_criteria?.length>0&&<div style={{marginBottom:8}}><div style={{...S.label,marginBottom:4}}>Escalation Criteria</div><div style={{display:"flex",flexWrap:"wrap",gap:4}}>{dr.escalation_criteria.map((e,i)=><span key={i} style={{...S.badge(THEME.danger),fontSize:9}}>{e}</span>)}</div></div>}
+                          {dr.false_positive_filters?.length>0&&<div style={{marginBottom:8}}><div style={{...S.label,marginBottom:4}}>False Positive Filters</div><div style={{fontSize:11,color:THEME.textMid,lineHeight:1.6}}>{dr.false_positive_filters.map((f,i)=><div key={i}>• {f}</div>)}</div></div>}
+                          {dr.required_fields?.length>0&&<details><summary style={{fontSize:11,color:THEME.textDim,cursor:"pointer",padding:"2px 0"}}>Required Payload Fields</summary><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:3,marginTop:6}}>{dr.required_fields.slice(0,10).map((f,i)=><div key={i} style={{fontSize:10,color:THEME.textMid,background:"rgba(255,255,255,0.03)",borderRadius:4,padding:"3px 6px"}}><span style={{color:THEME.text,fontFamily:"monospace"}}>{f.field}</span>{f.example&&<span style={{color:THEME.textDim}}> ({f.example})</span>}</div>)}</div></details>}
+                          {dr.notes&&<div style={{fontSize:11,color:"#f5a023",marginTop:6,lineHeight:1.5}}>{dr.notes}</div>}
+                        </div>
+                      )}
+                      {dr?.error&&<div style={{fontSize:11,color:THEME.danger}}>{dr.error}</div>}
+                    </div>
+                  );
+                })()}
+
                 <label style={S.label}>Webhook URL</label>
                 <input style={{...S.input,marginBottom:10}} value={soarUrl} onChange={e=>setSoarUrl(e.target.value)} placeholder="https://your-soar/webhook/..."/>
                 <label style={S.label}>Bearer Token (optional)</label>
