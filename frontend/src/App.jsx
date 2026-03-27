@@ -332,7 +332,7 @@ function OnboardingModal({ user, onComplete }) {
   const GOALS = [
     {id:"build",icon:"🔨",title:"Build Detections",desc:"Create production-ready detection rules using the ADS framework",tab:"builder",color:THEME.accent},
     {id:"hunt",icon:"🎯",title:"Hunt Threats",desc:"Investigate alerts, triage events, and track threat actors",tab:"triage",color:THEME.danger},
-    {id:"simulate",icon:"⚡",title:"Simulate Attacks",desc:"Generate realistic attack logs to test your detection coverage",tab:"simulator",color:THEME.purple},
+    {id:"simulate",icon:"⚡",title:"Simulate Attacks",desc:"Generate adversary campaigns and map them against your existing detection coverage",tab:"adversary",color:THEME.purple},
   ];
   function complete() {
     LS.set("onboarding_done", true);
@@ -7516,11 +7516,12 @@ const DOCS = [
   },
   {
     id:"adversary", section:"Analyze", icon:"🤖", title:"Adversary SIEM",
-    summary:"Simulate adversary behavior and map it against your existing detections.",
+    summary:"Generate adversary campaigns and map each step against your existing detections.",
     content:[
-      {h:"Overview", p:"The Adversary SIEM generates realistic attack scenarios — including actual attacker commands, payloads, and techniques — and shows which of your existing detections would catch each step."},
-      {h:"How to use", p:"Select an attack scenario or describe a threat actor/campaign. The simulator generates a full attack chain with commands, then maps each step to your saved detections. Gaps are highlighted."},
-      {h:"Coverage report", p:"The output shows which attack steps are covered, which are blind spots, and what detections you need to build to close the gaps. Use the 'Build Detection' button on any gap to jump straight to the builder."},
+      {h:"Overview", p:"The Adversary SIEM generates realistic multi-stage attack campaigns — including actual attacker commands, TTPs, and lateral movement paths — and cross-references each step against your saved detections to show where you have coverage and where you have blind spots."},
+      {h:"How to use", p:"Select a pre-built attack scenario (e.g. ransomware, APT lateral movement, credential theft) or describe a custom threat actor campaign. The AI generates a full kill-chain sequence with real attacker commands, then maps each step to your saved detections."},
+      {h:"Coverage report", p:"Each attack step shows: Covered (you have a detection), Partial (detection exists but may miss this variant), or Blind Spot (no detection). Use the 'Build Detection' button on any blind spot to jump to the builder with the gap pre-filled as context."},
+      {h:"Campaign Builder", p:"Choose Red Team mode to generate a full attack campaign with real commands and payloads, or Blue Team mode to generate detection-focused documentation. Export a professional campaign debrief report from either mode."},
     ]
   },
   {
@@ -7726,7 +7727,7 @@ function DocsPage({ onNav }) {
                   ))}
                   <div style={{marginTop:20, paddingTop:16, borderTop:"1px solid "+THEME.border, display:"flex", gap:8, flexWrap:"wrap"}}>
                     {doc.id !== "getting-started" && (
-                      <button style={{...S.btn("p"), padding:"8px 18px", fontSize:12}} onClick={() => onNav(doc.id === "settings" || doc.id === "team" ? doc.id : doc.id)}>Open {doc.title} →</button>
+                      <button style={{...S.btn("p"), padding:"8px 18px", fontSize:12}} onClick={() => { const TAB_MAP={"getting-started":"home","atomic":"usecases","heatmap":"heatmap","metrics":"metrics","community":"community"}; onNav(TAB_MAP[doc.id]||doc.id); }}>Open {doc.title} →</button>
                     )}
                     <button style={{...S.btn(), padding:"8px 18px", fontSize:12}} onClick={() => setActiveDoc(null)}>← Back to Docs</button>
                   </div>
@@ -7829,7 +7830,7 @@ function DetectIQLogo({size="sm",onClick,theme="dark"}){
       {size!=="icon"&&(
         <span style={{lineHeight:1}}>
           <span style={{display:"block",fontSize:wordSz,fontWeight:800,letterSpacing:"-0.025em",lineHeight:1}}><span style={{color:"#e8f4ff"}}>Detect</span><span style={{color:"#00d4ff"}}>IQ</span></span>
-          {size==="sm"&&<span style={{display:"block",fontSize:Math.round(sz*0.5),color:dim,fontWeight:400,letterSpacing:"0.02em",marginTop:1}}>v5.4</span>}
+          {size==="sm"&&<span style={{display:"block",fontSize:Math.round(sz*0.5),color:dim,fontWeight:400,letterSpacing:"0.02em",marginTop:1}}>v5.5</span>}
         </span>
       )}
     </span>
@@ -8074,21 +8075,21 @@ function AppInner(){
 
   if(!user&&!demoMode){
   const FEATURES=[
-    {title:"ADS Builder",desc:"AI-powered detection with full Attack Detection Strategy output — query, behaviors, false positives, tuning guide."},
-    {title:"Attack Simulator",desc:"Realistic log simulation across 10 SIEM platforms. Send events directly to Triage for instant analysis."},
-    {title:"Campaign Builder",desc:"Full kill-chain campaigns with Red Team commands or Blue Team detection focus. Generate professional reports."},
-    {title:"Threat Intel",desc:"Live CISA KEV feed + AI APT profiles. One-click to build detections or simulate attacks from any threat."},
-    {title:"Use Case Repository",desc:"216+ MITRE ATT&CK rules with attack story walkthroughs, tuning guides, and false positive guidance."},
-    {title:"Detection Library",desc:"Push to Splunk, Elastic, SOAR via webhook. AI enrichment shows attack paths and adjacent coverage gaps."},
-    {title:"Query Translator",desc:"Translate detection queries between 10 platforms — Splunk SPL, Sentinel KQL, CrowdStrike CQL, Elastic EQL."},
-    {title:"ATT&CK Heatmap",desc:"Visual MITRE coverage map showing tactic and technique coverage. AI gap analysis highlights your priorities."},
-    {title:"Alert Triage",desc:"AI verdict engine for security alerts. Paste any raw log and get TRUE/FALSE positive with confidence score."},
+    {title:"AI Detection Builder",desc:"Generate production-ready rules in SPL, KQL, EQL, and more from a plain-English threat description. Full ADS framework output — query, false positives, blind spots, and tuning guide."},
+    {title:"Detection Chain Builder",desc:"Chain two detections into a single multi-stage correlation rule. Fires only when both events occur on the same host within your time window — dramatically reducing false positives."},
+    {title:"Log Replay",desc:"Dry-run your detection against real log lines before deploying. AI evaluates each line, explains matches, and suggests query tuning — no SIEM access needed."},
+    {title:"Blast Radius & FP Estimator",desc:"Know your alert volume before you deploy. Estimates daily alerts across 4 org sizes, then predicts the top false-positive scenarios with ready-to-paste exclusion logic."},
+    {title:"Threat Intel + Autopilot",desc:"Live CISA KEV feed, CVE tracking, and AI APT profiles. Autopilot auto-drafts detections for new vulnerabilities — one-click review and save to library."},
+    {title:"Detection Library",desc:"Every saved detection with version history, staleness badges, quality scoring, Sigma export, and one-click push to Splunk, Elastic, Sentinel, or SOAR."},
+    {title:"Query Translator",desc:"Translate detection queries between 10 platforms — Splunk SPL, Sentinel KQL, CrowdStrike CQL, Elastic EQL, Chronicle YARA-L, QRadar AQL, and more."},
+    {title:"Defend — Honeytokens & Sinkhole",desc:"Generate honeytoken configs (fake AD accounts, canary files, AWS keys) and DNS sinkhole rules (Pi-hole, BIND9, Windows DNS). Any trap trigger is a 100%-confidence alert."},
+    {title:"ATT&CK Coverage Dashboard",desc:"Real-time MITRE coverage score, tactic-by-tactic progress bars, gap analysis with actionable recommendations, and full interactive heatmap."},
   ];
   const ROLES=[
-    {role:"SOC Analysts",desc:"Triage alerts faster. AI verdicts on any raw log or SIEM alert with confidence scores and recommended actions.",color:"#00d4ff"},
-    {role:"Detection Engineers",desc:"Generate, translate, score and push rules across your entire SIEM stack. ADS framework ensures every rule is production-ready.",color:"#00d4ff"},
-    {role:"Threat Hunters",desc:"Build hunt plans from CISA KEV or APT intel. Chain detections across the full kill chain with one click.",color:"#00d4ff"},
-    {role:"Red Teamers",desc:"Simulate campaigns with real attacker commands and log artifacts. Export professional campaign debrief reports.",color:"#00d4ff"},
+    {role:"SOC Analysts",desc:"Triage alerts faster with AI verdicts on any raw log or SIEM alert. Get confidence scores, attack classification, and recommended containment actions instantly.",color:"#00d4ff"},
+    {role:"Detection Engineers",desc:"Build, score, translate, and deploy rules across your SIEM stack. Dry-run with Log Replay, estimate blast radius, predict false positives — before a single alert fires.",color:"#00d4ff"},
+    {role:"Threat Hunters",desc:"Build hunt hypotheses from live CISA KEV and APT intel. Chain detections across the kill chain, then replay logs to validate coverage before committing to production.",color:"#00d4ff"},
+    {role:"Security Architects",desc:"Track MITRE ATT&CK coverage across all 14 tactics. Identify gaps, measure detection maturity, and plan coverage roadmaps with data-driven gap analysis.",color:"#00d4ff"},
   ];
   return(
     <>
@@ -8136,7 +8137,7 @@ function AppInner(){
             Build detection coverage<br/><span style={{color:"#00d4ff"}}>that holds.</span>
           </h1>
           <p style={{fontSize:15,color:"#4a5e72",lineHeight:1.75,marginBottom:36,maxWidth:480,fontFamily:"'Inter',system-ui,sans-serif"}}>
-            The complete detection engineering workbench. Build AI-powered detections with the ADS framework, translate across 10 SIEMs, simulate real attacks, triage alerts instantly, and track your full MITRE ATT&CK coverage — all in one place.
+            The complete detection engineering workbench. Build AI-powered detections with the ADS framework, translate across 10 SIEMs, dry-run with Log Replay, triage alerts instantly, and track your full MITRE ATT&CK coverage — all in one place.
           </p>
           <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:48}}>
             <button className="lp-btn-primary" onClick={()=>setShowLogin(true)}>Get Started Free</button>
@@ -8144,7 +8145,7 @@ function AppInner(){
           </div>
           {/* Stats row */}
           <div style={{display:"flex",alignItems:"center",gap:0}}>
-            {[["10","SIEM Platforms"],["216+","Use Cases"],["14","MITRE Tactics"],["ADS","Framework"]].map(([n,l],i,arr)=>(
+            {[["10","SIEM Platforms"],["14","MITRE Tactics"],["7+","AI Tools"],["ADS","Framework"]].map(([n,l],i,arr)=>(
               <div key={l} style={{display:"flex",alignItems:"center"}}>
                 <div style={{paddingRight:28,paddingLeft:i===0?0:28,borderLeft:i===0?"none":"1px solid #1a2536"}}>
                   <div style={{fontSize:28,fontWeight:800,color:"#00d4ff",lineHeight:1,letterSpacing:"-0.03em",fontFamily:"'Inter',system-ui,sans-serif"}}>{n}</div>
@@ -8276,7 +8277,7 @@ function AppInner(){
         setShowOnboarding(false);
         if(goal==="build")setTab("builder");
         else if(goal==="hunt")setTab("triage");
-        else if(goal==="simulate")setTab("simulator");
+        else if(goal==="simulate")setTab("adversary");
       }}/>}
     </>
   );}
