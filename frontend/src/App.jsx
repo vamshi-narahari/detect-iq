@@ -3012,6 +3012,12 @@ function QueryTranslator({prefill}){
   return(
     <div>
       <SectionHeader icon="🔄" title="Query Translator" color={THEME.purple}><span style={S.badge(THEME.purple)}>10 Platforms</span></SectionHeader>
+      <HelpBox title="Query Translator Quick Reference" color={THEME.purple} items={[
+        {icon:"🔄",title:"What it does",desc:"Converts detection queries between SIEM and EDR platforms — Splunk SPL, Sentinel KQL, Elastic EQL, CrowdStrike CQL, Chronicle YARA-L, QRadar AQL, and more. AI handles field name mapping and syntax differences."},
+        {icon:"📋",title:"How to use it",desc:"Select your source platform, paste the query, select the target platform, and click Translate. The output is ready to copy into your target SIEM."},
+        {icon:"⚠️",title:"Field mismatches",desc:"Some fields don't exist on every platform (e.g. 'process_name' in Splunk vs 'ProcessName' in Sentinel). The translator flags these so you can review and adjust before deploying."},
+        {icon:"💡",title:"Tip",desc:"For best results, translate one logical query at a time. Complex multi-search or sub-search queries may need manual review after translation."},
+      ]}/>
       <div style={S.card}>
         <div style={{display:"flex",gap:12,alignItems:"flex-end",marginBottom:18,flexWrap:"wrap"}}>
           <div style={{flex:1,minWidth:160}}><label style={S.label}>From</label><select style={S.input} value={fromTool.id} onChange={e=>setFromTool(TOOLS.find(t=>t.id===e.target.value))}>{TOOLS.map(t=><option key={t.id} value={t.id}>{t.name} ({t.lang})</option>)}</select></div>
@@ -3074,6 +3080,12 @@ function DetectionExplainer({prefill}){
   return(
     <div>
       <SectionHeader icon="🔍" title="Detection Explainer" color={THEME.warning}><span style={S.badge(THEME.warning)}>AI Analysis</span></SectionHeader>
+      <HelpBox title="Detection Explainer Quick Reference" color={THEME.warning} items={[
+        {icon:"🔍",title:"What it does",desc:"Paste any detection query and AI breaks it down line by line — explaining what each field, function, and condition does in plain English. Great for onboarding new analysts or reviewing inherited rules."},
+        {icon:"🏅",title:"Quality Score",desc:"After explaining the query, AI rates it 1–10 on specificity, coverage, FP risk, and data source quality. A score below 5 usually means the rule needs tuning."},
+        {icon:"🛠",title:"Improvement suggestions",desc:"AI identifies weaknesses (e.g. missing field filters, over-broad wildcards) and suggests specific improvements you can copy back into the Builder."},
+        {icon:"💡",title:"Tip",desc:"Use this on inherited or legacy rules from other teams to quickly understand what they cover — and whether they're still relevant."},
+      ]}/>
       <div style={S.card}>
         <div style={{marginBottom:16}}><label style={S.label}>Platform</label><div style={{display:"flex",flexWrap:"wrap",gap:8}}>{TOOLS.map(t=><div key={t.id} onClick={()=>setTool(t)} style={{padding:"6px 12px",borderRadius:7,border:"1px solid "+(tool.id===t.id?t.color+"88":THEME.border),background:tool.id===t.id?t.color+"12":"transparent",cursor:"pointer",fontSize:12,fontWeight:700,color:tool.id===t.id?t.color:THEME.textDim,transition:"all 0.15s"}}>{t.name}</div>)}</div></div>
         <label style={S.label}>Query to Explain</label>
@@ -3666,6 +3678,14 @@ Keep each section to 2-3 bullets, one line each:
           <span style={{...S.badge(THEME.purple),fontSize:9}}>BETA</span>
         </div>
       </SectionHeader>
+      <HelpBox title="Detection Library Quick Reference" color={THEME.success} items={[
+        {icon:"📦",title:"Your detection store",desc:"Every detection you build is saved here with full version history. Use search and filters to find rules by tactic, severity, SIEM platform, or quality score."},
+        {icon:"🏅",title:"Quality Score",desc:"Each rule has a score from 0–10. Click the score badge to see the full breakdown — what's strong, what's weak, and how to improve it."},
+        {icon:"⏳",title:"Staleness badges",desc:"Rules older than 90 days get a staleness badge. Old rules may reference outdated field names or miss new attacker techniques — review and re-generate periodically."},
+        {icon:"📤",title:"Export & deploy",desc:"Export any rule to Sigma format for platform-agnostic sharing, or push directly to Splunk, Sentinel, Elastic, or CrowdStrike with one click."},
+        {icon:"💡",title:"Bulk actions",desc:"Enable Bulk Mode to select multiple rules and export, delete, or push them all at once."},
+      ]}/>
+
 
       <div style={S.card}>
         <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:10}}>
@@ -4501,6 +4521,12 @@ function AttackHeatmap({detections}){
           <span style={S.badge(THEME.purple)}>{detections.length} rules</span>
         </div>
       </SectionHeader>
+      <HelpBox title="ATT&CK Heatmap Quick Reference" color={THEME.orange} items={[
+        {icon:"🗺",title:"Reading the heatmap",desc:"Each column is a MITRE ATT&CK tactic (Reconnaissance → Impact). Each cell is a technique. Green = you have 3+ rules covering it. Yellow = 1–2 rules. Dark = no coverage."},
+        {icon:"📊",title:"Coverage score",desc:"The maturity % in the header shows what fraction of tactics have 3+ rules (Strong posture). Aim for 70%+ coverage across all 14 tactics."},
+        {icon:"🔍",title:"Gap analysis",desc:"Click 'Run AI Gap Analysis' to get a prioritized list of uncovered techniques with recommendations based on your environment type and industry."},
+        {icon:"💡",title:"Tip",desc:"Click any technique cell to select it, then jump to the Builder to create a detection for that specific technique."},
+      ]}/>
       <div style={S.card}>
         <div style={{overflowX:"auto",marginBottom:14}}>
           <div style={{display:"flex",gap:3,minWidth:980}}>
@@ -4573,6 +4599,12 @@ function AlertTriage({prefillAlert}){
   return(
     <div>
       <SectionHeader icon="🚨" title="Alert Triage" color={THEME.danger}><span style={S.badge(THEME.danger)}>AI Verdict Engine</span></SectionHeader>
+      <HelpBox title="Alert Triage Quick Reference" color={THEME.danger} items={[
+        {icon:"🚨",title:"What it does",desc:"Paste any raw SIEM alert or log line and AI returns a verdict: True Positive, False Positive, or Needs Review — with a confidence score and recommended response action."},
+        {icon:"🔍",title:"How to use it",desc:"Paste the alert JSON or raw log text, select your SIEM platform, and click Triage. AI will classify the alert, explain why, and suggest containment or dismissal steps."},
+        {icon:"📋",title:"Confidence score",desc:"Each verdict comes with a 0–100% confidence score. Low confidence = ambiguous signal that may need manual review or additional log context."},
+        {icon:"💡",title:"Tip",desc:"You can send alerts directly from the Adversary SIEM tab — it pre-fills the triage form with synthetic adversary logs so you can test your detection logic."},
+      ]}/>
       {prefillAlert&&<StatusBar msg="Alert pre-filled from Attack Simulator. Click Triage Alert to analyze." type="success"/>}
       <div style={S.card}>
         <div style={S.grid2}>
@@ -4974,6 +5006,12 @@ function DetectionHealth({detections,onUpdate,onBuildOn,onNav}){
       <SectionHeader icon="❤" title="Detection Health">
         <span style={{fontSize:11,color:THEME.textMid}}>Library quality score · Gap finder · Bulk fix</span>
       </SectionHeader>
+      <HelpBox title="Detection Health Quick Reference" color={THEME.success} items={[
+        {icon:"❤",title:"Library health score",desc:"A composite score (0–100) across your entire detection library based on average quality, staleness, MITRE coverage, and severity distribution. Aim for 70+."},
+        {icon:"⏳",title:"Stale rules",desc:"Rules not updated in 90+ days are flagged. Attackers evolve — old rules may miss new techniques or generate more false positives as environments change."},
+        {icon:"📊",title:"Coverage gaps",desc:"Shows which MITRE tactics have zero or weak coverage so you know where to focus new detection engineering effort."},
+        {icon:"🔧",title:"Bulk fix",desc:"Use the Bulk Fix button to re-score and get AI improvement suggestions for your lowest-scoring rules in one pass."},
+      ]}/>
 
       {detections.length===0?(
         <div style={{...S.card,textAlign:"center",padding:48}}>
@@ -5203,6 +5241,13 @@ Be realistic — only mark as fired if the rule logic genuinely matches the log 
         <span style={{fontSize:11,padding:"3px 10px",borderRadius:5,background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",color:"#f87171",fontWeight:500}}>Red Team Lab</span>
         <span style={{fontSize:12,color:THEME.textDim}}>Generate adversary logs · Test detections · Find gaps</span>
       </SectionHeader>
+      <HelpBox title="Adversary SIEM Quick Reference" color={THEME.danger} items={[
+        {icon:"⚔️",title:"What it does",desc:"Simulates adversary behavior by generating realistic SIEM log events for any ATT&CK technique or threat scenario. Use it to test whether your detections would fire on real attacker activity."},
+        {icon:"📋",title:"How to use it",desc:"Describe an attack scenario (e.g. 'Mimikatz credential dumping on Windows'), select a SIEM platform, and click Generate. AI produces log lines that a real attacker would generate."},
+        {icon:"🔗",title:"Send to Triage",desc:"Click 'Send to Triage' on any generated log set to automatically test it against AI verdict — see if your current detections would catch it."},
+        {icon:"💡",title:"Tip",desc:"Use this before building a detection to understand what the adversary logs actually look like — then reference those fields in your detection query for maximum accuracy."},
+      ]}/>
+
 
       {/* Config Panel */}
       <div style={{...S.card,marginBottom:16}}>
@@ -5425,6 +5470,12 @@ function ThreatIntel({ onBuildDetection, onSimulate, onHunt }){
           {(kevData.length>0||aptFeed.length>0)&&<button style={{...S.btn("p"),padding:"6px 14px",fontSize:11}} onClick={generateHuntPlan} disabled={huntLoading}>{huntLoading?<><Spinner/>Generating...</>:"Generate Hunt Plan"}</button>}
         </div>
       </SectionHeader>
+      <HelpBox title="Threat Intelligence Quick Reference" color={THEME.success} items={[
+        {icon:"🌐",title:"What it does",desc:"Pulls live threat intelligence from CISA KEV (Known Exploited Vulnerabilities), APT feeds, and CVE advisories. Use it to stay current on active threats and build detections before attackers hit you."},
+        {icon:"🔴",title:"CISA KEV",desc:"The Known Exploited Vulnerabilities catalog — CVEs that CISA has confirmed are being actively exploited in the wild. High-priority targets for detection coverage."},
+        {icon:"🎯",title:"Generate Hunt Plan",desc:"Select an APT group or threat context and click 'Generate Hunt Plan' to get a prioritized list of hunt hypotheses, log sources to check, and detection recommendations."},
+        {icon:"💡",title:"Tip",desc:"Click any KEV entry to auto-populate the Detection Builder with the CVE context — AI will generate a detection tailored to that specific vulnerability."},
+      ]}/>
       {huntResult&&<div style={{...S.card,borderColor:THEME.success+"44",marginBottom:16}}><div style={{...S.row,marginBottom:10}}><div style={S.cardTitle}><span>🎯</span> Threat Hunt Plan</div><CopyBtn text={huntResult}/></div><div style={{fontSize:13,color:THEME.textMid,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{huntResult}</div></div>}
       <div style={S.grid2}>
         <div style={S.card}>
@@ -6069,6 +6120,12 @@ function TeamWorkspace({detections, user}){
           <span style={S.badge(THEME.purple)}>{members.filter(m=>m.status==="active").length} active · {members.filter(m=>m.status==="pending").length} pending</span>
         </div>
       </SectionHeader>
+      <HelpBox title="Team Workspace Quick Reference" color={THEME.purple} items={[
+        {icon:"👥",title:"Team roles",desc:"Admins can invite members and manage all detections. Editors can build and edit. Viewers can read and export but not save changes."},
+        {icon:"📨",title:"Inviting members",desc:"Enter an email address and select a role, then click Invite. They'll receive an email with a link to join your team workspace."},
+        {icon:"🔒",title:"Shared library",desc:"All team members share the same Detection Library. Changes are visible to everyone in real time — use the version history to track who changed what."},
+        {icon:"💡",title:"Tip",desc:"Assign the Viewer role to stakeholders or auditors who need read-only access to your detection posture without making changes."},
+      ]}/>
 
       <div style={S.grid2}>
         {/* ── Left column: roster + invite ── */}
@@ -6960,6 +7017,12 @@ function AutopilotTab({ user, detections, onSaveDetection, onNav }) {
           Autopilot watches the CISA KEV feed and automatically drafts detections for new vulnerabilities. Review and approve drafts before they go to your library.
         </div>
       </SectionHeader>
+      <HelpBox title="Detection Autopilot Quick Reference" color={THEME.accent} items={[
+        {icon:"🤖",title:"What it does",desc:"Monitors the CISA Known Exploited Vulnerabilities feed and automatically generates draft detection rules whenever a new CVE is added. You review and approve before anything goes live."},
+        {icon:"✅",title:"Review & approve",desc:"Drafts appear in the queue below. Each one shows the CVE, affected platforms, and the generated rule. Approve to add to your library, or edit before approving."},
+        {icon:"⚙️",title:"Platform targeting",desc:"Set your primary SIEM platform in Settings so Autopilot generates rules in the right query language for your environment."},
+        {icon:"💡",title:"Tip",desc:"Autopilot drafts are a starting point — always review the generated logic before approving, especially for complex CVEs with unusual exploitation patterns."},
+      ]}/>
 
       <div style={{...S.card,borderColor:enabled?THEME.accent+"33":THEME.border}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:16}}>
@@ -7601,6 +7664,12 @@ function DocsPage({ onNav }) {
       <SectionHeader icon="📖" title="Documentation" color={THEME.accent}>
         <span style={S.badge(THEME.accent)}>{DOCS.length} articles</span>
       </SectionHeader>
+      <HelpBox title="Documentation Quick Reference" color={THEME.accent} items={[
+        {icon:"🔍",title:"Search",desc:"Use the search bar to find articles by keyword. Results match article titles, summaries, and body content."},
+        {icon:"🏷",title:"Filter by category",desc:"Click a category tag (Getting Started, Detection, Analysis, etc.) to browse articles by topic."},
+        {icon:"↗️",title:"Open in context",desc:"Each article has an 'Open →' button that navigates directly to the relevant tab in the platform — so you can read and do at the same time."},
+        {icon:"💡",title:"Tip",desc:"If you're new, start with the 'Getting Started' category — it covers the full workflow from building your first detection to pushing it to your SIEM."},
+      ]}/>
 
       {/* Search */}
       <div style={{...S.card, padding:"14px 16px", marginBottom:16, display:"flex", gap:12, alignItems:"center"}}>
