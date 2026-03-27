@@ -511,7 +511,7 @@ function LoginModal({ onClose, onDemo }) {
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,backdropFilter:"blur(6px)"}} onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div style={{background:"linear-gradient(145deg,#0c1220,#080d18)",border:"1px solid "+THEME.borderBright,borderRadius:16,padding:36,width:"100%",maxWidth:420,boxShadow:"0 32px 80px rgba(0,0,0,0.7)"}}>
         <div style={{textAlign:"center",marginBottom:28}}>
-          <div style={{fontSize:26,fontWeight:900,marginBottom:8}}><span style={{color:THEME.accent}}>DETECT</span><span style={{color:THEME.text}}>IQ</span></div>
+          <div style={{display:"flex",justifyContent:"center",marginBottom:12}}><DetectIQLogo size="lg"/></div>
           <div style={{fontSize:13,color:THEME.textMid}}>{mode==="signin"?"Welcome back":"Create your account"}</div>
         </div>
         <div style={{marginBottom:14}}><label style={S.label}>Email</label><input style={S.input} type="email" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleSubmit()} placeholder="you@example.com" autoFocus/></div>
