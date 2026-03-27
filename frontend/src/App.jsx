@@ -6663,45 +6663,6 @@ function DashboardHome({ detections, onNav, user }) {
       {/* ── Onboarding checklist ──────────────────────────────────────────── */}
       <GettingStarted onNav={onNav} detections={detections}/>
 
-      {/* ── MITRE Tactic progress bar ─────────────────────────────────────── */}
-      {total>0&&(
-        <div style={{...S.card,marginBottom:16}}>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-            <div style={S.cardTitle}><span>🗺</span> ATT&amp;CK Coverage</div>
-            <span style={{...S.badge(coveragePct>=70?THEME.success:coveragePct>=40?THEME.warning:THEME.danger)}}>{coveragePct}% covered</span>
-            <span style={{...S.badge(maturityPct>=50?THEME.success:THEME.warning)}}>{maturityPct}% mature (3+ rules)</span>
-            <button style={{...S.btn("p"),padding:"4px 12px",fontSize:11,marginLeft:"auto"}} onClick={()=>onNav("heatmap")}>Full Heatmap →</button>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:6,marginBottom:10}}>
-            {TACTICS_LIST.map(t=>{
-              const cnt=tacticCounts[t]||0;
-              const color=cnt>=3?THEME.success:cnt>=1?THEME.warning:THEME.border;
-              const bg=cnt>=3?"rgba(34,197,94,0.08)":cnt>=1?"rgba(245,158,11,0.08)":"rgba(255,255,255,0.02)";
-              return(
-                <div key={t} title={t+": "+cnt+" rule"+(cnt===1?"":"s")} style={{padding:"8px 6px",background:bg,border:"1px solid "+color,borderRadius:7,textAlign:"center",cursor:"pointer"}} onClick={()=>onNav("heatmap")}>
-                  <div style={{fontSize:18,fontWeight:800,color,lineHeight:1,marginBottom:3}}>{cnt||"·"}</div>
-                  <div style={{fontSize:8,color:THEME.textDim,lineHeight:1.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.split(" ")[0]}</div>
-                </div>
-              );
-            })}
-          </div>
-          {gaps.length>0&&(
-            <div style={{padding:"10px 14px",background:"rgba(239,68,68,0.04)",border:"1px solid rgba(239,68,68,0.15)",borderRadius:8}}>
-              <div style={{fontSize:11,fontWeight:700,color:THEME.danger,marginBottom:6}}>⚠ {gaps.length} uncovered tactic{gaps.length>1?"s":" — "+gaps[0]}: no detections yet</div>
-              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                {gaps.slice(0,6).map(t=>(
-                  <div key={t} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 10px",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:6}}>
-                    <span style={{fontSize:11,color:THEME.textMid}}>{t}</span>
-                    <button style={{fontSize:10,color:THEME.accent,background:"none",border:"none",cursor:"pointer",padding:0,fontFamily:"inherit"}} onClick={()=>onNav("builder")}>+ Build</button>
-                  </div>
-                ))}
-                {gaps.length>6&&<span style={{fontSize:11,color:THEME.textDim,padding:"4px 0"}}>+{gaps.length-6} more</span>}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ── Honeycomb visual ─────────────────────────────────────────────── */}
       {total>0&&<HoneycombGrid detections={detections}/>}
 
