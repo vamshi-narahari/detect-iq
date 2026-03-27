@@ -7746,7 +7746,204 @@ function DocsPage({ onNav }) {
   );
 }
 
+function GettingStartedPage({onNav,detections}){
+  const steps=[
+    {
+      num:1,
+      icon:"🔨",
+      title:"Build Your First Detection",
+      color:"#00d4ff",
+      tab:"builder",
+      summary:"Describe a threat in plain English — DetectIQ writes the detection rule for you.",
+      bullets:[
+        "Type a scenario like \"detect lateral movement via PsExec\" or pick a MITRE tactic",
+        "AI generates a complete Splunk SPL, KQL, or EQL rule with field mappings",
+        "Get an automatic Quality Score (0–10) based on specificity, field coverage, and false-positive risk",
+        "Add enrichments — Threat Intel lookups, GeoIP, WHOIS — with one click",
+        "Save to your Detection Library and push to your SIEM",
+      ],
+      cta:"Open Detection Builder",
+    },
+    {
+      num:2,
+      icon:"📋",
+      title:"Review & Score Your Detections",
+      color:"#00e87a",
+      tab:"library",
+      summary:"Your Detection Library tracks every rule you build with version history and quality scoring.",
+      bullets:[
+        "Each detection gets a score from 0–10 — click it to see why (what's missing, what's strong)",
+        "Staleness badges flag rules older than 90 days that may need updating",
+        "Filter by tactic, severity, SIEM platform, or ADS framework compliance",
+        "Export to Sigma format for platform-agnostic portability",
+        "One-click push to Splunk, Sentinel, Elastic, or CrowdStrike",
+      ],
+      cta:"Open Detection Library",
+    },
+    {
+      num:3,
+      icon:"🔄",
+      title:"Translate Across Platforms",
+      color:"#a855f7",
+      tab:"translator",
+      summary:"Already have rules in Splunk? Convert them to Sentinel KQL or Elastic EQL instantly.",
+      bullets:[
+        "Paste any query — SPL, KQL, EQL, YARA-L, QRadar AQL, and more",
+        "AI translates field names, functions, and syntax to your target platform",
+        "Supports 10 SIEM/EDR platforms including CrowdStrike, Chronicle, and Sumo Logic",
+        "Flags fields that don't exist on the target platform so you can fix them",
+      ],
+      cta:"Open Translator",
+    },
+    {
+      num:4,
+      icon:"🎮",
+      title:"Test Before You Deploy",
+      color:"#f59e0b",
+      tab:"replay",
+      summary:"Dry-run your detection against real log samples before pushing to production.",
+      bullets:[
+        "Pick any saved detection and paste log lines to test against",
+        "AI evaluates which log lines would trigger the rule and which wouldn't",
+        "Catch false positives and tune your rule before it goes live",
+        "Compare two detections side-by-side on the same log set",
+      ],
+      cta:"Open Log Replay",
+    },
+    {
+      num:5,
+      icon:"🗺",
+      title:"Check Your MITRE Coverage",
+      color:"#ff7700",
+      tab:"heatmap",
+      summary:"See which ATT&CK tactics you're covered for and where your gaps are.",
+      bullets:[
+        "The Honeycomb on your Dashboard shows tactic coverage at a glance",
+        "Open the full ATT&CK Heatmap for technique-level detail",
+        "Gap badges show tactics with zero detections — click to build one",
+        "Run AI Gap Analysis to get prioritized recommendations based on your environment",
+        "Target 3+ rules per tactic for a Strong posture (shown in green)",
+      ],
+      cta:"Open ATT&CK Heatmap",
+    },
+    {
+      num:6,
+      icon:"🔗",
+      title:"Chain Multi-Stage Detections",
+      color:"#00d4ff",
+      tab:"chain",
+      summary:"Correlate two detections into a kill-chain rule that fires only when both conditions are met.",
+      bullets:[
+        "Pick two saved detections and define the time window between them",
+        "AI generates a correlation rule in your chosen SIEM format",
+        "Ideal for detecting lateral movement + persistence, or recon + exfiltration",
+        "Reduces alert fatigue by requiring multiple signals before firing",
+      ],
+      cta:"Open Detection Chain",
+    },
+    {
+      num:7,
+      icon:"🛡",
+      title:"Defend with Traps & Sinkholing",
+      color:"#ef4444",
+      tab:"defend",
+      summary:"Deploy honeytokens and DNS sinkholes — any trigger is a 100%-confidence alert.",
+      bullets:[
+        "Generate fake AD accounts, canary files, and AWS honeytokens",
+        "Create DNS sinkhole configs for Pi-hole, BIND9, or Windows DNS Server",
+        "Import any saved detection to auto-generate a matching defence trap",
+        "Honeytoken alerts have near-zero false positives — if it fires, something is wrong",
+      ],
+      cta:"Open Defend",
+    },
+  ];
+
+  const done=detections.length>0;
+
+  return(
+    <div>
+      {/* Hero */}
+      <div style={{...S.card,background:"linear-gradient(135deg,rgba(0,212,255,0.06) 0%,rgba(0,232,122,0.04) 100%)",border:"1px solid rgba(0,212,255,0.18)",marginBottom:24,padding:"28px 32px"}}>
+        <div style={{display:"flex",alignItems:"flex-start",gap:20}}>
+          <div style={{fontSize:40,lineHeight:1}}>🚀</div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:22,fontWeight:800,color:THEME.text,marginBottom:6,letterSpacing:"-0.02em"}}>
+              Welcome to DetectIQ
+            </div>
+            <div style={{fontSize:14,color:THEME.textMid,lineHeight:1.7,maxWidth:680,marginBottom:16}}>
+              DetectIQ is your AI-powered detection engineering platform. Follow the steps below to go from zero to a fully-covered MITRE ATT&CK posture — each step builds on the last.
+            </div>
+            <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+              <button style={{...S.btn("p"),padding:"9px 20px",fontSize:13,fontWeight:700}} onClick={()=>onNav("builder")}>
+                Start Building Detections →
+              </button>
+              <button style={{...S.btn(),padding:"9px 20px",fontSize:13}} onClick={()=>onNav("home")}>
+                View Dashboard
+              </button>
+            </div>
+          </div>
+          {done&&(
+            <div style={{textAlign:"center",padding:"14px 20px",background:"rgba(0,232,122,0.08)",border:"1px solid rgba(0,232,122,0.2)",borderRadius:10,flexShrink:0}}>
+              <div style={{fontSize:28,fontWeight:900,color:THEME.success,lineHeight:1}}>{detections.length}</div>
+              <div style={{fontSize:10,color:THEME.textDim,marginTop:2}}>detections built</div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Steps */}
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        {steps.map((step,idx)=>(
+          <div key={step.num} style={{...S.card,marginBottom:0,border:"1px solid "+step.color+"22",transition:"border-color 0.2s"}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor=step.color+"55"}
+            onMouseLeave={e=>e.currentTarget.style.borderColor=step.color+"22"}>
+            <div style={{display:"flex",gap:16,alignItems:"flex-start"}}>
+              {/* Step number */}
+              <div style={{width:44,height:44,borderRadius:12,background:step.color+"14",border:"1px solid "+step.color+"33",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <div style={{fontSize:18,lineHeight:1}}>{step.icon}</div>
+                <div style={{fontSize:8,color:step.color,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",marginTop:1}}>0{step.num}</div>
+              </div>
+              {/* Content */}
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6,flexWrap:"wrap"}}>
+                  <div style={{fontSize:15,fontWeight:700,color:THEME.text}}>{step.title}</div>
+                  <span style={{...S.badge(step.color),fontSize:9}}>Step {step.num}</span>
+                </div>
+                <div style={{fontSize:12,color:THEME.textMid,marginBottom:12,lineHeight:1.6}}>{step.summary}</div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
+                  {step.bullets.map((b,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"flex-start",gap:7,padding:"7px 12px",background:step.color+"08",border:"1px solid "+step.color+"18",borderRadius:8,fontSize:11,color:THEME.textMid,lineHeight:1.5,flex:"1 1 260px",minWidth:0}}>
+                      <span style={{color:step.color,fontWeight:700,flexShrink:0,marginTop:1}}>›</span>
+                      <span>{b}</span>
+                    </div>
+                  ))}
+                </div>
+                <button style={{...S.btn("p"),padding:"7px 18px",fontSize:12,background:step.color+"18",border:"1px solid "+step.color+"44",color:step.color}}
+                  onClick={()=>onNav(step.tab)}
+                  onMouseEnter={e=>{e.currentTarget.style.background=step.color+"30";}}
+                  onMouseLeave={e=>{e.currentTarget.style.background=step.color+"18";}}>
+                  {step.cta} →
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Footer tip */}
+      <div style={{marginTop:20,padding:"14px 20px",background:"rgba(255,255,255,0.02)",border:"1px solid "+THEME.border,borderRadius:10,display:"flex",alignItems:"center",gap:12}}>
+        <span style={{fontSize:20}}>💡</span>
+        <div style={{fontSize:12,color:THEME.textMid,lineHeight:1.6}}>
+          <span style={{color:THEME.text,fontWeight:600}}>Pro tip: </span>
+          You don't need to follow the steps in order. If you already have Splunk rules, start at <span style={{color:"#a855f7",cursor:"pointer",fontWeight:600}} onClick={()=>onNav("translator")}>Step 3 — Translator</span>. If you want to see your MITRE gaps first, jump to <span style={{color:THEME.orange,cursor:"pointer",fontWeight:600}} onClick={()=>onNav("heatmap")}>Step 5 — ATT&CK Map</span>.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const NAV_STRUCTURE=[
+  {id:"start",label:"Get Started",icon:"🚀",desc:"Step-by-step guide to building your first detection and exploring the platform"},
   {id:"home",label:"Dashboard",icon:"🏠",desc:"Overview of your detections, coverage, and activity"},
   {groupId:"build",label:"Build",icon:"🔨",desc:"Create and manage detections",children:[
     {id:"builder",label:"Detection Builder",desc:"AI-powered builder — generate SPL/KQL/EQL detections from a scenario or tactic"},
@@ -7955,7 +8152,7 @@ function LazyTab({ id, tab, children, skeleton }) {
 
 function AppInner(){
   const{user,loading,signOut}=useAuth();
-  const VALID_TABS=["home","builder","usecases","translator","explainer","library","heatmap","triage","adversary","health","intel","team","autopilot","metrics","community","settings","chain","replay","defend","docs"];
+  const VALID_TABS=["start","home","builder","usecases","translator","explainer","library","heatmap","triage","adversary","health","intel","team","autopilot","metrics","community","settings","chain","replay","defend","docs"];
   const[tab,setTab]=useState(()=>{const p=window.location.pathname.replace(/^\//,"");return VALID_TABS.includes(p)?p:"home";});
   useEffect(()=>{
     const url=tab==="home"?"/":"/"+tab;
@@ -8285,6 +8482,9 @@ function AppInner(){
           </div>
           {!user&&demoMode&&<DemoBanner onSignIn={()=>setShowLogin(true)}/>}
           <div style={{flex:1,overflowY:"auto",padding:"28px 32px"}}>
+            <LazyTab id="start" tab={tab} skeleton={<SkeletonCard/>}>
+              <GettingStartedPage detections={detections} onNav={setTab}/>
+            </LazyTab>
             <LazyTab id="home" tab={tab} skeleton={<SkeletonDashboard/>}>
               <DashboardHome detections={detections} onNav={setTab} user={user}/>
             </LazyTab>
