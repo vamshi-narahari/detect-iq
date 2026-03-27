@@ -1,17 +1,17 @@
-import { useState, useEffect, useContext, createContext } from "react";
+import { useState, useEffect, useContext, createContext, useCallback, useRef } from "react";
 import { supabase } from "./supabase";
 
 const THEME = {
-  bg: "#05080f", bgCard: "#0a0e1a", bgCardHover: "#0d1220",
-  border: "#151d2e", borderBright: "#1e2d45",
-  accent: "#00d4ff", accentDim: "#0088aa", accentGlow: "rgba(0,212,255,0.1)",
-  success: "#00e87a", successGlow: "rgba(0,232,122,0.1)",
-  warning: "#ffaa00", warningGlow: "rgba(255,170,0,0.1)",
-  danger: "#ff3d55", dangerGlow: "rgba(255,61,85,0.1)",
-  purple: "#7c55ff", purpleGlow: "rgba(124,85,255,0.1)",
-  orange: "#ff7700", orangeGlow: "rgba(255,119,0,0.1)",
-  text: "#dce8f0", textDim: "#4a5a6a", textMid: "#7a8a9a",
-  sidebar: "#07090f", sidebarBorder: "#111827",
+  bg: "#0b0d12", bgCard: "#10131a", bgCardHover: "#13161f",
+  border: "#1e2330", borderBright: "#262d3d",
+  accent: "#4f8ef7", accentDim: "#3a6fd4", accentGlow: "rgba(79,142,247,0.1)",
+  success: "#22c55e", successGlow: "rgba(34,197,94,0.1)",
+  warning: "#f59e0b", warningGlow: "rgba(245,158,11,0.1)",
+  danger: "#ef4444", dangerGlow: "rgba(239,68,68,0.1)",
+  purple: "#8b5cf6", purpleGlow: "rgba(139,92,246,0.1)",
+  orange: "#f97316", orangeGlow: "rgba(249,115,22,0.1)",
+  text: "#e2e8f0", textDim: "#4a5568", textMid: "#718096",
+  sidebar: "#0b0d12", sidebarBorder: "#1e2330",
 };
 
 const TACTICS = ["Reconnaissance","Resource Development","Initial Access","Execution","Persistence","Privilege Escalation","Defense Evasion","Credential Access","Discovery","Lateral Movement","Collection","Command and Control","Exfiltration","Impact"];
@@ -32,16 +32,16 @@ const TOOLS = [
 ];
 
 const S = {
-  input: {width:"100%",background:"#03060d",border:"1px solid "+THEME.border,borderRadius:7,padding:"10px 13px",color:THEME.text,fontFamily:"inherit",fontSize:13,outline:"none",boxSizing:"border-box",transition:"border-color 0.15s"},
-  textarea: {width:"100%",background:"#03060d",border:"1px solid "+THEME.border,borderRadius:7,padding:"10px 13px",color:THEME.text,fontFamily:"inherit",fontSize:13,outline:"none",resize:"vertical",boxSizing:"border-box",minHeight:100,transition:"border-color 0.15s"},
-  btn: (v="p")=>({padding:"9px 18px",borderRadius:7,border:v==="p"?"1px solid "+THEME.accentDim:v==="d"?"1px solid "+THEME.danger+"66":v==="s"?"1px solid "+THEME.success+"66":"1px solid "+THEME.border,background:v==="p"?"linear-gradient(135deg,rgba(0,212,255,0.12),rgba(0,136,170,0.08))":v==="d"?THEME.dangerGlow:v==="s"?THEME.successGlow:"rgba(255,255,255,0.03)",color:v==="p"?THEME.accent:v==="d"?THEME.danger:v==="s"?THEME.success:THEME.textMid,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,transition:"all 0.15s",whiteSpace:"nowrap",letterSpacing:"0.03em"}),
-  badge: (c)=>({display:"inline-flex",alignItems:"center",padding:"3px 9px",borderRadius:5,fontSize:10,fontWeight:700,background:c+"18",color:c,border:"1px solid "+c+"33",letterSpacing:"0.05em"}),
-  card: {background:THEME.bgCard,border:"1px solid "+THEME.border,borderRadius:12,padding:20,marginBottom:16,transition:"border-color 0.2s"},
-  cardTitle: {fontSize:12,fontWeight:800,color:THEME.accent,letterSpacing:"0.04em",textTransform:"none",marginBottom:16,display:"flex",alignItems:"center",gap:8,fontFamily:"'Syne',sans-serif"},
-  label: {fontSize:10,color:THEME.textDim,marginBottom:6,display:"block",letterSpacing:"0.06em",textTransform:"uppercase",fontWeight:600,fontFamily:"'JetBrains Mono',monospace"},
-  code: {background:"#02040a",border:"1px solid "+THEME.border,borderRadius:8,padding:16,fontSize:12,color:"#7dd3fc",overflowX:"auto",whiteSpace:"pre-wrap",wordBreak:"break-all",fontFamily:"'Courier New',monospace",lineHeight:1.8},
-  spinner: {display:"inline-block",width:12,height:12,border:"2px solid rgba(0,212,255,0.15)",borderTop:"2px solid #00d4ff",borderRadius:"50%",animation:"spin 0.7s linear infinite",marginRight:7,verticalAlign:"middle"},
-  tag: {display:"inline-flex",alignItems:"center",padding:"3px 9px",borderRadius:5,fontSize:11,background:"rgba(0,212,255,0.08)",color:"#00d4ff",border:"1px solid rgba(0,136,170,0.25)",marginRight:4,marginBottom:4},
+  input: {width:"100%",background:"#0b0d14",border:"1px solid "+THEME.border,borderRadius:8,padding:"9px 12px",color:THEME.text,fontFamily:"inherit",fontSize:13,outline:"none",boxSizing:"border-box",transition:"border-color 0.15s"},
+  textarea: {width:"100%",background:"#0b0d14",border:"1px solid "+THEME.border,borderRadius:8,padding:"9px 12px",color:THEME.text,fontFamily:"inherit",fontSize:13,outline:"none",resize:"vertical",boxSizing:"border-box",minHeight:100,transition:"border-color 0.15s"},
+  btn: (v="p")=>({padding:"8px 16px",borderRadius:7,border:v==="p"?"1px solid "+THEME.accentDim:v==="d"?"1px solid "+THEME.danger+"55":v==="s"?"1px solid "+THEME.success+"55":"1px solid "+THEME.borderBright,background:v==="p"?"rgba(79,142,247,0.12)":v==="d"?"rgba(239,68,68,0.08)":v==="s"?"rgba(34,197,94,0.08)":"rgba(255,255,255,0.03)",color:v==="p"?THEME.accent:v==="d"?THEME.danger:v==="s"?THEME.success:THEME.textMid,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,transition:"all 0.15s",whiteSpace:"nowrap"}),
+  badge: (c)=>({display:"inline-flex",alignItems:"center",padding:"2px 8px",borderRadius:4,fontSize:10,fontWeight:600,background:c+"14",color:c,border:"1px solid "+c+"28"}),
+  card: {background:THEME.bgCard,border:"1px solid "+THEME.border,borderRadius:10,padding:20,marginBottom:16},
+  cardTitle: {fontSize:13,fontWeight:700,color:THEME.text,marginBottom:16,display:"flex",alignItems:"center",gap:8,fontFamily:"'Syne',sans-serif"},
+  label: {fontSize:11,color:THEME.textMid,marginBottom:5,display:"block",fontWeight:500},
+  code: {background:"#080a10",border:"1px solid "+THEME.border,borderRadius:8,padding:16,fontSize:12,color:"#94b8e8",overflowX:"auto",whiteSpace:"pre-wrap",wordBreak:"break-all",fontFamily:"'JetBrains Mono','Courier New',monospace",lineHeight:1.7},
+  spinner: {display:"inline-block",width:12,height:12,border:"2px solid rgba(79,142,247,0.2)",borderTop:"2px solid "+THEME.accent,borderRadius:"50%",animation:"spin 0.7s linear infinite",marginRight:7,verticalAlign:"middle"},
+  tag: {display:"inline-flex",alignItems:"center",padding:"3px 9px",borderRadius:5,fontSize:11,background:"rgba(79,142,247,0.08)",color:THEME.accent,border:"1px solid rgba(79,142,247,0.2)",marginRight:4,marginBottom:4},
   divider: {height:1,background:THEME.border,margin:"18px 0"},
   flex: {display:"flex",alignItems:"center",gap:10},
   row: {display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14},
@@ -56,6 +56,27 @@ async function callClaude(messages,system="",max_tokens=2000){
   const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages,system,max_tokens})});
   if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error||"API error "+res.status);}
   const data=await res.json();return data.text||data.content?.[0]?.text||"";
+}
+async function callClaudeStream(messages,system="",max_tokens=2000,onChunk){
+  const res=await fetch("/api/claude/stream",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages,system,max_tokens})});
+  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error||"API error "+res.status);}
+  const reader=res.body.getReader();const decoder=new TextDecoder();
+  let fullText="",buffer="";
+  while(true){
+    const{done,value}=await reader.read();if(done)break;
+    buffer+=decoder.decode(value,{stream:true});
+    const lines=buffer.split("\n");buffer=lines.pop();
+    for(const line of lines){
+      if(line.startsWith("data: ")){
+        try{const d=JSON.parse(line.slice(6));
+          if(d.text){fullText+=d.text;onChunk&&onChunk(fullText);}
+          if(d.done)return d.fullText||fullText;
+          if(d.error)throw new Error(d.error);
+        }catch(e){if(e.message&&!e.message.includes("JSON"))throw e;}
+      }
+    }
+  }
+  return fullText;
 }
 function Spinner(){return <span style={S.spinner}></span>;}
 function StatusBar({msg,type="info"}){if(!msg)return null;const c=type==="error"?THEME.danger:type==="success"?THEME.success:THEME.accent;return <div style={{padding:"11px 15px",borderRadius:8,background:c+"0d",border:"1px solid "+c+"2a",color:c,fontSize:12,marginBottom:14,display:"flex",alignItems:"center",gap:8}}><span>{type==="error"?"!":type==="success"?"v":"i"}</span>{msg}</div>;}
@@ -121,6 +142,32 @@ function SkeletonDashboard() {
 }
 
 function CopyBtn({text,small=false}){const[c,setC]=useState(false);return <button style={{...S.btn(),padding:small?"3px 10px":"9px 18px",fontSize:small?10:12}} onClick={()=>{navigator.clipboard.writeText(text);setC(true);setTimeout(()=>setC(false),1500)}}>{c?"Copied!":"Copy"}</button>;}
+
+function SslCertGuide({url}){
+  const base = url ? url.replace(/\/services.*/,"").replace(/\/api.*/,"") : "";
+  return(
+    <div style={{marginBottom:12,padding:"14px 16px",borderRadius:8,background:"rgba(255,170,0,0.07)",border:"1px solid rgba(255,170,0,0.3)"}}>
+      <div style={{fontWeight:700,fontSize:12,color:THEME.warning,marginBottom:8}}>⚠ Splunk SSL Certificate Not Trusted</div>
+      <div style={{fontSize:12,color:THEME.textMid,lineHeight:1.8,marginBottom:12}}>
+        Your browser blocked the connection because Splunk uses a self-signed SSL certificate.
+        Fix this in <strong style={{color:THEME.text}}>3 steps</strong>:
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
+        {[
+          ["1","Open Splunk in a new tab",`Click the link below → browser shows "Your connection is not private" → click Advanced → Proceed to ${base||"Splunk"}`,"open"],
+          ["2","Accept the certificate","Once you see the Splunk login page, the certificate is trusted. You can close that tab.","check"],
+          ["3","Try pushing again","Come back here and click Push to Splunk again — it will work now.","retry"],
+        ].map(([n,title,desc])=>(
+          <div key={n} style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+            <div style={{width:20,height:20,borderRadius:"50%",background:THEME.warning+"22",border:"1px solid "+THEME.warning+"55",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800,color:THEME.warning,flexShrink:0,marginTop:1}}>{n}</div>
+            <div><div style={{fontSize:12,fontWeight:700,color:THEME.text,marginBottom:2}}>{title}</div><div style={{fontSize:11,color:THEME.textDim,lineHeight:1.5}}>{desc}</div></div>
+          </div>
+        ))}
+      </div>
+      {base&&<a href={base} target="_blank" rel="noreferrer" style={{display:"inline-flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:6,background:THEME.warning+"15",border:"1px solid "+THEME.warning+"44",color:THEME.warning,fontSize:11,fontWeight:700,textDecoration:"none"}}>↗ Open {base} to trust certificate</a>}
+    </div>
+  );
+}
 
 const AuthContext = createContext(null);
 function useAuth(){ return useContext(AuthContext); }
@@ -249,6 +296,19 @@ function HoneycombGrid({ detections }) {
           </div>
         ))}
       </div>
+      {/* ── Gap row ── */}
+      {TACTICS_LIST.filter(t=>tacticMap[t]===0).length>0&&(
+        <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid "+THEME.border}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <span style={{fontSize:11,fontWeight:500,color:THEME.textMid,flexShrink:0}}>Gaps:</span>
+            {TACTICS_LIST.filter(t=>tacticMap[t]===0).map(t=>(
+              <span key={t} style={{display:"inline-flex",alignItems:"center",padding:"2px 8px",borderRadius:4,background:"rgba(239,68,68,0.07)",border:"1px solid rgba(239,68,68,0.2)",fontSize:10,color:"#f87171",fontWeight:500}}>
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -604,25 +664,124 @@ function ToolSelector({selected, onSelect}){
   );
 }
 
+// ── HelpBox: collapsible inline documentation panel ──────────────────────────
+function HelpBox({ title="How it works", items=[], color=THEME.accent }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{marginBottom:14,border:"1px solid "+color+"22",borderRadius:8,overflow:"hidden"}}>
+      <div onClick={()=>setOpen(o=>!o)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 14px",cursor:"pointer",background:color+"07",userSelect:"none"}}>
+        <div style={{display:"flex",alignItems:"center",gap:7}}>
+          <span style={{fontSize:13}}>📖</span>
+          <span style={{fontSize:12,fontWeight:600,color}}>{title}</span>
+        </div>
+        <span style={{fontSize:11,color,opacity:0.7}}>{open?"▲ Hide":"▼ Show"}</span>
+      </div>
+      {open&&(
+        <div style={{padding:"12px 14px",background:color+"04",display:"flex",flexDirection:"column",gap:8}}>
+          {items.map((item,i)=>(
+            <div key={i} style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+              <span style={{fontSize:14,flexShrink:0,marginTop:1}}>{item.icon}</span>
+              <div>
+                <div style={{fontSize:12,fontWeight:600,color:THEME.text,marginBottom:2}}>{item.title}</div>
+                <div style={{fontSize:11,color:THEME.textMid,lineHeight:1.6}}>{item.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SectionHeader({ icon, title, color = THEME.accent, children }) {
   return (
-    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,paddingBottom:16,borderBottom:"1px solid "+THEME.border}}>
       <div style={{display:"flex",alignItems:"center",gap:10}}>
-        <div style={{width:32,height:32,borderRadius:8,background:color+"15",border:"1px solid "+color+"30",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>{icon}</div>
-        <div style={{fontSize:16,fontWeight:800,color:THEME.text,letterSpacing:"-0.01em"}}>{title}</div>
+        <span style={{fontSize:16,opacity:0.8}}>{icon}</span>
+        <span style={{fontSize:17,fontWeight:700,color:THEME.text,letterSpacing:"-0.02em",fontFamily:"'Syne',sans-serif"}}>{title}</span>
       </div>
-      {children}
+      <div style={{display:"flex",alignItems:"center",gap:8}}>{children}</div>
     </div>
   );
 }
 
 function StatCard({ value, label, icon, color = THEME.accent, sub }) {
   return (
-    <div style={{background:"linear-gradient(135deg,"+color+"08,"+color+"03)",border:"1px solid "+color+"20",borderRadius:12,padding:"18px 20px",position:"relative",overflow:"hidden"}}>
-      <div style={{position:"absolute",top:14,right:16,fontSize:22,opacity:0.4}}>{icon}</div>
-      <div style={{fontSize:28,fontWeight:900,color:color,letterSpacing:"-0.02em",lineHeight:1}}>{value}</div>
-      <div style={{fontSize:12,fontWeight:700,color:THEME.textMid,marginTop:6,letterSpacing:"0.03em"}}>{label}</div>
+    <div style={{background:THEME.bgCard,border:"1px solid "+THEME.border,borderRadius:10,padding:"18px 20px",position:"relative",overflow:"hidden"}}>
+      <div style={{position:"absolute",top:14,right:16,fontSize:18,opacity:0.25}}>{icon}</div>
+      <div style={{fontSize:26,fontWeight:800,color:THEME.text,letterSpacing:"-0.02em",lineHeight:1}}>{value}</div>
+      <div style={{fontSize:12,color:THEME.textMid,marginTop:5,fontWeight:500}}>{label}</div>
       {sub && <div style={{fontSize:11,color:THEME.textDim,marginTop:3}}>{sub}</div>}
+      <div style={{position:"absolute",bottom:0,left:0,width:"3px",height:"100%",background:color,borderRadius:"0 0 0 10px",opacity:0.7}}/>
+    </div>
+  );
+}
+
+// ── External Enrichment Tools ─────────────────────────────────────────────────
+const ENRICH_TOOLS=[
+  {cat:"🔗 URL & Domain",color:"#00d4ff",tools:[
+    {name:"URLScan.io",url:"https://urlscan.io/search/#*",desc:"Scan and analyse URLs for malicious content"},
+    {name:"VirusTotal URL",url:"https://www.virustotal.com/gui/home/url",desc:"Multi-AV URL and domain reputation check"},
+    {name:"URLVoid",url:"https://www.urlvoid.com/",desc:"Website reputation and blacklist checker"},
+    {name:"PhishTank",url:"https://phishtank.org/",desc:"Community phishing URL database"},
+  ]},
+  {cat:"🌐 IP & Domain Rep",color:"#7c55ff",tools:[
+    {name:"AbuseIPDB",url:"https://www.abuseipdb.com/",desc:"IP address abuse reports and reputation"},
+    {name:"Shodan",url:"https://www.shodan.io/",desc:"Internet-connected device search and exposure"},
+    {name:"GreyNoise",url:"https://viz.greynoise.io/",desc:"Internet background noise and mass scanner IPs"},
+    {name:"IPVoid",url:"https://www.ipvoid.com/",desc:"IP reputation, DNSBL, and geolocation lookup"},
+    {name:"MXToolbox",url:"https://mxtoolbox.com/SuperTool.aspx",desc:"DNS, blacklist, and mail server diagnostics"},
+  ]},
+  {cat:"📧 Email & Headers",color:"#ffaa00",tools:[
+    {name:"MXToolbox Header",url:"https://mxtoolbox.com/EmailHeaders.aspx",desc:"Parse and analyze email message headers"},
+    {name:"Google Admin Toolbox",url:"https://toolbox.googleapps.com/apps/messageheader/",desc:"Google's email header analyzer"},
+    {name:"EmailRep",url:"https://emailrep.io/",desc:"Email address reputation and risk score"},
+    {name:"hunter.io",url:"https://hunter.io/email-verifier",desc:"Verify email addresses and find breached accounts"},
+  ]},
+  {cat:"🦠 File & Hash",color:"#ff3d55",tools:[
+    {name:"VirusTotal Hash",url:"https://www.virustotal.com/gui/home/search",desc:"Multi-engine malware scan by file hash"},
+    {name:"MalwareBazaar",url:"https://bazaar.abuse.ch/",desc:"Malware sample database by hash, tag, or signature"},
+    {name:"Hybrid Analysis",url:"https://www.hybrid-analysis.com/",desc:"Free malware sandbox with MITRE ATT&CK mapping"},
+    {name:"Any.run",url:"https://app.any.run/",desc:"Interactive malware sandbox — watch execution live"},
+    {name:"Joe Sandbox",url:"https://www.joesandbox.com/",desc:"Deep file analysis and behavioral sandbox"},
+  ]},
+  {cat:"🔍 OSINT & Threat Intel",color:"#00e87a",tools:[
+    {name:"MITRE ATT&CK",url:"https://attack.mitre.org/techniques/",desc:"Official MITRE technique database and TTPs"},
+    {name:"OTX AlienVault",url:"https://otx.alienvault.com/",desc:"Open threat intelligence — IOCs and pulses"},
+    {name:"ThreatFox",url:"https://threatfox.abuse.ch/",desc:"IOC sharing database — IPs, domains, hashes"},
+    {name:"Robtex",url:"https://www.robtex.com/",desc:"DNS and IP routing intelligence and relationships"},
+  ]},
+];
+function ExternalEnrichTools({tactic,technique,name}){
+  const[open,setOpen]=useState(false);
+  return(
+    <div style={{marginTop:16,border:"1px solid "+THEME.border,borderRadius:8,overflow:"hidden"}}>
+      <div onClick={()=>setOpen(o=>!o)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",cursor:"pointer",background:"rgba(255,255,255,0.02)"}}
+        onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.04)"}
+        onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.02)"}>
+        <div style={{fontSize:11,fontWeight:700,color:THEME.textMid,letterSpacing:"0.08em"}}>🔬 EXTERNAL ENRICHMENT TOOLS</div>
+        <span style={{fontSize:11,color:THEME.textDim,transform:open?"rotate(90deg)":"rotate(0deg)",display:"inline-block",transition:"transform 0.15s"}}>›</span>
+      </div>
+      {open&&(
+        <div style={{padding:"12px 14px",display:"grid",gap:12}}>
+          {ENRICH_TOOLS.map(cat=>(
+            <div key={cat.cat}>
+              <div style={{fontSize:10,fontWeight:800,color:cat.color,letterSpacing:"0.1em",marginBottom:7}}>{cat.cat}</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {cat.tools.map(t=>(
+                  <a key={t.name} href={t.url} target="_blank" rel="noopener noreferrer" title={t.desc}
+                    style={{display:"inline-flex",alignItems:"center",gap:5,padding:"5px 11px",borderRadius:6,background:"rgba(255,255,255,0.03)",border:"1px solid "+THEME.border,color:THEME.textMid,textDecoration:"none",fontSize:11,transition:"all 0.12s"}}
+                    onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.07)";e.currentTarget.style.color=cat.color;e.currentTarget.style.borderColor=cat.color+"55";}}
+                    onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.03)";e.currentTarget.style.color=THEME.textMid;e.currentTarget.style.borderColor=THEME.border;}}>
+                    {t.name} <span style={{fontSize:9,opacity:0.5}}>↗</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          ))}
+          <div style={{fontSize:10,color:THEME.textDim,marginTop:4}}>Tip: copy IOCs (IPs, hashes, domains) from your detection query above and paste into these tools for manual enrichment.</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -630,7 +789,355 @@ function StatCard({ value, label, icon, color = THEME.accent, sub }) {
 // ── Tabbed ADS View ───────────────────────────────────────────────────────────
 function ADSResult({ ads, threat, tactic, tool, onSave, detName, setDetName, severity, beginner, onSendToTriage }) {
   const [activeTab, setActiveTab] = useState("overview");
+  // Active query — starts as original, gets improved by Score/Enrich/ML actions
+  const [activeQuery, setActiveQuery] = useState(()=>ads.detection_query||"");
+  const [queryModified, setQueryModified] = useState(false);
+  const [applyingFix, setApplyingFix] = useState(false);
+  // Score tab
+  const [scoreData, setScoreData] = useState(null);
+  const [scoring, setScoring] = useState(false);
+  const [scoreErr, setScoreErr] = useState("");
+  // Enrich tab
+  const [enrichData, setEnrichData] = useState(null);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichErr, setEnrichErr] = useState("");
+  // ML/UBA/RBA tab
+  const [mlData, setMlData] = useState(null);
+  const [mlLoading, setMlLoading] = useState(false);
+  const [mlErr, setMlErr] = useState("");
+  // Blast Radius tab
+  const [blastData, setBlastData] = useState(null);
+  const [blasting, setBlasting] = useState(false);
+  const [blastErr, setBlastErr] = useState("");
+  // AI False Positive tab
+  const [fpAiData, setFpAiData] = useState(null);
+  const [fpAiLoading, setFpAiLoading] = useState(false);
+  const [fpAiErr, setFpAiErr] = useState("");
+  // Defend tab (Honeytoken + DNS Sinkhole)
+  const [defendSubTab, setDefendSubTab] = useState("honey");
+  const [honeytokenData, setHoneytokenData] = useState(null);
+  const [honeytokenLoading, setHoneytokenLoading] = useState(false);
+  const [honeytokenErr, setHoneytokenErr] = useState("");
+  const [sinkholeData, setSinkholeData] = useState(null);
+  const [sinkholeLoading, setSinkholeLoading] = useState(false);
+  const [sinkholeErr, setSinkholeErr] = useState("");
+  // LOTL tab
+  const [lotlData, setLotlData] = useState(null);
+  const [lotlLoading, setLotlLoading] = useState(false);
+  const [lotlErr, setLotlErr] = useState("");
+  const [mlSubTab, setMlSubTab] = useState("ml");
+  // Workflow tab
+  const [workflowData, setWorkflowData] = useState(null);
+  const [workflowLoading, setWorkflowLoading] = useState(false);
+  const [workflowErr, setWorkflowErr] = useState("");
+  const [workflowSubTab, setWorkflowSubTab] = useState("visual");
+  // Deploy tab
+  const [deploySubTab, setDeploySubTab] = useState("test");
+  const [testResult, setTestResult] = useState(null);
+  const [testLoading, setTestLoading] = useState(false);
+  const [playbookContent, setPlaybookContent] = useState("");
+  const [generatingPlaybook, setGeneratingPlaybook] = useState(false);
+  const [ticketContent, setTicketContent] = useState("");
+  const [generatingTicket, setGeneratingTicket] = useState(false);
+  const [sigmaContent, setSigmaContent] = useState("");
+  const [loadingSigma, setLoadingSigma] = useState(false);
+  const [pushResult, setPushResult] = useState("");
+  const [pushing, setPushing] = useState(false);
+  const [showCurlCmd, setShowCurlCmd] = useState(false);
+  const [splunkUrl, setSplunkUrl] = useState(LS.get("splunk_url",""));
+  const [splunkToken, setSplunkToken] = useState(LS.get("splunk_token",""));
+  const [splunkAuthMode, setSplunkAuthMode] = useState(LS.get("splunk_auth_mode","token"));
+  const [splunkUser, setSplunkUser] = useState(LS.get("splunk_user",""));
+  const [splunkPass, setSplunkPass] = useState(LS.get("splunk_pass",""));
+  const [elasticUrl, setElasticUrl] = useState(LS.get("elastic_url",""));
+  const [elasticToken, setElasticToken] = useState(LS.get("elastic_token",""));
+  const [soarUrl, setSoarUrl] = useState(LS.get("soar_url",""));
+  const [soarToken, setSoarToken] = useState(LS.get("soar_token",""));
   if (!ads) return null;
+
+  // Poll async job until done or error (max 90s, polls every 1.5s)
+  async function pollJob(jobId, maxWaitMs=90000) {
+    const interval=1500, start=Date.now();
+    while(Date.now()-start<maxWaitMs){
+      await new Promise(r=>setTimeout(r,interval));
+      const r=await fetch(`/api/jobs/${jobId}`);
+      const d=await r.json();
+      if(d.status==="done") return d.result;
+      if(d.status==="error") throw new Error(d.error||"Job failed");
+      // still queued/active — keep polling
+    }
+    throw new Error("Request timed out — please try again.");
+  }
+
+  // Build a det object — always uses activeQuery so improvements flow through to Deploy
+  function buildDet() {
+    return { id: "builder-preview", name: detName||threat.slice(0,60), threat, tactic, queryType: tool.lang, tool: tool.id, query: activeQuery, severity, ads };
+  }
+
+  function applyQuery(newQuery, label) {
+    if(!newQuery) return;
+    setActiveQuery(newQuery);
+    setQueryModified(true);
+    setActiveTab("query");
+  }
+
+  async function fixQueryFromScore() {
+    if (!scoreData) return;
+    setApplyingFix(true);
+    try {
+      const issues = [...(scoreData.weaknesses||[]), ...(scoreData.recommendations||[])].join("\n- ");
+      const improved = await callClaudeStream(
+        [{ role:"user", content:`You are a detection engineer. Improve this ${tool.lang} query by fixing these specific issues:\n\n${issues}\n\nOriginal query:\n${activeQuery}\n\nReturn ONLY the improved ${tool.lang} query. No explanation, no markdown.` }],
+        "Expert detection engineer. Return only the query.",
+        2000
+      );
+      applyQuery(improved.trim(), "score-fix");
+    } catch(e) { setScoreErr("Fix failed: "+e.message); }
+    setApplyingFix(false);
+  }
+
+  async function fixQueryFromEnrich() {
+    if (!enrichData) return;
+    setApplyingFix(true);
+    try {
+      const context = [
+        enrichData.gap_warning ? "Coverage gap to fix: "+enrichData.gap_warning : "",
+        enrichData.quick_win ? "Quick win to apply: "+enrichData.quick_win : "",
+        enrichData.adjacent_detections?.length ? "Extend coverage for: "+enrichData.adjacent_detections.map(d=>d.name).join(", ") : ""
+      ].filter(Boolean).join("\n");
+      const improved = await callClaudeStream(
+        [{ role:"user", content:`Improve this ${tool.lang} detection query to address these gaps:\n\n${context}\n\nOriginal query:\n${activeQuery}\n\nReturn ONLY the improved ${tool.lang} query. No explanation, no markdown.` }],
+        "Expert detection engineer. Return only the query.",
+        2000
+      );
+      applyQuery(improved.trim(), "enrich-fix");
+    } catch(e) { setEnrichErr("Fix failed: "+e.message); }
+    setApplyingFix(false);
+  }
+
+  async function runTest() {
+    setTestLoading(true); setTestResult(null); setActiveTab("deploy"); setDeploySubTab("test");
+    const det = buildDet();
+    try {
+      const res = await fetch("/api/detection/test", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ name:det.name, query:det.query, queryType:det.queryType, tool:det.tool, tactic:det.tactic, severity:det.severity, threat:det.threat }) });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setTestResult(data);
+    } catch(e) { setTestResult({ error: e.message }); }
+    setTestLoading(false);
+  }
+
+  async function runPlaybook() {
+    setGeneratingPlaybook(true); setPlaybookContent(""); setActiveTab("deploy"); setDeploySubTab("playbook");
+    const det = buildDet();
+    try {
+      const txt = await callClaudeStream([{ role:"user", content:`Short IR playbook for: ${det.name} (${det.tactic}, ${det.severity})\n\nKeep each section to 2-3 bullet points max, one line each:\n1. TRIAGE (verify TP)\n2. ENRICH (IPs/users/hashes to check)\n3. CONTAIN\n4. ERADICATE\n5. ESCALATE WHEN\n6. FP FILTERS\n7. PSEUDO-CODE (5 lines max)` }],
+        "Expert SOC analyst and SOAR engineer writing incident response playbooks.", 2000,
+        (partial) => setPlaybookContent(partial));
+      setPlaybookContent(txt);
+    } catch(e) { setPlaybookContent("Error: "+e.message); }
+    setGeneratingPlaybook(false);
+  }
+
+  async function runTicket() {
+    setGeneratingTicket(true); setTicketContent(""); setActiveTab("deploy"); setDeploySubTab("ticket");
+    const det = buildDet();
+    try {
+      const txt = await callClaude([{ role:"user", content:`Write a brief JIRA ticket for deploying: ${det.name} (${det.severity}/${det.tactic}/${det.queryType})\n\nSections (2-3 lines each max): Summary, Description, Acceptance Criteria, Test Steps, Rollback.` }], "SOC engineer.", 1000);
+      setTicketContent(txt);
+    } catch(e) { setTicketContent("Error: "+e.message); }
+    setGeneratingTicket(false);
+  }
+
+  async function runSigmaAI() {
+    setLoadingSigma(true); setSigmaContent(""); setActiveTab("deploy"); setDeploySubTab("sigma");
+    const det = buildDet();
+    try {
+      const res = await fetch("/api/sigma/export", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ detection:{ name:det.name, query:det.query, tactic:det.tactic, technique:ads.mitre_id||"", severity:det.severity, queryType:det.queryType, tool:det.tool, threat:det.threat } }) });
+      const data = await res.json();
+      setSigmaContent(data.sigma || ("Error: "+(data.error||"Sigma export failed.")));
+    } catch(e) { setSigmaContent("Error: "+e.message); }
+    setLoadingSigma(false);
+  }
+
+  async function runBlast() {
+    setBlasting(true); setBlastErr(""); setBlastData(null); setActiveTab("blast");
+    const det = buildDet();
+    try {
+      const res = await fetch("/api/detection/blast-radius",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:det.name,query:det.query,queryType:tool.lang,tactic,severity})});
+      const data = await res.json(); if(data.error) throw new Error(data.error); setBlastData(data);
+    } catch(e) { setBlastErr(e.message); }
+    setBlasting(false);
+  }
+
+  async function runFpAi() {
+    setFpAiLoading(true); setFpAiErr(""); setFpAiData(null); setActiveTab("aitp");
+    const det = buildDet();
+    try {
+      const res = await fetch("/api/detection/false-positives",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:det.name,query:det.query,queryType:tool.lang,tactic})});
+      const data = await res.json(); if(data.error) throw new Error(data.error); setFpAiData(data);
+    } catch(e) { setFpAiErr(e.message); }
+    setFpAiLoading(false);
+  }
+
+  async function runHoneytoken() {
+    setHoneytokenLoading(true); setHoneytokenErr(""); setHoneytokenData(null); setActiveTab("defend"); setDefendSubTab("honey");
+    const det = buildDet();
+    try {
+      const res = await fetch("/api/detection/honeytoken",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:det.name,query:det.query,queryType:tool.lang,tactic,threat})});
+      const data = await res.json(); if(data.error) throw new Error(data.error); setHoneytokenData(data);
+    } catch(e) { setHoneytokenErr(e.message); }
+    setHoneytokenLoading(false);
+  }
+
+  async function runSinkhole() {
+    setSinkholeLoading(true); setSinkholeErr(""); setSinkholeData(null); setActiveTab("defend"); setDefendSubTab("sinkhole");
+    const det = buildDet();
+    try {
+      const res = await fetch("/api/detection/dns-sinkhole",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:det.name,query:det.query,tactic,threat})});
+      const data = await res.json(); if(data.error) throw new Error(data.error); setSinkholeData(data);
+    } catch(e) { setSinkholeErr(e.message); }
+    setSinkholeLoading(false);
+  }
+
+  async function runLotl() {
+    setLotlLoading(true); setLotlErr(""); setLotlData(null); setActiveTab("lotl");
+    const det = buildDet();
+    try {
+      const res = await fetch("/api/detection/lotl-coverage",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:det.name,tactic,queryType:tool.lang})});
+      const data = await res.json(); if(data.error) throw new Error(data.error); setLotlData(data);
+    } catch(e) { setLotlErr(e.message); }
+    setLotlLoading(false);
+  }
+
+  async function runML() {
+    setMlLoading(true); setMlErr(""); setMlData(null); setActiveTab("ml");
+    const det = buildDet();
+    try {
+      const res = await fetch("/api/detection/ml-enhance", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ name:det.name, query:det.query, queryType:tool.lang, tactic, severity, threat }) });
+      const init = await res.json();
+      if (init.error) throw new Error(init.error);
+      const data = init.jobId ? await pollJob(init.jobId) : init;
+      setMlData(data);
+    } catch(e) { setMlErr(e.message); }
+    setMlLoading(false);
+  }
+
+  async function runWorkflow() {
+    setWorkflowLoading(true); setWorkflowErr(""); setWorkflowData(null); setActiveTab("workflow");
+    const det = buildDet();
+    try {
+      const res = await fetch("/api/detection/workflow", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ name:det.name, query:det.query, queryType:tool.lang, tactic, severity, threat, mitre_id:ads.mitre_id||"" }) });
+      const init = await res.json();
+      if (init.error) throw new Error(init.error);
+      const data = init.jobId ? await pollJob(init.jobId) : init;
+      setWorkflowData(data);
+    } catch(e) { setWorkflowErr(e.message); }
+    setWorkflowLoading(false);
+  }
+
+  function isOnPremUrl(url) {
+    if (!url) return false;
+    try { const h = new URL(url).hostname; return h==="localhost"||h==="127.0.0.1"||h.endsWith(".local")||/^10\./.test(h)||/^192\.168\./.test(h)||/^172\.(1[6-9]|2\d|3[01])\./.test(h); } catch { return false; }
+  }
+
+  async function pushToSplunk() {
+    if (!splunkUrl||(!splunkToken&&splunkAuthMode==="token")||(!splunkUser&&splunkAuthMode==="basic")) { setPushResult("error:Fill in Splunk URL and credentials first."); return; }
+    LS.set("splunk_url",splunkUrl); LS.set("splunk_token",splunkToken); LS.set("splunk_auth_mode",splunkAuthMode); LS.set("splunk_user",splunkUser); LS.set("splunk_pass",splunkPass);
+    setPushing(true); setPushResult("");
+    const det = buildDet();
+    try {
+      // Always proxy through server — it handles self-signed certs with rejectUnauthorized:false
+      const res = await fetch("/api/siem/push/splunk", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ url:splunkUrl, token:splunkToken, authMode:splunkAuthMode, username:splunkUser, password:splunkPass, name:det.name, query:det.query, severity:det.severity, description:det.threat||"", tactic:det.tactic, queryType:det.queryType }) });
+      const data = await res.json();
+      if(data.success){ setPushResult("success:"+data.message); }
+      else {
+        const isLocalDns = data.error&&(data.error.includes("EAI_AGAIN")||data.error.includes("ENOTFOUND")||data.error.includes("getaddrinfo"));
+        if(isLocalDns){ setShowCurlCmd(true); setPushResult("error:LOCAL_NET"); }
+        else setPushResult("error:"+(data.error||"Push failed."));
+      }
+    } catch(e) { setPushResult("error:"+e.message); }
+    setPushing(false);
+  }
+
+  async function pushToElastic() {
+    if (!elasticUrl||!elasticToken) { setPushResult("error:Fill in Kibana URL and API key first."); return; }
+    LS.set("elastic_url",elasticUrl); LS.set("elastic_token",elasticToken);
+    setPushing(true); setPushResult("");
+    const det = buildDet();
+    try {
+      if (isOnPremUrl(elasticUrl)) {
+        const sev = det.severity==="critical"?"critical":det.severity==="high"?"high":det.severity==="medium"?"medium":"low";
+        const langMap = {kql:"kuery",eql:"eql",esql:"esql"}; const lang = langMap[det.queryType?.toLowerCase()]||"kuery";
+        const rule = { name:det.name, description:det.threat||det.name, risk_score:sev==="critical"?99:sev==="high"?73:sev==="medium"?47:21, severity:sev, type:"query", query:det.query||"", language:lang, index:["logs-*","*"], enabled:false };
+        const res = await fetch(`${elasticUrl.replace(/\/$/,"")}/api/detection_engine/rules`, { method:"POST", headers:{"Authorization":`ApiKey ${elasticToken}`,"Content-Type":"application/json","kbn-xsrf":"detectiq"}, body:JSON.stringify(rule) });
+        if (res.ok) setPushResult("success:Rule created in Elastic Security (disabled for review).");
+        else if (res.status===409) setPushResult("success:Rule already exists in Elastic.");
+        else setPushResult("error:Elastic returned "+res.status);
+      } else {
+        const res = await fetch("/api/siem/push/elastic", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ url:elasticUrl, token:elasticToken, name:det.name, query:det.query, severity:det.severity, description:det.threat||det.name, tactic:det.tactic, queryType:det.queryType }) });
+        const data = await res.json();
+        setPushResult(data.success ? "success:"+data.message : "error:"+(data.error||"Push failed."));
+      }
+    } catch(e) { setPushResult("error:"+e.message); }
+    setPushing(false);
+  }
+
+  async function pushToSOAR() {
+    if (!soarUrl) { setPushResult("error:Fill in SOAR webhook URL first."); return; }
+    LS.set("soar_url",soarUrl); LS.set("soar_token",soarToken);
+    setPushing(true); setPushResult("");
+    const det = buildDet();
+    try {
+      const res = await fetch("/api/siem/push/soar", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ url:soarUrl, token:soarToken, payload:{ source:"DetectIQ", event_type:"detection_push", detection:{ id:det.id, name:det.name, tactic:det.tactic, severity:det.severity, query_type:det.queryType, tool:det.tool, query:det.query, description:det.threat||"", mitre_id:ads.mitre_id||"", summary:ads.summary||"" }, timestamp:new Date().toISOString() } }) });
+      const data = await res.json();
+      setPushResult(data.success ? "success:"+data.message : "error:"+(data.error||"SOAR push failed."));
+    } catch(e) { setPushResult("error:"+e.message); }
+    setPushing(false);
+  }
+
+  async function runScore() {
+    setScoring(true); setScoreErr(""); setScoreData(null); setActiveTab("score");
+    try {
+      const res = await fetch("/api/detection/quality-score", {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ name: detName||threat.slice(0,60), query: ads.detection_query||"", queryType: tool.lang, tactic, severity })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setScoreData(data);
+    } catch(e) { setScoreErr(e.message); }
+    setScoring(false);
+  }
+
+  async function runEnrich() {
+    setEnriching(true); setEnrichErr(""); setEnrichData(null); setActiveTab("enrich");
+    try {
+      const prompt = `You are a detection engineer advisor. Give a SHORT, actionable enrichment for this detection.
+
+Detection: ${detName||threat.slice(0,60)}
+Tactic: ${tactic}
+Severity: ${severity}
+MITRE ID: ${ads.mitre_id||"unknown"}
+
+Return ONLY valid JSON:
+{
+  "attack_path_summary": "one sentence, max 12 words",
+  "next_tactics": ["tactic1","tactic2"],
+  "adjacent_detections": [{"name":"short name","why":"6 words max"},{"name":"short name","why":"6 words max"}],
+  "high_value_targets": "3-5 asset types, comma separated",
+  "cvss_score": "N/A",
+  "quick_win": "one action, max 10 words",
+  "gap_warning": "one sentence, max 12 words"
+}`;
+      const result = await callClaude([{role:"user",content:prompt}],"Expert detection engineer. Return ONLY valid JSON.",1200);
+      const m = result.match(/\{[\s\S]*\}/);
+      if (!m) throw new Error("Could not parse enrichment");
+      const cleaned = m[0].replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,"").replace(/\\(?!["\\/bfnrtu])/g,"\\\\");
+      setEnrichData(JSON.parse(cleaned));
+    } catch(e) { setEnrichErr(e.message); }
+    setEnriching(false);
+  }
 
   const tabs = [
     { id:"overview",  label:"Overview",       icon:"📋" },
@@ -639,6 +1146,14 @@ function ADSResult({ ads, threat, tactic, tool, onSave, detName, setDetName, sev
     { id:"fp",        label:"False Positives",icon:"🔇"  },
     { id:"tuning",    label:"Tuning",         icon:"🎛"  },
     { id:"refs",      label:"References",     icon:"📎"  },
+    { id:"score",     label:"Score",          icon:"🏅"  },
+    { id:"enrich",    label:"Enrich",         icon:"🔍"  },
+    { id:"ml",        label:"ML/UBA/RBA",     icon:"🧠"  },
+    { id:"blast",     label:"Blast Radius",   icon:"💥"  },
+    { id:"aitp",      label:"False Positives",icon:"⚠️"  },
+    { id:"lotl",      label:"LOTL",           icon:"🔧"  },
+    { id:"workflow",  label:"Workflow",       icon:"⚡"  },
+    { id:"deploy",    label:"Deploy",         icon:"🚀"  },
   ];
 
   return (
@@ -656,9 +1171,19 @@ function ADSResult({ ads, threat, tactic, tool, onSave, detName, setDetName, sev
               <span style={{...S.badge(THEME.textDim)}}>{tactic}</span>
             </div>
           </div>
-          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-            <input style={{...S.input,width:200}} value={detName} onChange={e=>setDetName(e.target.value)} placeholder="Detection name..."/>
-            <button style={{...S.btn("s"),padding:"9px 16px"}} onClick={onSave}>Save</button>
+          <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+            <input style={{...S.input,width:170}} value={detName} onChange={e=>setDetName(e.target.value)} placeholder="Detection name..."/>
+            <button style={{...S.btn(),padding:"7px 11px",fontSize:11}} onClick={runScore} disabled={scoring}>{scoring?<><Spinner/>...</>:"🏅 Score"}</button>
+            <button style={{...S.btn(),padding:"7px 11px",fontSize:11}} onClick={runEnrich} disabled={enriching}>{enriching?<><Spinner/>...</>:"🔍 Enrich"}</button>
+            <button style={{...S.btn(),padding:"7px 11px",fontSize:11}} onClick={runML} disabled={mlLoading}>{mlLoading?<><Spinner/>...</>:"🧠 ML/UBA"}</button>
+            <button style={{...S.btn(),padding:"7px 11px",fontSize:11,borderColor:"rgba(255,80,80,0.4)",color:"#ff8080"}} onClick={runBlast} disabled={blasting}>{blasting?<><Spinner/>...</>:"💥 Blast"}</button>
+            <button style={{...S.btn(),padding:"7px 11px",fontSize:11,borderColor:"rgba(255,170,0,0.4)",color:THEME.warning}} onClick={runFpAi} disabled={fpAiLoading}>{fpAiLoading?<><Spinner/>...</>:"⚠️ FP"}</button>
+            <button style={{...S.btn(),padding:"7px 11px",fontSize:11,borderColor:"rgba(0,232,122,0.4)",color:THEME.success}} onClick={runLotl} disabled={lotlLoading}>{lotlLoading?<><Spinner/>...</>:"🔧 LOTL"}</button>
+            <button style={{...S.btn(),padding:"7px 11px",fontSize:11}} onClick={runWorkflow} disabled={workflowLoading}>{workflowLoading?<><Spinner/>...</>:"⚡ Workflow"}</button>
+            <div style={{marginLeft:"auto",display:"flex",gap:8}}>
+              <button style={{...S.btn(),padding:"7px 16px",fontSize:12,borderColor:THEME.purple+"55",color:THEME.purple,fontWeight:600}} onClick={()=>setActiveTab("deploy")}>🚀 Deploy</button>
+              <button style={{...S.btn("s"),padding:"7px 18px",fontSize:12}} onClick={onSave}>Save</button>
+            </div>
           </div>
         </div>
         {/* One-line summary */}
@@ -707,23 +1232,791 @@ function ADSResult({ ads, threat, tactic, tool, onSave, detName, setDetName, sev
         {activeTab==="query"&&(
           <div>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-              <span style={{fontSize:11,color:tool.color,fontWeight:700}}>{tool.name} — {tool.lang}</span>
-              <CopyBtn text={ads.detection_query||""}/>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:11,color:tool.color,fontWeight:700}}>{tool.name} — {tool.lang}</span>
+                {queryModified&&<span style={{fontSize:9,fontWeight:800,padding:"2px 8px",borderRadius:4,background:"rgba(0,255,136,0.12)",border:"1px solid rgba(0,255,136,0.3)",color:THEME.success}}>✓ IMPROVED</span>}
+              </div>
+              <div style={{display:"flex",gap:6}}>
+                {queryModified&&<button style={{...S.btn(),padding:"4px 10px",fontSize:10}} onClick={()=>{setActiveQuery(ads.detection_query||"");setQueryModified(false);}}>↩ Reset to original</button>}
+                <CopyBtn text={activeQuery}/>
+              </div>
             </div>
-            <div style={S.code}>{ads.detection_query||"No query generated."}</div>
-            {beginner&&<div style={{marginTop:10,padding:"10px 14px",background:THEME.accentGlow,border:"1px solid "+THEME.accentDim+"33",borderRadius:8,fontSize:12,color:THEME.accent}}><b>Beginner tip:</b> Copy this query and paste it directly into {tool.name}. The comments (lines starting with //) explain what each part does.</div>}
+            {queryModified&&(
+              <div style={{marginBottom:10,padding:"8px 12px",background:"rgba(0,255,136,0.05)",border:"1px solid rgba(0,255,136,0.2)",borderRadius:7,fontSize:11,color:THEME.success}}>
+                ✓ Query improved — this version will be used when pushing to Splunk/Elastic/SOAR.
+              </div>
+            )}
+            <textarea style={{...S.textarea,minHeight:180,fontFamily:"monospace",fontSize:12}} value={activeQuery} onChange={e=>{setActiveQuery(e.target.value);setQueryModified(e.target.value!==ads.detection_query);}}/>
+            {beginner&&<div style={{marginTop:10,padding:"10px 14px",background:THEME.accentGlow,border:"1px solid "+THEME.accentDim+"33",borderRadius:8,fontSize:12,color:THEME.accent}}><b>Beginner tip:</b> Copy this query and paste it directly into {tool.name}.</div>}
           </div>
         )}
 
         {activeTab==="fp"&&<div style={{fontSize:13,color:THEME.textMid,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{ads.false_positive_guidance||"No false positive guidance available."}</div>}
         {activeTab==="tuning"&&<div style={{fontSize:13,color:THEME.textMid,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{ads.tuning_tips||"No tuning tips available."}</div>}
         {activeTab==="refs"&&<div style={{fontSize:13,color:THEME.textMid,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{ads.references||"No references available."}</div>}
+
+        {activeTab==="score"&&(
+          <div>
+            {scoring&&<div style={{textAlign:"center",padding:32,color:THEME.textDim}}><Spinner/> Analyzing detection quality...</div>}
+            {scoreErr&&<div style={{color:THEME.danger,fontSize:13}}>{scoreErr}</div>}
+            {!scoring&&!scoreData&&!scoreErr&&<div style={{textAlign:"center",padding:32,color:THEME.textDim,fontSize:13}}>Click "🏅 Score" to analyze this detection's quality.</div>}
+            {scoreData&&(
+              <div>
+                {/* Overall score */}
+                <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:20,padding:"16px 20px",background:"rgba(0,212,255,0.04)",border:"1px solid "+THEME.borderBright,borderRadius:10}}>
+                  <div style={{fontSize:42,fontWeight:900,color:scoreData.overall>=80?THEME.success:scoreData.overall>=60?THEME.warning:THEME.danger,lineHeight:1}}>{scoreData.overall}</div>
+                  <div>
+                    <div style={{fontSize:10,fontWeight:800,letterSpacing:"0.12em",color:THEME.textDim,marginBottom:2}}>OVERALL QUALITY SCORE</div>
+                    <div style={{fontSize:12,color:THEME.textMid}}>{scoreData.overall>=80?"Strong detection":scoreData.overall>=60?"Acceptable — needs tuning":"Needs significant improvement"}</div>
+                  </div>
+                  <div style={{flex:1,height:8,background:THEME.border,borderRadius:4,overflow:"hidden",marginLeft:8}}>
+                    <div style={{width:scoreData.overall+"%",height:"100%",background:scoreData.overall>=80?THEME.success:scoreData.overall>=60?THEME.warning:THEME.danger,borderRadius:4,transition:"width 0.6s ease"}}/>
+                  </div>
+                </div>
+                {/* Breakdown */}
+                {scoreData.breakdown&&(
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+                    {Object.entries(scoreData.breakdown).map(([k,v])=>(
+                      <div key={k} style={{padding:"10px 14px",background:"rgba(255,255,255,0.02)",border:"1px solid "+THEME.border,borderRadius:8}}>
+                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                          <span style={{fontSize:11,color:THEME.textMid,textTransform:"capitalize"}}>{k.replace(/_/g," ")}</span>
+                          <span style={{fontSize:13,fontWeight:700,color:v.score>=80?THEME.success:v.score>=60?THEME.warning:THEME.danger}}>{v.score}</span>
+                        </div>
+                        <div style={{height:4,background:THEME.border,borderRadius:2,marginBottom:6}}>
+                          <div style={{width:v.score+"%",height:"100%",background:v.score>=80?THEME.success:v.score>=60?THEME.warning:THEME.danger,borderRadius:2}}/>
+                        </div>
+                        <div style={{fontSize:11,color:THEME.textDim,lineHeight:1.5}}>{v.notes}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* Strengths / Weaknesses / Recs */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+                  {scoreData.strengths?.length>0&&(
+                    <div style={{padding:"10px 14px",background:"rgba(0,255,136,0.04)",border:"1px solid rgba(0,255,136,0.15)",borderRadius:8}}>
+                      <div style={{fontSize:10,fontWeight:800,color:THEME.success,letterSpacing:"0.1em",marginBottom:8}}>STRENGTHS</div>
+                      {scoreData.strengths.map((s,i)=><div key={i} style={{fontSize:11,color:THEME.textMid,marginBottom:4,paddingLeft:8,borderLeft:"2px solid "+THEME.success+"44"}}>✓ {s}</div>)}
+                    </div>
+                  )}
+                  {scoreData.weaknesses?.length>0&&(
+                    <div style={{padding:"10px 14px",background:"rgba(255,61,85,0.04)",border:"1px solid rgba(255,61,85,0.15)",borderRadius:8}}>
+                      <div style={{fontSize:10,fontWeight:800,color:THEME.danger,letterSpacing:"0.1em",marginBottom:8}}>WEAKNESSES</div>
+                      {scoreData.weaknesses.map((w,i)=><div key={i} style={{fontSize:11,color:THEME.textMid,marginBottom:4,paddingLeft:8,borderLeft:"2px solid "+THEME.danger+"44"}}>⚠ {w}</div>)}
+                    </div>
+                  )}
+                  {scoreData.recommendations?.length>0&&(
+                    <div style={{padding:"10px 14px",background:"rgba(124,85,255,0.04)",border:"1px solid rgba(124,85,255,0.15)",borderRadius:8}}>
+                      <div style={{fontSize:10,fontWeight:800,color:THEME.purple,letterSpacing:"0.1em",marginBottom:8}}>RECOMMENDATIONS</div>
+                      {scoreData.recommendations.map((r,i)=><div key={i} style={{fontSize:11,color:THEME.textMid,marginBottom:4,paddingLeft:8,borderLeft:"2px solid "+THEME.purple+"44"}}>→ {r}</div>)}
+                    </div>
+                  )}
+                </div>
+                {/* Apply fixes CTA */}
+                {(scoreData.weaknesses?.length>0||scoreData.recommendations?.length>0)&&(
+                  <div style={{marginTop:14,padding:"12px 16px",background:"rgba(0,255,136,0.05)",border:"1px solid rgba(0,255,136,0.2)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+                    <div>
+                      <div style={{fontSize:12,fontWeight:700,color:THEME.success,marginBottom:2}}>✨ Auto-fix the query</div>
+                      <div style={{fontSize:11,color:THEME.textDim}}>Rewrite the {tool.lang} query applying all {scoreData.weaknesses?.length||0} weaknesses and {scoreData.recommendations?.length||0} recommendations. The improved query will be used when pushing to Splunk/Elastic.</div>
+                    </div>
+                    <button style={{...S.btn("p"),padding:"9px 20px",fontSize:12,whiteSpace:"nowrap",flexShrink:0}} onClick={fixQueryFromScore} disabled={applyingFix}>{applyingFix?<><Spinner/>Rewriting...</>:"✨ Apply Fixes to Query"}</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab==="enrich"&&(
+          <div>
+            {enriching&&<div style={{textAlign:"center",padding:32,color:THEME.textDim}}><Spinner/> Enriching with threat intelligence...</div>}
+            {enrichErr&&<div style={{color:THEME.danger,fontSize:13}}>{enrichErr}</div>}
+            {!enriching&&!enrichData&&!enrichErr&&<div style={{textAlign:"center",padding:32,color:THEME.textDim,fontSize:13}}>Click "🔍 Enrich" to add threat context and coverage gaps.</div>}
+            {enrichData&&(
+              <div style={{display:"grid",gap:12}}>
+                {enrichData.attack_path_summary&&(
+                  <div style={{padding:"12px 16px",background:"rgba(0,212,255,0.04)",border:"1px solid "+THEME.borderBright,borderRadius:8}}>
+                    <div style={{fontSize:10,fontWeight:800,color:THEME.accent,letterSpacing:"0.12em",marginBottom:6}}>KILL CHAIN POSITION</div>
+                    <div style={{fontSize:13,color:THEME.textMid,lineHeight:1.6}}>{enrichData.attack_path_summary}</div>
+                  </div>
+                )}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                  {enrichData.next_tactics?.length>0&&(
+                    <div style={{padding:"12px 16px",background:"rgba(255,255,255,0.02)",border:"1px solid "+THEME.border,borderRadius:8}}>
+                      <div style={{fontSize:10,fontWeight:800,color:THEME.warning,letterSpacing:"0.12em",marginBottom:8}}>NEXT LIKELY TACTICS</div>
+                      {enrichData.next_tactics.map((t,i)=><div key={i} style={{fontSize:12,color:THEME.textMid,marginBottom:4,display:"flex",alignItems:"center",gap:6}}><span style={{color:THEME.warning,fontSize:10}}>→</span>{t}</div>)}
+                    </div>
+                  )}
+                  {enrichData.high_value_targets&&(
+                    <div style={{padding:"12px 16px",background:"rgba(255,255,255,0.02)",border:"1px solid "+THEME.border,borderRadius:8}}>
+                      <div style={{fontSize:10,fontWeight:800,color:THEME.danger,letterSpacing:"0.12em",marginBottom:8}}>HIGH VALUE TARGETS AT RISK</div>
+                      <div style={{fontSize:12,color:THEME.textMid,lineHeight:1.6}}>{enrichData.high_value_targets}</div>
+                    </div>
+                  )}
+                </div>
+                {enrichData.adjacent_detections?.length>0&&(
+                  <div style={{padding:"12px 16px",background:"rgba(255,255,255,0.02)",border:"1px solid "+THEME.border,borderRadius:8}}>
+                    <div style={{fontSize:10,fontWeight:800,color:THEME.purple,letterSpacing:"0.12em",marginBottom:8}}>ADJACENT DETECTIONS TO BUILD</div>
+                    {enrichData.adjacent_detections.map((d,i)=>(
+                      <div key={i} style={{marginBottom:8,paddingLeft:10,borderLeft:"2px solid "+THEME.purple+"44"}}>
+                        <div style={{fontSize:12,fontWeight:700,color:THEME.text}}>{d.name}</div>
+                        <div style={{fontSize:11,color:THEME.textDim}}>{d.why}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                  {enrichData.quick_win&&(
+                    <div style={{padding:"12px 16px",background:"rgba(0,255,136,0.04)",border:"1px solid rgba(0,255,136,0.15)",borderRadius:8}}>
+                      <div style={{fontSize:10,fontWeight:800,color:THEME.success,letterSpacing:"0.12em",marginBottom:6}}>QUICK WIN</div>
+                      <div style={{fontSize:12,color:THEME.textMid,lineHeight:1.6}}>{enrichData.quick_win}</div>
+                    </div>
+                  )}
+                  {enrichData.gap_warning&&(
+                    <div style={{padding:"12px 16px",background:"rgba(255,61,85,0.04)",border:"1px solid rgba(255,61,85,0.15)",borderRadius:8}}>
+                      <div style={{fontSize:10,fontWeight:800,color:THEME.danger,letterSpacing:"0.12em",marginBottom:6}}>COVERAGE GAP</div>
+                      <div style={{fontSize:12,color:THEME.textMid,lineHeight:1.6}}>{enrichData.gap_warning}</div>
+                    </div>
+                  )}
+                </div>
+                {/* Apply enrich improvements CTA */}
+                {(enrichData.gap_warning||enrichData.quick_win)&&(
+                  <div style={{marginTop:14,padding:"12px 16px",background:"rgba(0,255,136,0.05)",border:"1px solid rgba(0,255,136,0.2)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+                    <div>
+                      <div style={{fontSize:12,fontWeight:700,color:THEME.success,marginBottom:2}}>✨ Apply enrichment to query</div>
+                      <div style={{fontSize:11,color:THEME.textDim}}>Rewrite the {tool.lang} query to fix the coverage gap{enrichData.quick_win?" and apply the quick win":""}. Improved version will be used when deploying.</div>
+                    </div>
+                    <button style={{...S.btn("p"),padding:"9px 20px",fontSize:12,whiteSpace:"nowrap",flexShrink:0}} onClick={fixQueryFromEnrich} disabled={applyingFix}>{applyingFix?<><Spinner/>Rewriting...</>:"✨ Apply to Query"}</button>
+                  </div>
+                )}
+              </div>
+            )}
+            {/* External Enrichment Tools — always shown */}
+            <ExternalEnrichTools tactic={tactic} technique={ads?.mitre_id} name={detName}/>
+          </div>
+        )}
+
+        {activeTab==="ml"&&(
+          <div>
+            {mlLoading&&<div style={{textAlign:"center",padding:32,color:THEME.textDim}}><Spinner/> Generating ML/UBA/RBA enhancements...</div>}
+            {mlErr&&<div style={{color:THEME.danger,fontSize:13,padding:12,background:"rgba(255,61,85,0.06)",borderRadius:8}}>{mlErr}</div>}
+            {!mlLoading&&!mlData&&!mlErr&&<div style={{textAlign:"center",padding:32,color:THEME.textDim,fontSize:13}}>Click "🧠 ML/UBA" to generate ML-enhanced queries, UBA baselines, and risk scoring rules.</div>}
+            {mlData&&(
+              <div>
+                {/* Sub-tabs */}
+                <div style={{display:"flex",gap:4,marginBottom:16,flexWrap:"wrap"}}>
+                  {[["ml","🤖 ML Query"],["uba","👤 UBA"],["rba","⚠️ Risk Rules"],["factors","📊 Risk Factors"]].map(([id,label])=>(
+                    <button key={id} onClick={()=>setMlSubTab(id)}
+                      style={{padding:"6px 14px",borderRadius:6,border:"1px solid "+(mlSubTab===id?THEME.accent+"88":"transparent"),background:mlSubTab===id?"rgba(0,212,255,0.08)":"rgba(255,255,255,0.02)",color:mlSubTab===id?THEME.accent:THEME.textDim,cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:mlSubTab===id?700:400}}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {mlSubTab==="ml"&&(
+                  <div>
+                    <div style={{padding:"10px 14px",background:"rgba(0,212,255,0.04)",border:"1px solid "+THEME.borderBright,borderRadius:8,marginBottom:12}}>
+                      <div style={{fontSize:10,fontWeight:800,color:THEME.accent,letterSpacing:"0.12em",marginBottom:4}}>ML APPROACH</div>
+                      <div style={{fontSize:13,color:THEME.textMid,lineHeight:1.6}}>{mlData.ml_approach}</div>
+                    </div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                      <span style={{fontSize:11,color:THEME.textDim}}>ML-Enhanced Query — <span style={{color:THEME.success}}>{mlData.anomaly_threshold}</span></span>
+                      <div style={{display:"flex",gap:6}}><CopyBtn text={mlData.ml_query||""}/><button style={{...S.btn("p"),padding:"4px 10px",fontSize:10,opacity:mlData.ml_query?1:0.4,cursor:mlData.ml_query?"pointer":"default"}} onClick={()=>mlData.ml_query&&applyQuery(mlData.ml_query,"ml")}>Use This Query ↑</button></div>
+                    </div>
+                    <div style={S.code}>{mlData.ml_query||"No query generated."}</div>
+                    {mlData.ml_explanation&&<div style={{marginTop:10,fontSize:12,color:THEME.textMid,lineHeight:1.7,padding:"10px 14px",background:"rgba(255,255,255,0.02)",borderRadius:8}}>{mlData.ml_explanation}</div>}
+                    <div style={{marginTop:10,display:"flex",gap:12,fontSize:11,color:THEME.textDim}}>
+                      <span>Baseline window: <span style={{color:THEME.warning}}>{mlData.baseline_window}</span></span>
+                    </div>
+                  </div>
+                )}
+
+                {mlSubTab==="uba"&&(
+                  <div>
+                    <div style={{padding:"10px 14px",background:"rgba(124,85,255,0.04)",border:"1px solid "+THEME.purple+"33",borderRadius:8,marginBottom:12}}>
+                      <div style={{fontSize:10,fontWeight:800,color:THEME.purple,letterSpacing:"0.12em",marginBottom:4}}>UBA BEHAVIORAL PATTERN</div>
+                      <div style={{fontSize:13,color:THEME.textMid,lineHeight:1.6}}>{mlData.uba_pattern}</div>
+                    </div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                      <span style={{fontSize:11,color:THEME.textDim}}>UBA-Focused Query (baselines per user/entity)</span>
+                      <div style={{display:"flex",gap:6}}><CopyBtn text={mlData.uba_query||""}/><button style={{...S.btn("p"),padding:"4px 10px",fontSize:10,opacity:mlData.uba_query?1:0.4,cursor:mlData.uba_query?"pointer":"default"}} onClick={()=>mlData.uba_query&&applyQuery(mlData.uba_query,"uba")}>Use This Query ↑</button></div>
+                    </div>
+                    <div style={S.code}>{mlData.uba_query||"No UBA query generated."}</div>
+                  </div>
+                )}
+
+                {mlSubTab==="rba"&&(
+                  <div>
+                    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12,padding:"12px 16px",background:"rgba(255,170,0,0.04)",border:"1px solid rgba(255,170,0,0.2)",borderRadius:8}}>
+                      <div style={{fontSize:36,fontWeight:900,color:mlData.risk_score>=70?THEME.danger:mlData.risk_score>=40?THEME.warning:THEME.success}}>{mlData.risk_score}</div>
+                      <div>
+                        <div style={{fontSize:10,fontWeight:800,letterSpacing:"0.12em",color:THEME.textDim}}>RISK SCORE</div>
+                        <div style={{fontSize:12,color:THEME.textMid}}>Splunk ES Risk Framework contribution</div>
+                      </div>
+                    </div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                      <span style={{fontSize:11,color:THEME.textDim}}>Risk Modifier Rule (adds to Splunk ES risk index — deploy alongside main detection)</span>
+                      <div style={{display:"flex",gap:6}}><CopyBtn text={mlData.risk_modifier_rule||""}/><button style={{...S.btn("p"),padding:"4px 10px",fontSize:10,opacity:mlData.risk_modifier_rule?1:0.4,cursor:mlData.risk_modifier_rule?"pointer":"default"}} onClick={()=>mlData.risk_modifier_rule&&applyQuery(mlData.risk_modifier_rule,"rba")}>Use This Query ↑</button></div>
+                    </div>
+                    <div style={S.code}>{mlData.risk_modifier_rule||"No risk rule generated."}</div>
+                  </div>
+                )}
+
+                {mlSubTab==="factors"&&(
+                  <div>
+                    <div style={{fontSize:10,fontWeight:800,color:THEME.warning,letterSpacing:"0.12em",marginBottom:12}}>RISK FACTORS ({mlData.risk_factors?.length||0} identified)</div>
+                    {(mlData.risk_factors||[]).map((f,i)=>(
+                      <div key={i} style={{display:"flex",gap:10,alignItems:"flex-start",padding:"10px 14px",background:"rgba(255,255,255,0.02)",border:"1px solid "+THEME.border,borderRadius:8,marginBottom:8}}>
+                        <div style={{width:22,height:22,borderRadius:"50%",background:THEME.warning+"22",border:"1px solid "+THEME.warning+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:THEME.warning,flexShrink:0}}>{i+1}</div>
+                        <div style={{fontSize:12,color:THEME.textMid,lineHeight:1.6}}>{f}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab==="blast"&&(
+          <div>
+            {blasting&&<div style={{textAlign:"center",padding:32,color:THEME.textDim}}><Spinner/> Estimating blast radius across org sizes...</div>}
+            {blastErr&&<div style={{color:THEME.danger,fontSize:13,padding:12,background:"rgba(255,61,85,0.06)",borderRadius:8}}>{blastErr}</div>}
+            {!blasting&&!blastData&&!blastErr&&<div style={{textAlign:"center",padding:32,color:THEME.textDim,fontSize:13}}>Click "💥 Blast" to estimate how many alerts this detection generates before deploying.</div>}
+            {blastData&&(
+              <div>
+                <div style={{marginBottom:16,padding:"12px 16px",background:"rgba(255,80,80,0.04)",border:"1px solid rgba(255,80,80,0.2)",borderRadius:8}}>
+                  <div style={{fontSize:10,fontWeight:800,color:"#ff8080",letterSpacing:"0.12em",marginBottom:4}}>ALERT FATIGUE RISK — {blastData.alert_fatigue_risk||"Unknown"}</div>
+                  <div style={{fontSize:12,color:THEME.textMid}}>{blastData.benchmark}</div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,marginBottom:16}}>
+                  {(blastData.estimates||[]).map((e,i)=>(
+                    <div key={i} style={{padding:"14px 16px",background:"rgba(255,255,255,0.02)",border:"1px solid "+(e.noise_level==="Very High"?THEME.danger:e.noise_level==="High"?THEME.warning:e.noise_level==="Medium"?"rgba(0,212,255,0.3)":THEME.success)+"44",borderRadius:8}}>
+                      <div style={{fontSize:16,fontWeight:800,color:e.noise_level==="Very High"?THEME.danger:e.noise_level==="High"?THEME.warning:e.noise_level==="Medium"?THEME.accent:THEME.success}}>{e.daily_alerts} <span style={{fontSize:11,fontWeight:400,color:THEME.textDim}}>alerts/day</span></div>
+                      <div style={{fontSize:11,fontWeight:700,color:THEME.text,marginTop:2}}>{e.endpoints}</div>
+                      <div style={{fontSize:10,color:THEME.textDim,marginTop:2}}>FP rate: {e.fp_rate} · Noise: {e.noise_level}</div>
+                      <div style={{fontSize:10,color:THEME.textMid,marginTop:6,paddingTop:6,borderTop:"1px solid "+THEME.border}}>{e.recommendation}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+                  <div style={{padding:"10px 14px",background:"rgba(255,255,255,0.02)",border:"1px solid "+THEME.border,borderRadius:8}}>
+                    <div style={{fontSize:10,fontWeight:800,color:THEME.textDim,letterSpacing:"0.1em",marginBottom:4}}>PEAK HOURS</div>
+                    <div style={{fontSize:12,color:THEME.textMid}}>{blastData.peak_hours}</div>
+                  </div>
+                  <div style={{padding:"10px 14px",background:"rgba(255,255,255,0.02)",border:"1px solid "+THEME.border,borderRadius:8}}>
+                    <div style={{fontSize:10,fontWeight:800,color:THEME.textDim,letterSpacing:"0.1em",marginBottom:4}}>TOP LOG SOURCES</div>
+                    <div style={{fontSize:12,color:THEME.textMid}}>{(blastData.top_log_sources||[]).join(", ")}</div>
+                  </div>
+                </div>
+                <div style={{padding:"12px 16px",background:"rgba(255,170,0,0.04)",border:"1px solid rgba(255,170,0,0.2)",borderRadius:8}}>
+                  <div style={{fontSize:10,fontWeight:800,color:THEME.warning,letterSpacing:"0.1em",marginBottom:6}}>TUNING RECOMMENDATION</div>
+                  <div style={{fontSize:12,color:THEME.textMid,lineHeight:1.6}}>{blastData.tuning_recommendation}</div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab==="aitp"&&(
+          <div>
+            {fpAiLoading&&<div style={{textAlign:"center",padding:32,color:THEME.textDim}}><Spinner/> Analyzing detection for false positive scenarios...</div>}
+            {fpAiErr&&<div style={{color:THEME.danger,fontSize:13,padding:12,background:"rgba(255,61,85,0.06)",borderRadius:8}}>{fpAiErr}</div>}
+            {!fpAiLoading&&!fpAiData&&!fpAiErr&&<div style={{textAlign:"center",padding:32,color:THEME.textDim,fontSize:13}}>Click "⚠️ FP Check" to get AI analysis of false positive scenarios and ready-to-paste exclusions.</div>}
+            {fpAiData&&(
+              <div>
+                <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:16,padding:"12px 16px",background:fpAiData.safe_to_deploy?"rgba(0,232,122,0.05)":"rgba(255,170,0,0.05)",border:"1px solid "+(fpAiData.safe_to_deploy?THEME.success:THEME.warning)+"44",borderRadius:8}}>
+                  <div style={{fontSize:22}}>{fpAiData.safe_to_deploy?"✅":"⚠️"}</div>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:700,color:fpAiData.safe_to_deploy?THEME.success:THEME.warning}}>{fpAiData.safe_to_deploy?"Safe to Deploy":"Tune Before Deploying"}</div>
+                    <div style={{fontSize:11,color:THEME.textMid}}>{fpAiData.deploy_recommendation} · Overall FP rate: {fpAiData.overall_fp_rate}</div>
+                  </div>
+                </div>
+                <div style={{marginBottom:14}}>
+                  <div style={{fontSize:10,fontWeight:800,color:THEME.warning,letterSpacing:"0.12em",marginBottom:10}}>FALSE POSITIVE SCENARIOS ({(fpAiData.scenarios||[]).length})</div>
+                  {(fpAiData.scenarios||[]).map((s,i)=>(
+                    <div key={i} style={{marginBottom:10,padding:"12px 14px",background:"rgba(255,255,255,0.02)",border:"1px solid "+THEME.border,borderRadius:8}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                        <div style={{fontSize:12,fontWeight:700,color:THEME.text}}>{s.title}</div>
+                        <span style={{...S.badge(s.likelihood==="High"?THEME.danger:s.likelihood==="Medium"?THEME.warning:THEME.success),fontSize:9}}>{s.likelihood} likelihood</span>
+                      </div>
+                      <div style={{fontSize:11,color:THEME.textMid,marginBottom:6}}>{s.description} · <span style={{color:THEME.textDim}}>Affects: {s.affected_roles}</span></div>
+                      {s.exclusion_query&&<div style={{...S.code,fontSize:10,padding:"6px 10px"}}>{s.exclusion_query}</div>}
+                    </div>
+                  ))}
+                </div>
+                <div style={{marginBottom:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                    <div style={{fontSize:10,fontWeight:800,color:THEME.accent,letterSpacing:"0.12em"}}>EXCLUSION TEMPLATE — paste at end of detection</div>
+                    <CopyBtn text={fpAiData.exclusion_template||""}/>
+                  </div>
+                  <div style={S.code}>{fpAiData.exclusion_template||"No template generated."}</div>
+                </div>
+                <div style={{padding:"10px 14px",background:"rgba(255,255,255,0.02)",border:"1px solid "+THEME.border,borderRadius:8}}>
+                  <div style={{fontSize:10,fontWeight:800,color:THEME.textDim,letterSpacing:"0.1em",marginBottom:4}}>RECOMMENDED WHITELIST FIELDS</div>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{(fpAiData.recommended_whitelist_fields||[]).map((f,i)=><span key={i} style={S.badge(THEME.accent)}>{f}</span>)}</div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab==="lotl"&&(
+          <div>
+            {lotlLoading&&<div style={{textAlign:"center",padding:32,color:THEME.textDim}}><Spinner/> Mapping LOTL binary coverage for {tactic}...</div>}
+            {lotlErr&&<div style={{color:THEME.danger,fontSize:13,padding:12,background:"rgba(255,61,85,0.06)",borderRadius:8}}>{lotlErr}</div>}
+            {!lotlLoading&&!lotlData&&!lotlErr&&<div style={{textAlign:"center",padding:32,color:THEME.textDim,fontSize:13}}>Click "🔧 LOTL" to see all Living-off-the-Land binaries relevant to this tactic with detection queries for each.</div>}
+            {lotlData&&(
+              <div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+                  <div style={{padding:"12px 16px",background:"rgba(0,232,122,0.04)",border:"1px solid rgba(0,232,122,0.2)",borderRadius:8}}>
+                    <div style={{fontSize:10,fontWeight:800,color:THEME.success,letterSpacing:"0.1em",marginBottom:4}}>COVERAGE GAP</div>
+                    <div style={{fontSize:12,color:THEME.textMid}}>{lotlData.coverage_gap_summary}</div>
+                  </div>
+                  <div style={{padding:"12px 16px",background:"rgba(0,212,255,0.04)",border:"1px solid "+THEME.borderBright,borderRadius:8}}>
+                    <div style={{fontSize:10,fontWeight:800,color:THEME.accent,letterSpacing:"0.1em",marginBottom:4}}>QUICK WIN</div>
+                    <div style={{fontSize:12,color:THEME.textMid}}>{lotlData.quick_win}</div>
+                  </div>
+                </div>
+                <div style={{marginBottom:10}}>
+                  <div style={{fontSize:10,fontWeight:800,color:THEME.textDim,letterSpacing:"0.12em",marginBottom:10}}>PRIORITY ORDER</div>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>{(lotlData.priority_order||[]).map((b,i)=><span key={i} style={{...S.badge(i===0?THEME.danger:i===1?THEME.warning:THEME.accent),fontSize:10}}>#{i+1} {b}</span>)}</div>
+                </div>
+                {(lotlData.lolbins||[]).map((b,i)=>(
+                  <div key={i} style={{marginBottom:10,border:"1px solid "+THEME.border,borderRadius:8,overflow:"hidden"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",background:"rgba(255,255,255,0.02)"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                        <span style={{fontFamily:"monospace",fontSize:12,fontWeight:700,color:THEME.text}}>{b.name}</span>
+                        <span style={S.badge(b.risk==="High"?THEME.danger:b.risk==="Medium"?THEME.warning:THEME.success)}>{b.risk}</span>
+                        <span style={{fontSize:10,color:THEME.textDim}}>{b.prevalence}</span>
+                      </div>
+                      <div style={{display:"flex",gap:6}}>
+                        <CopyBtn text={b.query||""}/>
+                        <button style={{...S.btn("p"),padding:"3px 10px",fontSize:10}} onClick={()=>b.query&&applyQuery(b.query,"lotl")}>Use ↑</button>
+                      </div>
+                    </div>
+                    <div style={{padding:"8px 14px",borderTop:"1px solid "+THEME.border}}>
+                      <div style={{fontSize:11,color:THEME.textMid,marginBottom:6}}>{b.abuse}</div>
+                      <div style={{...S.code,fontSize:10,padding:"6px 10px"}}>{b.query}</div>
+                    </div>
+                  </div>
+                ))}
+                <div style={{marginTop:10,fontSize:11,color:THEME.textDim}}>Reference: <a href="https://lolbas-project.github.io/" target="_blank" rel="noopener noreferrer" style={{color:THEME.accent}}>LOLBAS Project ↗</a> · <a href="https://gtfobins.github.io/" target="_blank" rel="noopener noreferrer" style={{color:THEME.accent}}>GTFOBins ↗</a></div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab==="defend"&&(
+          <div>
+            <div style={{display:"flex",gap:6,marginBottom:16}}>
+              {[{id:"honey",label:"🍯 Honeytokens"},{id:"sinkhole",label:"🕳 DNS Sinkhole"}].map(t=>(
+                <button key={t.id} onClick={()=>setDefendSubTab(t.id)} style={{padding:"6px 14px",borderRadius:6,border:"1px solid "+(defendSubTab===t.id?THEME.purple+"88":"transparent"),background:defendSubTab===t.id?"rgba(124,85,255,0.1)":"transparent",color:defendSubTab===t.id?THEME.purple:THEME.textDim,cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:defendSubTab===t.id?700:400}}>{t.label}</button>
+              ))}
+            </div>
+
+            {defendSubTab==="honey"&&(
+              <div>
+                {honeytokenLoading&&<div style={{textAlign:"center",padding:32,color:THEME.textDim}}><Spinner/> Designing honeytoken traps...</div>}
+                {honeytokenErr&&<div style={{color:THEME.danger,fontSize:13,padding:12,background:"rgba(255,61,85,0.06)",borderRadius:8}}>{honeytokenErr}</div>}
+                {!honeytokenLoading&&!honeytokenData&&!honeytokenErr&&<div style={{textAlign:"center",padding:32,color:THEME.textDim,fontSize:13}}>Click "🍯 Honey" to generate honeytoken traps that give 100% confidence alerts when triggered.</div>}
+                {honeytokenData&&(
+                  <div>
+                    <div style={{marginBottom:14,padding:"12px 16px",background:"rgba(124,85,255,0.04)",border:"1px solid "+THEME.purple+"33",borderRadius:8}}>
+                      <div style={{fontSize:12,color:THEME.textMid,marginBottom:4}}>{honeytokenData.coverage_benefit}</div>
+                      <div style={{fontSize:11,color:THEME.textDim}}>Canary tokens: <a href={honeytokenData.canarytoken_url} target="_blank" rel="noopener noreferrer" style={{color:THEME.accent}}>canarytokens.org ↗</a></div>
+                    </div>
+                    {(honeytokenData.tokens||[]).map((t,i)=>(
+                      <div key={i} style={{marginBottom:12,border:"1px solid "+THEME.border,borderRadius:8,overflow:"hidden"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",background:"rgba(255,255,255,0.02)"}}>
+                          <div>
+                            <div style={{fontSize:12,fontWeight:700,color:THEME.text}}>{t.type}</div>
+                            <div style={{fontSize:10,color:THEME.textDim}}>{t.platform} · Alert confidence: <span style={{color:THEME.success}}>{t.alert_confidence}</span></div>
+                          </div>
+                          <span style={S.badge(THEME.success)}>100% confidence</span>
+                        </div>
+                        <div style={{padding:"10px 14px",borderTop:"1px solid "+THEME.border}}>
+                          <div style={{fontSize:11,color:THEME.textMid,marginBottom:8}}>{t.description}</div>
+                          <div style={{fontSize:10,fontWeight:700,color:THEME.textDim,marginBottom:4}}>DEPLOY CMD</div>
+                          <div style={{...S.code,fontSize:10,padding:"6px 10px",marginBottom:8}}>{t.deployment_cmd}</div>
+                          <div style={{fontSize:10,fontWeight:700,color:THEME.textDim,marginBottom:4}}>DETECTION QUERY</div>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                            <span style={{fontSize:10,color:THEME.textDim}}></span>
+                            <div style={{display:"flex",gap:6}}><CopyBtn text={t.detection_query||""}/><button style={{...S.btn("p"),padding:"3px 10px",fontSize:10}} onClick={()=>t.detection_query&&applyQuery(t.detection_query,"honey")}>Use ↑</button></div>
+                          </div>
+                          <div style={S.code}>{t.detection_query}</div>
+                        </div>
+                      </div>
+                    ))}
+                    {honeytokenData.deployment_guide&&(
+                      <div style={{padding:"12px 14px",background:"rgba(255,255,255,0.02)",border:"1px solid "+THEME.border,borderRadius:8}}>
+                        <div style={{fontSize:10,fontWeight:800,color:THEME.textDim,letterSpacing:"0.1em",marginBottom:6}}>DEPLOYMENT GUIDE</div>
+                        <div style={{fontSize:12,color:THEME.textMid,lineHeight:1.7}}>{honeytokenData.deployment_guide}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {defendSubTab==="sinkhole"&&(
+              <div>
+                {sinkholeLoading&&<div style={{textAlign:"center",padding:32,color:THEME.textDim}}><Spinner/> Generating DNS sinkhole configurations...</div>}
+                {sinkholeErr&&<div style={{color:THEME.danger,fontSize:13,padding:12,background:"rgba(255,61,85,0.06)",borderRadius:8}}>{sinkholeErr}</div>}
+                {!sinkholeLoading&&!sinkholeData&&!sinkholeErr&&<div style={{textAlign:"center",padding:32,color:THEME.textDim,fontSize:13}}>Click "🕳 Sinkhole" to generate RPZ zone files, Pi-hole lists, and Windows DNS configs for this threat.</div>}
+                {sinkholeData&&(
+                  <div>
+                    <div style={{marginBottom:14}}>
+                      <div style={{fontSize:10,fontWeight:800,color:THEME.accent,letterSpacing:"0.12em",marginBottom:8}}>INFERRED DOMAINS TO BLOCK ({(sinkholeData.inferred_domains||[]).length})</div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>{(sinkholeData.inferred_domains||[]).map((d,i)=><span key={i} style={{...S.badge(THEME.danger),fontFamily:"monospace",fontSize:10}}>{d}</span>)}</div>
+                    </div>
+                    {[
+                      {label:"Pi-hole Blocklist",key:"pihole_blocklist",color:THEME.success},
+                      {label:"BIND9 RPZ Zone",key:"bind9_rpz",color:THEME.warning},
+                      {label:"Windows DNS RPZ",key:"windows_dns_rpz",color:THEME.accent},
+                      {label:"Unbound Config",key:"unbound_conf",color:THEME.purple},
+                      {label:"Sinkhole Detection Query",key:"sinkhole_detection_query",color:THEME.danger},
+                    ].map(({label,key,color})=>(
+                      <div key={key} style={{marginBottom:10}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                          <span style={{fontSize:10,fontWeight:800,color,letterSpacing:"0.1em"}}>{label}</span>
+                          <div style={{display:"flex",gap:6}}>
+                            <CopyBtn text={sinkholeData[key]||""}/>
+                            {key==="sinkhole_detection_query"&&<button style={{...S.btn("p"),padding:"3px 10px",fontSize:10}} onClick={()=>sinkholeData[key]&&applyQuery(sinkholeData[key],"sinkhole")}>Use ↑</button>}
+                          </div>
+                        </div>
+                        <div style={{...S.code,fontSize:10,padding:"8px 12px",whiteSpace:"pre-wrap"}}>{sinkholeData[key]||"Not generated."}</div>
+                      </div>
+                    ))}
+                    {sinkholeData.deployment_steps&&(
+                      <div style={{padding:"12px 14px",background:"rgba(255,255,255,0.02)",border:"1px solid "+THEME.border,borderRadius:8}}>
+                        <div style={{fontSize:10,fontWeight:800,color:THEME.textDim,letterSpacing:"0.1em",marginBottom:8}}>DEPLOYMENT STEPS</div>
+                        {(sinkholeData.deployment_steps||[]).map((s,i)=><div key={i} style={{fontSize:12,color:THEME.textMid,marginBottom:4}}>{s}</div>)}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab==="workflow"&&(
+          <div>
+            {workflowLoading&&<div style={{textAlign:"center",padding:32,color:THEME.textDim}}><Spinner/> Designing automated response workflow...</div>}
+            {workflowErr&&<div style={{color:THEME.danger,fontSize:13,padding:12,background:"rgba(255,61,85,0.06)",borderRadius:8}}>{workflowErr}</div>}
+            {!workflowLoading&&!workflowData&&!workflowErr&&<div style={{textAlign:"center",padding:32,color:THEME.textDim,fontSize:13}}>Click "⚡ Workflow" to generate an automated SOAR response workflow for this detection.</div>}
+            {workflowData&&(
+              <div>
+                <div style={{marginBottom:14,padding:"12px 16px",background:"rgba(0,212,255,0.04)",border:"1px solid "+THEME.borderBright,borderRadius:8}}>
+                  <div style={{fontSize:13,fontWeight:700,color:THEME.text,marginBottom:4}}>{workflowData.workflow_name}</div>
+                  <div style={{fontSize:12,color:THEME.textMid}}>{workflowData.description}</div>
+                  {workflowData.key_integrations?.length>0&&(
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:8}}>
+                      {workflowData.key_integrations.map((k,i)=><span key={i} style={S.badge(THEME.purple)}>{k}</span>)}
+                    </div>
+                  )}
+                </div>
+
+                {/* Sub-tabs */}
+                <div style={{display:"flex",gap:4,marginBottom:14}}>
+                  {[["visual","🔀 Visual"],["n8n","n8n JSON"],["xsoar","XSOAR"],["tines","Tines"]].map(([id,label])=>(
+                    <button key={id} onClick={()=>setWorkflowSubTab(id)}
+                      style={{padding:"6px 14px",borderRadius:6,border:"1px solid "+(workflowSubTab===id?THEME.accent+"88":"transparent"),background:workflowSubTab===id?"rgba(0,212,255,0.08)":"rgba(255,255,255,0.02)",color:workflowSubTab===id?THEME.accent:THEME.textDim,cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:workflowSubTab===id?700:400}}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {workflowSubTab==="visual"&&(
+                  <div style={{overflowX:"auto",paddingBottom:8}}>
+                    {(() => {
+                      const steps = workflowData.steps || [];
+                      const edges = workflowData.edges || [];
+                      const iconMap = { webhook:"🔔", code:"{}", globe:"🌐", ai:"🤖", merge:"⇄", decision:"◆", email:"✉", http:"🌐" };
+                      const typeColor = { trigger:THEME.success, http:THEME.accent, ai:THEME.purple, transform:"#ff9900", decision:THEME.warning, notify:"#00ccff" };
+                      // Group steps into columns for layout
+                      const colOrder = ["trigger","extract","enrich1","enrich2","llm_analyze","merge","decision","block_action","update_siem","llm_report","notify","log_no_action"];
+                      const ordered = colOrder.filter(id=>steps.find(s=>s.id===id)).map(id=>steps.find(s=>s.id===id));
+                      const rest = steps.filter(s=>!colOrder.includes(s.id));
+                      const allSteps = [...ordered,...rest];
+                      return (
+                        <div style={{display:"flex",alignItems:"flex-start",gap:0,minWidth:800,position:"relative"}}>
+                          {allSteps.map((step,i)=>{
+                            const color = typeColor[step.type]||THEME.textDim;
+                            const isDecision = step.type==="decision";
+                            return (
+                              <div key={step.id} style={{display:"flex",alignItems:"center",flexShrink:0}}>
+                                <div style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
+                                  <div style={{width:110,padding:"10px 8px",background:"rgba(255,255,255,0.04)",border:"1px solid "+color+"66",borderRadius:isDecision?0:8,transform:isDecision?"rotate(2deg)":"none",marginBottom:4,cursor:"default"}} title={step.description}>
+                                    <div style={{fontSize:18,textAlign:"center",marginBottom:4}}>{iconMap[step.icon]||"⬡"}</div>
+                                    <div style={{fontSize:10,fontWeight:700,color:color,textAlign:"center",lineHeight:1.3,marginBottom:2}}>{step.label}</div>
+                                    {step.sublabel&&<div style={{fontSize:9,color:THEME.textDim,textAlign:"center",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:95}}>{step.sublabel}</div>}
+                                  </div>
+                                </div>
+                                {i<allSteps.length-1&&<div style={{width:24,height:1,background:THEME.borderBright,flexShrink:0,position:"relative"}}><div style={{position:"absolute",right:-2,top:-4,fontSize:10,color:THEME.textDim}}>›</div></div>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                    <div style={{marginTop:16,display:"flex",gap:8,flexWrap:"wrap"}}>
+                      {[["trigger","Trigger",THEME.success],["http","HTTP/API",THEME.accent],["ai","AI/LLM",THEME.purple],["transform","Transform","#ff9900"],["decision","Decision",THEME.warning],["notify","Notify","#00ccff"]].map(([t,label,color])=>(
+                        <span key={t} style={{fontSize:10,color:color,display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,borderRadius:"50%",background:color,display:"inline-block"}}></span>{label}</span>
+                      ))}
+                    </div>
+                    {/* Step details */}
+                    <div style={{marginTop:16,display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                      {(workflowData.steps||[]).map(step=>(
+                        <div key={step.id} style={{padding:"8px 12px",background:"rgba(255,255,255,0.02)",border:"1px solid "+THEME.border,borderRadius:6}}>
+                          <div style={{fontSize:11,fontWeight:700,color:THEME.text,marginBottom:2}}>{step.label}</div>
+                          <div style={{fontSize:11,color:THEME.textDim,lineHeight:1.5}}>{step.description}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {workflowSubTab==="n8n"&&(
+                  <div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                      <span style={{fontSize:11,color:THEME.textDim}}>Import this JSON into n8n (File → Import Workflow)</span>
+                      <div style={{display:"flex",gap:6}}>
+                        <CopyBtn text={JSON.stringify(workflowData.n8n_workflow||{name:workflowData.workflow_name,nodes:[],connections:{}},null,2)}/>
+                        <button style={{...S.btn(),padding:"4px 10px",fontSize:10}} onClick={()=>{const b=new Blob([JSON.stringify(workflowData.n8n_workflow||{name:workflowData.workflow_name,nodes:[],connections:{}},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="detectiq-workflow.json";a.click();}}>⬇ Download</button>
+                      </div>
+                    </div>
+                    <div style={S.code}>{JSON.stringify(workflowData.n8n_workflow||{name:workflowData.workflow_name,nodes:[],connections:{}},null,2)}</div>
+                  </div>
+                )}
+
+                {workflowSubTab==="xsoar"&&(
+                  <div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                      <span style={{fontSize:11,color:THEME.textDim}}>Cortex XSOAR / Splunk SOAR playbook pseudocode</span>
+                      <CopyBtn text={workflowData.xsoar_pseudocode||""}/>
+                    </div>
+                    <div style={{fontSize:12,color:THEME.textMid,lineHeight:1.9,whiteSpace:"pre-wrap",padding:14,background:"#02040a",borderRadius:8,border:"1px solid "+THEME.border}}>{workflowData.xsoar_pseudocode||"No XSOAR config generated."}</div>
+                  </div>
+                )}
+
+                {workflowSubTab==="tines"&&(
+                  <div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                      <span style={{fontSize:11,color:THEME.textDim}}>Tines story implementation guidance</span>
+                      <CopyBtn text={workflowData.tines_description||""}/>
+                    </div>
+                    <div style={{fontSize:12,color:THEME.textMid,lineHeight:1.9,whiteSpace:"pre-wrap",padding:14,background:"#02040a",borderRadius:8,border:"1px solid "+THEME.border}}>{workflowData.tines_description||"No Tines config generated."}</div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab==="deploy"&&(
+          <div>
+            {/* Query being deployed */}
+            <div style={{marginBottom:14,padding:"10px 14px",background:queryModified?"rgba(0,255,136,0.05)":"rgba(255,255,255,0.02)",border:"1px solid "+(queryModified?"rgba(0,255,136,0.25)":THEME.border),borderRadius:8,display:"flex",alignItems:"flex-start",gap:10}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:10,fontWeight:800,letterSpacing:"0.1em",color:queryModified?THEME.success:THEME.textDim,marginBottom:4}}>{queryModified?"✓ IMPROVED QUERY WILL BE DEPLOYED":"ORIGINAL QUERY WILL BE DEPLOYED"}</div>
+                <div style={{fontSize:11,fontFamily:"monospace",color:THEME.textMid,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{activeQuery.slice(0,120)}{activeQuery.length>120?"...":""}</div>
+              </div>
+              <button style={{...S.btn(),padding:"4px 10px",fontSize:10,flexShrink:0}} onClick={()=>setActiveTab("query")}>View / Edit ↗</button>
+            </div>
+            {/* Sub-tab row */}
+            <div style={{display:"flex",gap:4,marginBottom:14,flexWrap:"wrap"}}>
+              {[["test","🧪 Test"],["playbook","🎭 Playbook"],["ticket","🎫 Ticket"],["sigma","∑ Sigma AI"],["splunk","Splunk"],["elastic","Elastic"],["soar","SOAR"]].map(([id,label])=>(
+                <button key={id} onClick={()=>setDeploySubTab(id)}
+                  style={{padding:"6px 12px",borderRadius:6,border:"1px solid "+(deploySubTab===id?THEME.purple+"88":"transparent"),background:deploySubTab===id?"rgba(124,85,255,0.1)":"rgba(255,255,255,0.02)",color:deploySubTab===id?THEME.purple:THEME.textDim,cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:deploySubTab===id?700:400}}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* BETA badge row */}
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}}>
+              <button style={{...S.btn(),padding:"7px 14px",fontSize:11}} onClick={runTest} disabled={testLoading}>{testLoading?<><Spinner/>Testing...</>:"🧪 Test Detection"}</button>
+              <button style={{...S.btn(),padding:"7px 14px",fontSize:11}} onClick={runPlaybook} disabled={generatingPlaybook}>{generatingPlaybook?<><Spinner/>Generating...</>:"🎭 Playbook"}</button>
+              <button style={{...S.btn(),padding:"7px 14px",fontSize:11}} onClick={runTicket} disabled={generatingTicket}>{generatingTicket?<><Spinner/>Generating...</>:"🎫 Create Ticket"}</button>
+              <button style={{...S.btn(),padding:"7px 14px",fontSize:11}} onClick={runSigmaAI} disabled={loadingSigma}>{loadingSigma?<><Spinner/>Exporting...</>:"∑ Sigma AI"}</button>
+              <div style={{borderLeft:"1px solid "+THEME.border,margin:"0 4px"}}/>
+              <button style={{...S.btn(),padding:"7px 14px",fontSize:11,borderColor:THEME.purple+"44",color:THEME.purple}} onClick={()=>setDeploySubTab("splunk")}>Push to Splunk</button>
+              <button style={{...S.btn(),padding:"7px 14px",fontSize:11,borderColor:THEME.purple+"44",color:THEME.purple}} onClick={()=>setDeploySubTab("elastic")}>Push to Elastic</button>
+              <button style={{...S.btn(),padding:"7px 14px",fontSize:11,borderColor:THEME.purple+"44",color:THEME.purple}} onClick={()=>setDeploySubTab("soar")}>Push to SOAR</button>
+            </div>
+
+            {pushResult&&(pushResult.includes("LOCAL_NET")
+              ? <div style={{marginBottom:12,padding:"12px 16px",background:"rgba(255,170,0,0.07)",border:"1px solid rgba(255,170,0,0.3)",borderRadius:8}}>
+                  <div style={{fontSize:12,fontWeight:700,color:THEME.warning,marginBottom:4}}>⚠ Splunk is on your local network</div>
+                  <div style={{fontSize:11,color:THEME.textMid,lineHeight:1.6}}>The cloud server can't resolve <code style={{color:THEME.accent}}>{splunkUrl}</code> — <code>.local</code> hostnames only work on your Mac's network.<br/>Use the <b>curl command below</b> — run it in your Mac terminal to push directly from your machine.</div>
+                </div>
+              : pushResult.includes("SSL_CERT:")
+                ? <SslCertGuide url={pushResult.replace(/.*SSL_CERT:/,"")}/>
+                : <div style={{marginBottom:12}}><StatusBar msg={pushResult.split(/:(.+)/)[1]||pushResult} type={pushResult.startsWith("success")?"success":"error"}/></div>
+            )}
+
+            {/* 🧪 Test */}
+            {deploySubTab==="test"&&(
+              <div>
+                {testLoading&&<div style={{textAlign:"center",padding:24,color:THEME.textDim}}><Spinner/> Running detection test...</div>}
+                {!testLoading&&!testResult&&<div style={{textAlign:"center",padding:32,color:THEME.textDim,fontSize:13}}>Click "🧪 Test Detection" to validate your detection logic.</div>}
+                {testResult?.error&&<div style={{color:THEME.danger,fontSize:13,padding:12,background:"rgba(255,61,85,0.06)",borderRadius:8}}>{testResult.error}</div>}
+                {testResult&&!testResult.error&&(
+                  <div>
+                    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14,padding:"14px 18px",background:testResult.passed?"rgba(0,255,136,0.05)":"rgba(255,61,85,0.05)",border:"1px solid "+(testResult.passed?THEME.success+"33":THEME.danger+"33"),borderRadius:10}}>
+                      <div style={{fontSize:28}}>{testResult.passed?"✅":"❌"}</div>
+                      <div>
+                        <div style={{fontSize:14,fontWeight:700,color:testResult.passed?THEME.success:THEME.danger}}>{testResult.passed?"Detection Passed":"Detection Issues Found"}</div>
+                        <div style={{fontSize:12,color:THEME.textMid,marginTop:2}}>{testResult.summary}</div>
+                      </div>
+                    </div>
+                    {testResult.issues?.length>0&&<div style={{marginBottom:12}}>{testResult.issues.map((iss,i)=><div key={i} style={{fontSize:12,color:THEME.warning,padding:"6px 10px",background:"rgba(255,170,0,0.05)",borderRadius:6,marginBottom:4}}>⚠ {iss}</div>)}</div>}
+                    {testResult.suggestions?.length>0&&<div>{testResult.suggestions.map((s,i)=><div key={i} style={{fontSize:12,color:THEME.textMid,padding:"6px 10px",background:"rgba(255,255,255,0.02)",borderRadius:6,marginBottom:4,borderLeft:"2px solid "+THEME.accent+"44"}}>→ {s}</div>)}</div>}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 🎭 Playbook */}
+            {deploySubTab==="playbook"&&(
+              <div>
+                {generatingPlaybook&&<div style={{textAlign:"center",padding:24,color:THEME.textDim}}><Spinner/> Generating IR playbook...</div>}
+                {!generatingPlaybook&&!playbookContent&&<div style={{textAlign:"center",padding:32,color:THEME.textDim,fontSize:13}}>Click "🎭 Playbook" to generate a SOAR response playbook.</div>}
+                {playbookContent&&<div style={{fontSize:12,color:THEME.textMid,lineHeight:1.9,whiteSpace:"pre-wrap",padding:14,background:"#02040a",borderRadius:8,border:"1px solid "+THEME.border}}><div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}><CopyBtn text={playbookContent}/></div>{playbookContent}</div>}
+              </div>
+            )}
+
+            {/* 🎫 Ticket */}
+            {deploySubTab==="ticket"&&(
+              <div>
+                {generatingTicket&&<div style={{textAlign:"center",padding:24,color:THEME.textDim}}><Spinner/> Generating JIRA/ServiceNow ticket...</div>}
+                {!generatingTicket&&!ticketContent&&<div style={{textAlign:"center",padding:32,color:THEME.textDim,fontSize:13}}>Click "🎫 Create Ticket" to generate a deployment ticket.</div>}
+                {ticketContent&&<div style={{fontSize:12,color:THEME.textMid,lineHeight:1.9,whiteSpace:"pre-wrap",padding:14,background:"#02040a",borderRadius:8,border:"1px solid "+THEME.border}}><div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}><CopyBtn text={ticketContent}/></div>{ticketContent}</div>}
+              </div>
+            )}
+
+            {/* ∑ Sigma AI */}
+            {deploySubTab==="sigma"&&(
+              <div>
+                {loadingSigma&&<div style={{textAlign:"center",padding:24,color:THEME.textDim}}><Spinner/> Generating Sigma rule...</div>}
+                {!loadingSigma&&!sigmaContent&&<div style={{textAlign:"center",padding:32,color:THEME.textDim,fontSize:13}}>Click "∑ Sigma AI" to export as a Sigma rule.</div>}
+                {sigmaContent&&(
+                  <div style={{position:"relative"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                      <span style={{fontSize:11,color:THEME.textDim}}>Sigma Rule (YAML)</span>
+                      <div style={{display:"flex",gap:6}}>
+                        <CopyBtn text={sigmaContent}/>
+                        <button style={{...S.btn(),padding:"4px 10px",fontSize:10}} onClick={()=>{const b=new Blob([sigmaContent],{type:"text/plain"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=(detName||"detection").replace(/\s+/g,"_")+".yml";a.click();}}>⬇ Download</button>
+                      </div>
+                    </div>
+                    <div style={S.code}>{sigmaContent}</div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Splunk */}
+            {deploySubTab==="splunk"&&(
+              <div style={{display:"grid",gap:10}}>
+                <div style={{fontSize:11,color:THEME.textDim}}>Push this detection as a Splunk saved search / alert.</div>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                  <span style={{fontSize:11,color:THEME.textMid,width:80}}>Auth Mode</span>
+                  <select style={{...S.input,flex:1}} value={splunkAuthMode} onChange={e=>setSplunkAuthMode(e.target.value)}>
+                    <option value="token">Bearer Token</option>
+                    <option value="basic">Username / Password</option>
+                  </select>
+                </div>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontSize:11,color:THEME.textMid,width:80}}>Splunk URL</span><input style={{...S.input,flex:1}} value={splunkUrl} onChange={e=>setSplunkUrl(e.target.value)} placeholder="https://your-splunk:8089"/></div>
+                {splunkAuthMode==="token"
+                  ? <div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontSize:11,color:THEME.textMid,width:80}}>Token</span><input style={{...S.input,flex:1}} type="password" value={splunkToken} onChange={e=>setSplunkToken(e.target.value)} placeholder="Splunk HEC/API token"/></div>
+                  : <><div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontSize:11,color:THEME.textMid,width:80}}>Username</span><input style={{...S.input,flex:1}} value={splunkUser} onChange={e=>setSplunkUser(e.target.value)} placeholder="admin"/></div><div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontSize:11,color:THEME.textMid,width:80}}>Password</span><input style={{...S.input,flex:1}} type="password" value={splunkPass} onChange={e=>setSplunkPass(e.target.value)}/></div></>
+                }
+                <button style={{...S.btn("p"),padding:"9px 20px",alignSelf:"flex-start"}} onClick={pushToSplunk} disabled={pushing}>{pushing?<><Spinner/>Pushing...</>:"Push to Splunk"}</button>
+                {/* curl fallback */}
+                <div style={{marginTop:4}}>
+                  <div onClick={()=>setShowCurlCmd(o=>!o)} style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",padding:"6px 0"}}>
+                    <span style={{fontSize:10,color:THEME.textDim,transform:showCurlCmd?"rotate(90deg)":"rotate(0deg)",display:"inline-block",transition:"transform 0.15s"}}>›</span>
+                    <span style={{fontSize:11,color:THEME.textDim}}>📋 Copy as curl command <span style={{color:THEME.warning}}>(run this on your Mac if Splunk is local)</span></span>
+                  </div>
+                  {showCurlCmd&&(()=>{
+                    const det=buildDet();const q=(det.query||"").replace(/'/g,"'\\''");
+                    const authFlag=splunkAuthMode==="basic"?`-u '${splunkUser||"admin"}:${splunkPass||"password"}'`:`-H 'Authorization: Bearer ${splunkToken||"<token>"}'`;
+                    const url=(splunkUrl||"https://splunk:8089").replace(/\/$/,"");
+                    const name=(det.name||"detection").replace(/'/g,"'\\''");
+                    const cmd=`#!/bin/bash\nSPLUNK_QUERY='${q}'\n\ncurl -k -X POST '${url}/services/saved/searches' \\\n  ${authFlag} \\\n  --data-urlencode "name=${name}" \\\n  --data-urlencode "search=$SPLUNK_QUERY" \\\n  -d 'is_scheduled=1' \\\n  -d 'cron_schedule=*/15 * * * *' \\\n  -d 'dispatch.earliest_time=-15m' \\\n  -d 'dispatch.latest_time=now'`;
+                    return(<div style={{position:"relative",marginTop:4}}>
+                      <div style={{fontSize:10,color:THEME.textDim,marginBottom:4}}>Save as <code>push.sh</code>, then run: <code>chmod +x push.sh && ./push.sh</code></div>
+                      <pre style={{...S.code,fontSize:10,lineHeight:1.6,whiteSpace:"pre-wrap",wordBreak:"break-all",paddingRight:60}}>{cmd}</pre>
+                      <button style={{position:"absolute",top:28,right:6,...S.btn("p"),padding:"4px 10px",fontSize:10}} onClick={()=>navigator.clipboard.writeText(cmd)}>Copy</button>
+                    </div>);
+                  })()}</div>
+              </div>
+            )}
+
+            {/* Elastic */}
+            {deploySubTab==="elastic"&&(
+              <div style={{display:"grid",gap:10}}>
+                <div style={{fontSize:11,color:THEME.textDim}}>Push this detection as a Kibana detection rule.</div>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontSize:11,color:THEME.textMid,width:80}}>Kibana URL</span><input style={{...S.input,flex:1}} value={elasticUrl} onChange={e=>setElasticUrl(e.target.value)} placeholder="https://your-kibana:5601"/></div>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontSize:11,color:THEME.textMid,width:80}}>API Key</span><input style={{...S.input,flex:1}} type="password" value={elasticToken} onChange={e=>setElasticToken(e.target.value)} placeholder="base64 of id:api_key"/></div>
+                <button style={{...S.btn("p"),padding:"9px 20px",alignSelf:"flex-start"}} onClick={pushToElastic} disabled={pushing}>{pushing?<><Spinner/>Pushing...</>:"Push to Elastic"}</button>
+              </div>
+            )}
+
+            {/* SOAR */}
+            {deploySubTab==="soar"&&(
+              <div style={{display:"grid",gap:10}}>
+                <div style={{fontSize:11,color:THEME.textDim}}>Send this detection as a webhook payload to your SOAR platform (Splunk SOAR, XSOAR, Tines, n8n, etc).</div>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontSize:11,color:THEME.textMid,width:100}}>Webhook URL</span><input style={{...S.input,flex:1}} value={soarUrl} onChange={e=>setSoarUrl(e.target.value)} placeholder="https://your-soar/webhook/..."/></div>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontSize:11,color:THEME.textMid,width:100}}>Token (opt)</span><input style={{...S.input,flex:1}} type="password" value={soarToken} onChange={e=>setSoarToken(e.target.value)} placeholder="Optional bearer token"/></div>
+                <button style={{...S.btn("p"),padding:"9px 20px",alignSelf:"flex-start"}} onClick={pushToSOAR} disabled={pushing}>{pushing?<><Spinner/>Pushing...</>:"Push to SOAR"}</button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 // ── Detection Builder ─────────────────────────────────────────────────────────
+const TACTIC_KEYWORDS={
+  "Reconnaissance":["scan","recon","nmap","sweep","port scan","network scan","ip range","fingerprint","enumerat","shodan","censys","probe"],
+  "Resource Development":["c2 infra","domain reg","phishing kit","malware dev","exploit kit","stage infra"],
+  "Initial Access":["phishing","spearphish","exploit public","drive-by","supply chain","watering hole","external service","vpn exploit","rdp exploit","initial access"],
+  "Execution":["powershell","cmd.exe","wscript","cscript","scheduled task","wmi exec","rundll","regsvr32","mshta","command exec","script exec","invoke-","shellcode"],
+  "Persistence":["registry run","startup","autorun","scheduled task","service install","cron","persistence","boot","logon script","winlogon"],
+  "Privilege Escalation":["privilege esc","uac bypass","token impersonat","sudo","suid","juicypotato","printspoofer","escalat","privesc","admin access","local admin"],
+  "Defense Evasion":["obfuscat","encode","base64","lolbas","timestomp","clear log","disable av","amsi","etw bypass","process inject","masquerad","unhook","packer"],
+  "Credential Access":["lsass","mimikatz","credential dump","password spray","brute force","kerberoast","pass-the-hash","pth","golden ticket","ntlm","hashcat","secretsdump","credential"],
+  "Discovery":["net user","whoami","ipconfig","systeminfo","net group","ldap query","bloodhound","sharphound","adrecon","net localgroup","tasklist","netstat","discovery"],
+  "Lateral Movement":["psexec","wmiexec","lateral","remote service","dcom","smb exec","rdp lateral","move laterally","pass-the-ticket"],
+  "Collection":["keylog","screenshot","clipboard","archive","zip collect","data collect","email collect","browser history","stage data"],
+  "Command and Control":["c2","beacon","cobalt strike","dns tunnel","http tunnel","reverse shell","c&c","cobaltstrike","metasploit","empire","command and control","implant"],
+  "Exfiltration":["exfil","data theft","exfiltrat","ftp upload","data leak","dns exfil","http post data","upload sensitive"],
+  "Impact":["ransomware","encrypt file","shadow copy","disk wipe","defac","dos attack","ddos","destruct","wiper","delete backup","data destroy"],
+};
+const SEVERITY_KEYWORDS={
+  "Critical":["ransomware","shadow copy","domain admin","domain controller","dc compromise","golden ticket","encrypt file","disk wipe","wiper"],
+  "High":["lsass","mimikatz","privilege esc","c2","beacon","psexec","credential dump","kerberoast","lateral movement","cobalt","pass-the-hash","reverse shell"],
+  "Medium":["phishing","brute force","password spray","recon","scan","discovery","scheduled task","persistence","registry"],
+  "Low":["whoami","systeminfo","ipconfig","net user","tasklist","netstat","ping","nslookup"],
+};
+function inferTacticAndSeverity(text){
+  const t=text.toLowerCase();
+  let bestTactic=null,bestScore=0;
+  for(const[tac,kws] of Object.entries(TACTIC_KEYWORDS)){
+    const score=kws.filter(k=>t.includes(k)).length;
+    if(score>bestScore){bestScore=score;bestTactic=tac;}
+  }
+  let bestSev="Medium";
+  for(const[sev,kws] of Object.entries(SEVERITY_KEYWORDS)){
+    if(kws.some(k=>t.includes(k))){bestSev=sev;break;}
+  }
+  return{tactic:bestTactic,severity:bestSev};
+}
+
 function DetectionBuilder({onSave, onSendToTriage, prefill}){
   const[threat,setThreat]=useState("");
   const[logSample,setLogSample]=useState("");
@@ -738,13 +2031,27 @@ function DetectionBuilder({onSave, onSendToTriage, prefill}){
   const[severity,setSeverity]=useState("Medium");
   const[beginner,setBeginner]=useState(false);
   const[viewMode,setViewMode]=useState("ads");
+  const[streamTokens,setStreamTokens]=useState(0);
+  const[tacticAuto,setTacticAuto]=useState(false);
+  const[severityAuto,setSeverityAuto]=useState(false);
 
   useEffect(()=>{
     if(prefill?.scenario){
       setThreat(prefill.scenario);
-      if(prefill.tactic) setTactic(prefill.tactic);
+      if(prefill.tactic){setTactic(prefill.tactic);setTacticAuto(false);}
     }
   },[prefill]);
+
+  // Auto-detect tactic + severity from threat text (debounced 500ms)
+  useEffect(()=>{
+    if(!threat.trim()||threat.length<8)return;
+    const timer=setTimeout(()=>{
+      const{tactic:t,severity:s}=inferTacticAndSeverity(threat);
+      if(t){setTactic(t);setTacticAuto(true);}
+      setSeverity(s);setSeverityAuto(true);
+    },500);
+    return()=>clearTimeout(timer);
+  },[threat]);
 
   async function extractSchema(s){if(!s.trim())return[];try{const t=await callClaude([{role:"user",content:"Extract field names from this log. Return ONLY a JSON array of strings.\n"+s}],"",300);const m=t.match(/\[[\s\S]*\]/);return m?JSON.parse(m[0]):[];}catch{return[];}}
 
@@ -758,7 +2065,7 @@ function DetectionBuilder({onSave, onSendToTriage, prefill}){
       const hint=fields.length?"Use these exact field names: "+fields.join(", "):"";
       setStage(2);
 
-      const adsPrompt = `Generate a concise Attack Detection Strategy (ADS) for this threat.
+      const adsPrompt = `Generate an Attack Detection Strategy (ADS) for this threat. Be concise throughout.
 
 Threat: ${threat}
 MITRE Tactic: ${tactic}
@@ -767,23 +2074,34 @@ ${hint}
 
 Return ONLY valid JSON:
 {
-  "technique_name": "short detection name",
+  "technique_name": "short name",
   "mitre_id": "T####",
-  "summary": "one sentence: what this detects and why it matters",
-  "attack_overview": "2 short paragraphs: what the attacker does and why",
-  "observable_behaviors": "5-7 bullet points of specific log artifacts to look for",
-  "simulated_events": ["3 realistic log entries as strings, formatted exactly as they appear in ${selectedTool.name}"],
-  "detection_query": "production-ready ${selectedTool.lang} query with inline comments",
-  "false_positive_guidance": "3-4 specific legitimate scenarios that could trigger this, and how to tell them apart",
-  "tuning_tips": "3-4 specific tuning suggestions",
-  "references": "MITRE URL + 2 related technique IDs"
+  "summary": "one sentence",
+  "attack_overview": "2-3 sentences total",
+  "observable_behaviors": "3-4 bullet points, one line each",
+  "simulated_events": ["1-2 realistic log entries for ${selectedTool.name}"],
+  "detection_query": "production-ready ${selectedTool.lang} query",
+  "false_positive_guidance": "2-3 scenarios, one line each",
+  "tuning_tips": "2-3 tips, one line each",
+  "references": "MITRE URL + 1-2 technique IDs"
 }`;
 
-      const result = await callClaude([{role:"user",content:adsPrompt}], "Expert detection engineer. Return ONLY valid JSON, no markdown.", 5000);
+      setStreamTokens(0);
+      const result = await callClaudeStream([{role:"user",content:adsPrompt}], "Expert detection engineer. Return ONLY valid JSON, no markdown.", 5000,
+        (partial)=>setStreamTokens(partial.length)
+      );
       const jsonMatch = result.match(/\{[\s\S]*\}/);
       if(!jsonMatch) throw new Error("Could not parse response. Try again.");
-      const cleaned = jsonMatch[0].replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "").replace(/(?<!\\)\\(?!["\\/bfnrtu])/g, "\\\\");
-      const adsData = JSON.parse(cleaned);
+      let adsData;
+      try { adsData = JSON.parse(jsonMatch[0]); }
+      catch(_){
+        // fix common Claude JSON issues: bad escapes, control chars, trailing commas
+        const fixed = jsonMatch[0]
+          .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,"")
+          .replace(/,\s*([\]}])/g,"$1")
+          .replace(/(?<!\\)\\(?!["\\/bfnrtu])/g,"\\\\");
+        adsData = JSON.parse(fixed);
+      }
       setAds(adsData);
       setDetName(adsData.technique_name || "Detect " + threat.slice(0,40));
       setStage(3);
@@ -812,6 +2130,15 @@ Return ONLY valid JSON:
           <span style={S.badge(THEME.accent)}>ADS Framework</span>
         </div>
       </SectionHeader>
+      <HelpBox title="Builder Quick Reference" color={THEME.accent} items={[
+        {icon:"🎯",title:"Threat Scenario",desc:"Describe the attack behavior in plain English (e.g. 'Mimikatz LSASS dump via cmd.exe'). The more specific, the better the query. Include process names, tactics, or known malware if relevant."},
+        {icon:"📋",title:"Log Sample",desc:"Paste a real log line from your SIEM. DetectIQ will ground the query in your actual field names and data structure, avoiding generic templates that need heavy tuning."},
+        {icon:"🏅",title:"Score",desc:"Rates the detection on specificity, coverage, FP risk, and data source quality (1-10). Aim for 7+."},
+        {icon:"🧠",title:"ML/UBA",desc:"Generates a behavioral baseline rule that catches anomalies instead of static IOCs — harder for attackers to evade. Also produces Risk Scores and RBA rules."},
+        {icon:"💥",title:"Blast Radius",desc:"Estimates how many alerts per day this rule would generate across different org sizes. Run this before deploying to avoid alert fatigue."},
+        {icon:"⚠️",title:"False Positive Estimator",desc:"AI predicts the most common legitimate activities that would trigger this rule, and generates exclusion logic to suppress them."},
+        {icon:"🔧",title:"LOTL",desc:"Living-off-the-Land coverage — generates detections for built-in OS tools (PowerShell, WMI, certutil) that attackers abuse to blend in."},
+      ]}/>
 
       <div style={S.card}>
         <ToolSelector selected={selectedTool} onSelect={setSelectedTool}/>
@@ -820,8 +2147,20 @@ Return ONLY valid JSON:
           <div><label style={S.label}>Log Sample (optional)</label><textarea style={{...S.textarea,minHeight:80}} value={logSample} onChange={e=>setLogSample(e.target.value)} placeholder={"Paste a real "+selectedTool.name+" log to ground the query"}/></div>
         </div>
         <div style={{...S.grid2,marginTop:12}}>
-          <div><label style={S.label}>MITRE Tactic</label><select style={S.input} value={tactic} onChange={e=>setTactic(e.target.value)}>{TACTICS.map(t=><option key={t}>{t}</option>)}</select></div>
-          <div><label style={S.label}>Severity</label><select style={S.input} value={severity} onChange={e=>setSeverity(e.target.value)}>{SEVERITIES.map(s=><option key={s}>{s}</option>)}</select></div>
+          <div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+              <label style={{...S.label,marginBottom:0}}>MITRE Tactic</label>
+              {tacticAuto&&<span style={{fontSize:9,fontWeight:700,padding:"1px 7px",borderRadius:4,background:"rgba(0,212,255,0.12)",border:"1px solid rgba(0,212,255,0.3)",color:THEME.accent}}>AUTO</span>}
+            </div>
+            <select style={S.input} value={tactic} onChange={e=>{setTactic(e.target.value);setTacticAuto(false);}}>{TACTICS.map(t=><option key={t}>{t}</option>)}</select>
+          </div>
+          <div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+              <label style={{...S.label,marginBottom:0}}>Severity</label>
+              {severityAuto&&<span style={{fontSize:9,fontWeight:700,padding:"1px 7px",borderRadius:4,background:"rgba(255,170,0,0.12)",border:"1px solid rgba(255,170,0,0.3)",color:THEME.warning}}>AUTO</span>}
+            </div>
+            <select style={S.input} value={severity} onChange={e=>{setSeverity(e.target.value);setSeverityAuto(false);}}>{SEVERITIES.map(s=><option key={s}>{s}</option>)}</select>
+          </div>
         </div>
         {schema.length>0&&<div style={{marginTop:10}}><label style={S.label}>Schema Fields</label><div style={{display:"flex",flexWrap:"wrap"}}>{schema.map(f=><span key={f} style={S.tag}>{f}</span>)}</div></div>}
 
@@ -835,7 +2174,7 @@ Return ONLY valid JSON:
           </div>
         )}
         <div style={{marginTop:14,display:"flex",alignItems:"center",gap:12}}>
-          <button style={{...S.btn("p"),padding:"11px 26px",fontSize:13}} onClick={runPipeline} disabled={loading}>{loading&&<Spinner/>}{loading?"Generating ADS...":"Generate ADS"}</button>
+          <button style={{...S.btn("p"),padding:"11px 26px",fontSize:13}} onClick={runPipeline} disabled={loading}>{loading&&<Spinner/>}{loading?`Generating ADS... (${streamTokens} chars)`:"Generate ADS"}</button>
           {stage===3&&<span style={{fontSize:12,color:THEME.success,fontWeight:700}}>ADS ready!</span>}
         </div>
         {err&&<StatusBar msg={err} type="error"/>}
@@ -865,11 +2204,22 @@ function AttackSimulator({ onSendToTriage, onSendToBuilder, prefill }) {
   const[err,setErr]=useState("");
   const[sentEvents,setSentEvents]=useState({});
   const[activeLog,setActiveLog]=useState(null);
-  const[copyMode,setCopyMode]=useState("raw"); // raw | parsed
+  const[copyMode,setCopyMode]=useState("raw");
+  const[streamTokens,setStreamTokens]=useState(0);
+  const[tacticAuto,setTacticAuto]=useState(false);
 
   useEffect(()=>{
-    if(prefill?.scenario){setScenario(prefill.scenario);if(prefill.tactic)setTactic(prefill.tactic);}
+    if(prefill?.scenario){setScenario(prefill.scenario);if(prefill.tactic){setTactic(prefill.tactic);setTacticAuto(false);}}
   },[prefill]);
+
+  useEffect(()=>{
+    if(!scenario.trim()||scenario.length<8)return;
+    const timer=setTimeout(()=>{
+      const{tactic:t}=inferTacticAndSeverity(scenario);
+      if(t){setTactic(t);setTacticAuto(true);}
+    },500);
+    return()=>clearTimeout(timer);
+  },[scenario]);
 
   const QUICK_SCENARIOS=[
     {label:"Mimikatz LSASS Dump",tactic:"Credential Access"},
@@ -968,7 +2318,10 @@ Return ONLY valid JSON with NO backslashes except in log_event strings where the
 
 Generate exactly 5 timeline steps. Each log_event must be 100% realistic ${selectedTool.name} format.`;
 
-      const result=await callClaude([{role:"user",content:prompt}],"Expert SIEM engineer and red teamer. Return ONLY valid JSON.",4000);
+      setStreamTokens(0);
+      const result=await callClaudeStream([{role:"user",content:prompt}],"Expert SIEM engineer and red teamer. Return ONLY valid JSON.",4000,
+        (partial)=>setStreamTokens(partial.length)
+      );
       const m=result.match(/\{[\s\S]*\}/);
       if(!m) throw new Error("Could not parse response.");
 
@@ -1036,13 +2389,16 @@ Generate exactly 5 timeline steps. Each log_event must be 100% realistic ${selec
             <textarea style={{...S.textarea,minHeight:70}} value={scenario} onChange={e=>setScenario(e.target.value)} placeholder="e.g. Mimikatz LSASS credential dumping on Windows Server 2022..."/>
           </div>
           <div>
-            <label style={S.label}>MITRE Tactic</label>
-            <select style={S.input} value={tactic} onChange={e=>setTactic(e.target.value)}>{TACTICS.map(t=><option key={t}>{t}</option>)}</select>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+              <label style={{...S.label,marginBottom:0}}>MITRE Tactic</label>
+              {tacticAuto&&<span style={{fontSize:9,fontWeight:700,padding:"1px 7px",borderRadius:4,background:"rgba(0,212,255,0.12)",border:"1px solid rgba(0,212,255,0.3)",color:THEME.accent}}>AUTO</span>}
+            </div>
+            <select style={S.input} value={tactic} onChange={e=>{setTactic(e.target.value);setTacticAuto(false);}}>{TACTICS.map(t=><option key={t}>{t}</option>)}</select>
           </div>
         </div>
 
         <div style={{marginTop:14,display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-          <button style={{...S.btn("d"),padding:"11px 26px",fontSize:13}} onClick={simulate} disabled={loading}>{loading&&<Spinner/>}{loading?"Simulating...":"Simulate Attack"}</button>
+          <button style={{...S.btn("d"),padding:"11px 26px",fontSize:13}} onClick={simulate} disabled={loading}>{loading&&<Spinner/>}{loading?`Simulating... (${streamTokens} chars)`:"Simulate Attack"}</button>
           {events&&<button style={{...S.btn(),padding:"11px 20px",fontSize:12}} onClick={()=>onSendToBuilder(scenario,tactic)}>Build Detection for This</button>}
         </div>
         {err&&<StatusBar msg={err} type="error"/>}
@@ -1183,6 +2539,326 @@ Generate exactly 5 timeline steps. Each log_event must be 100% realistic ${selec
   );
 }
 
+// ── Atomic Tests ──────────────────────────────────────────────────────────────
+const ATOMIC_TACTICS=["All","Command and Control","Credential Access","Defense Evasion","Discovery","Execution","Exfiltration","Impact","Initial Access","Lateral Movement","Persistence","Privilege Escalation","Collection"];
+const ATOMIC_PLATFORMS=["All","windows","linux","macos"];
+
+function AtomicTests({onBuildOn,onImport}){
+  const toast=useToast();
+  const[tests,setTests]=useState([]);
+  const[loading,setLoading]=useState(true);
+  const[error,setError]=useState(null);
+  const[tactic,setTactic]=useState("All");
+  const[platform,setPlatform]=useState("All");
+  const[search,setSearch]=useState("");
+  const[expanded,setExpanded]=useState(null);
+  const[generating,setGenerating]=useState(null);
+  // per-test run mode: "simulate"|"agent"|"paste"
+  const[runMode,setRunMode]=useState({});
+  // simulation results keyed by test.id
+  const[simResults,setSimResults]=useState({});
+  const[simulating,setSimulating]=useState(null);
+  // agent
+  const[agentKey]=useState(()=>localStorage.getItem("atomic_agent_key")||(()=>{const k=crypto.randomUUID();localStorage.setItem("atomic_agent_key",k);return k;})());
+  const[agentJobs,setAgentJobs]=useState({});// jobId keyed by test.id
+  const[jobPollers,setJobPollers]=useState({});
+  // paste logs
+  const[pasteLogs,setPasteLogs]=useState({});
+  const[pasteAnalysis,setPasteAnalysis]=useState({});
+  const[analyzingPaste,setAnalyzingPaste]=useState(null);
+
+  useEffect(()=>{
+    setLoading(true);
+    const params=new URLSearchParams();
+    if(tactic!=="All")params.set("tactic",tactic);
+    if(platform!=="All")params.set("platform",platform);
+    if(search)params.set("search",search);
+    fetch("/api/atomic-tests?"+params)
+      .then(r=>r.json())
+      .then(d=>{setTests(d.tests||[]);setLoading(false);})
+      .catch(e=>{setError(e.message);setLoading(false);});
+  },[tactic,platform,search]);
+
+  async function generateDetection(test, extraContext=""){
+    setGenerating(test.id);
+    const scenario=`${test.technique_id} - ${test.technique_name}: ${test.test_name}\n\n${test.description}\n\nExecutor: ${test.executor_name}\nAttacker command:\n${test.resolved_command||test.command}${test.cleanup_command?"\n\nCleanup:\n"+test.cleanup_command:""}${extraContext?"\n\n"+extraContext:""}`;
+    onBuildOn?.(scenario, test.tactic);
+    toast?.("Opened in Detection Builder","success");
+    setGenerating(null);
+  }
+
+  async function runSimulate(test){
+    setSimulating(test.id);
+    try{
+      const res=await fetch("/api/atomic/simulate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({technique_id:test.technique_id,technique_name:test.technique_name,test_name:test.test_name,description:test.description,command:test.resolved_command||test.command,executor_name:test.executor_name,platforms:test.platforms})});
+      const data=await res.json();
+      if(data.error)throw new Error(data.error);
+      setSimResults(p=>({...p,[test.id]:data}));
+    }catch(e){toast?.("Simulation failed: "+e.message,"error");}
+    setSimulating(null);
+  }
+
+  async function runOnAgent(test){
+    try{
+      const res=await fetch("/api/atomic/jobs",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({test_id:test.id,command:test.resolved_command||test.command,cleanup_command:test.cleanup_command,executor_name:test.executor_name,platform:test.platforms[0]||"windows",agent_key:agentKey})});
+      const data=await res.json();
+      if(data.error)throw new Error(data.error);
+      setAgentJobs(p=>({...p,[test.id]:{job_id:data.job_id,status:"pending"}}));
+      toast?.("Job queued — agent will pick it up","success");
+      // poll for result
+      const poller=setInterval(async()=>{
+        const r=await fetch("/api/atomic/jobs/"+data.job_id).then(x=>x.json());
+        setAgentJobs(p=>({...p,[test.id]:r}));
+        if(r.status==="completed"||r.status==="failed"){clearInterval(poller);setJobPollers(p=>{const n={...p};delete n[test.id];return n;});}
+      },3000);
+      setJobPollers(p=>({...p,[test.id]:poller}));
+    }catch(e){toast?.("Agent job failed: "+e.message,"error");}
+  }
+
+  async function analyzePasteLogs(test){
+    const logs=pasteLogs[test.id];
+    if(!logs?.trim())return;
+    setAnalyzingPaste(test.id);
+    try{
+      const res=await fetch("/api/ai",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:[{role:"user",content:`Analyze these logs from running ATT&CK test ${test.technique_id} - ${test.test_name}:\n\n${logs}\n\nIdentify: key event IDs, suspicious fields, process names, detection opportunities. Be concise and specific.`}],system:"You are a detection engineering expert analyzing security logs.",maxTokens:800})});
+      const data=await res.json();
+      setPasteAnalysis(p=>({...p,[test.id]:data.text||data.content||"No analysis returned"}));
+    }catch(e){toast?.("Analysis failed: "+e.message,"error");}
+    setAnalyzingPaste(null);
+  }
+
+  const tacticColor={
+    "Execution":THEME.warning,"Credential Access":THEME.danger,"Defense Evasion":THEME.purple,
+    "Discovery":THEME.accent,"Persistence":THEME.orange,"Privilege Escalation":THEME.danger,
+    "Lateral Movement":THEME.warning,"Impact":THEME.danger,"Initial Access":THEME.danger,
+    "Command and Control":THEME.purple,"Exfiltration":THEME.orange,"Collection":THEME.accent,
+  };
+
+  return(
+    <div>
+      <SectionHeader icon="⚛" title="Atomic Tests">
+        <span style={{fontSize:11,padding:"3px 10px",borderRadius:5,background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",color:"#f87171",fontWeight:500}}>Red Canary</span>
+        <span style={{fontSize:12,color:THEME.textDim}}>Real attack procedures → instant detection generation</span>
+      </SectionHeader>
+
+      {/* Filters */}
+      <div style={{...S.card,marginBottom:16}}>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
+          <input style={{...S.input,flex:1,minWidth:180,padding:"7px 12px"}} placeholder="Search technique, name, description..." value={search} onChange={e=>setSearch(e.target.value)}/>
+          <select style={{...S.input,width:200}} value={tactic} onChange={e=>setTactic(e.target.value)}>
+            {ATOMIC_TACTICS.map(t=><option key={t}>{t}</option>)}
+          </select>
+          <select style={{...S.input,width:130}} value={platform} onChange={e=>setPlatform(e.target.value)}>
+            {ATOMIC_PLATFORMS.map(p=><option key={p}>{p.charAt(0).toUpperCase()+p.slice(1)}</option>)}
+          </select>
+          {tests.length>0&&<span style={{fontSize:11,color:THEME.textMid,whiteSpace:"nowrap"}}>{tests.length} tests</span>}
+        </div>
+      </div>
+
+      {/* Results */}
+      {loading?(
+        <div style={{...S.card,textAlign:"center",padding:48}}>
+          <Spinner/><span style={{color:THEME.textMid,marginLeft:10,fontSize:13}}>Fetching from Red Canary GitHub...</span>
+        </div>
+      ):error?(
+        <div style={{...S.card,textAlign:"center",padding:48,color:THEME.danger}}>{error}</div>
+      ):(
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {tests.map(test=>{
+            const isOpen=expanded===test.id;
+            const tc=tacticColor[test.tactic]||THEME.textMid;
+            return(
+              <div key={test.id} style={{...S.card,marginBottom:0,borderColor:isOpen?THEME.borderBright:THEME.border,transition:"border-color 0.15s"}}>
+                {/* Header row */}
+                <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={()=>setExpanded(isOpen?null:test.id)}>
+                  <span style={{fontSize:11,fontFamily:"monospace",fontWeight:700,color:tc,background:tc+"12",border:"1px solid "+tc+"30",borderRadius:5,padding:"2px 8px",flexShrink:0}}>{test.technique_id}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:600,color:THEME.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{test.test_name}</div>
+                    <div style={{fontSize:11,color:THEME.textMid}}>{test.technique_name}</div>
+                  </div>
+                  <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+                    {test.platforms.map(p=>(
+                      <span key={p} style={{fontSize:10,color:THEME.textDim,background:THEME.bgCard,border:"1px solid "+THEME.border,borderRadius:4,padding:"1px 6px"}}>{p}</span>
+                    ))}
+                    {test.elevation_required&&<span style={{fontSize:10,color:THEME.warning,background:THEME.warning+"10",border:"1px solid "+THEME.warning+"30",borderRadius:4,padding:"1px 6px"}}>admin</span>}
+                    <span style={{fontSize:10,color:THEME.textDim,marginLeft:4}}>{isOpen?"▲":"▼"}</span>
+                  </div>
+                </div>
+
+                {/* Expanded */}
+                {isOpen&&(
+                  <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid "+THEME.border}}>
+                    {test.description&&<p style={{fontSize:12,color:THEME.textMid,lineHeight:1.7,marginBottom:12}}>{test.description}</p>}
+
+                    {/* Executor badge */}
+                    {test.executor_name&&(
+                      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
+                        <span style={{fontSize:10,color:THEME.textDim}}>Executor:</span>
+                        <span style={{fontSize:10,fontWeight:600,color:THEME.accent,background:THEME.accent+"10",border:"1px solid "+THEME.accent+"25",borderRadius:4,padding:"1px 7px",fontFamily:"monospace"}}>{test.executor_name}</span>
+                      </div>
+                    )}
+
+                    {/* Input arguments */}
+                    {test.input_args?.length>0&&(
+                      <div style={{marginBottom:12}}>
+                        <div style={{fontSize:11,color:THEME.textDim,fontWeight:600,marginBottom:6}}>Input Arguments</div>
+                        <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                          {test.input_args.map(arg=>(
+                            <div key={arg.name} style={{display:"flex",alignItems:"baseline",gap:8,fontSize:11}}>
+                              <code style={{color:THEME.accent,fontFamily:"monospace",flexShrink:0}}>#{"{"+arg.name+"}"}</code>
+                              <span style={{color:THEME.textMid,flex:1}}>{arg.description}</span>
+                              <span style={{color:THEME.textDim,fontFamily:"monospace",background:THEME.bgCard,border:"1px solid "+THEME.border,borderRadius:3,padding:"0 5px"}}>{arg.default||"—"}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Resolved command (with defaults filled in) */}
+                    {(test.resolved_command||test.command)&&(
+                      <div style={{marginBottom:12}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                          <div style={{fontSize:11,color:THEME.textDim,fontWeight:600}}>
+                            {test.resolved_command?"Resolved Command":"Attack Command"}
+                          </div>
+                          {test.resolved_command&&<span style={{fontSize:10,color:THEME.success,background:THEME.success+"10",border:"1px solid "+THEME.success+"25",borderRadius:3,padding:"0 5px"}}>defaults applied</span>}
+                        </div>
+                        <pre style={{...S.code,fontSize:11,whiteSpace:"pre-wrap",wordBreak:"break-all",margin:0,padding:"10px 12px"}}>{test.resolved_command||test.command}</pre>
+                      </div>
+                    )}
+
+                    {/* Raw command if different */}
+                    {test.resolved_command&&test.command&&(
+                      <details style={{marginBottom:12}}>
+                        <summary style={{fontSize:11,color:THEME.textDim,cursor:"pointer",marginBottom:4}}>Raw template</summary>
+                        <pre style={{...S.code,fontSize:10,whiteSpace:"pre-wrap",wordBreak:"break-all",margin:"4px 0 0",padding:"8px 12px",opacity:0.7}}>{test.command}</pre>
+                      </details>
+                    )}
+
+                    {/* Cleanup command */}
+                    {test.cleanup_command&&(
+                      <div style={{marginBottom:12}}>
+                        <div style={{fontSize:11,color:THEME.textDim,fontWeight:600,marginBottom:4}}>Cleanup Command</div>
+                        <pre style={{...S.code,fontSize:11,whiteSpace:"pre-wrap",wordBreak:"break-all",margin:0,padding:"10px 12px",borderColor:THEME.success+"33"}}>{test.cleanup_command}</pre>
+                      </div>
+                    )}
+
+                    {/* 3-mode run panel */}
+                    <div style={{marginTop:4,borderTop:"1px solid "+THEME.border,paddingTop:12}}>
+                      {/* Mode tabs */}
+                      <div style={{display:"flex",gap:6,marginBottom:12}}>
+                        {[["simulate","🤖 AI Simulate"],["agent","💻 Run on Agent"],["paste","📋 Paste Logs"]].map(([m,label])=>(
+                          <button key={m} onClick={()=>setRunMode(p=>({...p,[test.id]:p[test.id]===m?null:m}))}
+                            style={{fontSize:11,padding:"5px 12px",borderRadius:6,border:"1px solid "+(runMode[test.id]===m?THEME.accent:THEME.border),background:runMode[test.id]===m?THEME.accent+"15":"transparent",color:runMode[test.id]===m?THEME.accent:THEME.textMid,cursor:"pointer",fontFamily:"inherit",fontWeight:runMode[test.id]===m?600:400,transition:"all 0.12s"}}>
+                            {label}
+                          </button>
+                        ))}
+                        <button style={{...S.btn("p"),padding:"5px 14px",fontSize:11,marginLeft:"auto"}} disabled={!!generating} onClick={()=>generateDetection(test)}>
+                          {generating===test.id?<><Spinner/>Opening...</>:"Generate Detection →"}
+                        </button>
+                      </div>
+
+                      {/* Mode A: AI Simulate */}
+                      {runMode[test.id]==="simulate"&&(
+                        <div style={{background:THEME.bgCard,border:"1px solid "+THEME.border,borderRadius:8,padding:14}}>
+                          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                            <span style={{fontSize:12,fontWeight:600,color:THEME.text}}>AI-simulated execution output</span>
+                            <button style={{...S.btn("p"),padding:"5px 14px",fontSize:11}} onClick={()=>runSimulate(test)} disabled={simulating===test.id}>
+                              {simulating===test.id?<><Spinner/>Simulating...</>:"Run Simulation"}
+                            </button>
+                          </div>
+                          {simResults[test.id]?(()=>{
+                            const s=simResults[test.id];
+                            return(
+                              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                                {s.what_happens&&<div><div style={{fontSize:10,color:THEME.textDim,fontWeight:600,marginBottom:3}}>WHAT HAPPENS</div><p style={{fontSize:12,color:THEME.textMid,lineHeight:1.7,margin:0}}>{s.what_happens}</p></div>}
+                                {s.process_tree?.length>0&&<div><div style={{fontSize:10,color:THEME.textDim,fontWeight:600,marginBottom:3}}>PROCESS TREE</div>{s.process_tree.map((p,i)=><div key={i} style={{fontSize:11,fontFamily:"monospace",color:THEME.text,padding:"2px 0"}}>{p}</div>)}</div>}
+                                {s.event_logs?.length>0&&<div><div style={{fontSize:10,color:THEME.textDim,fontWeight:600,marginBottom:4}}>EXPECTED EVENT LOGS</div>{s.event_logs.map((e,i)=>(
+                                  <div key={i} style={{background:THEME.bg,border:"1px solid "+THEME.border,borderRadius:6,padding:"8px 10px",marginBottom:4}}>
+                                    <div style={{display:"flex",gap:8,marginBottom:4}}>
+                                      <span style={{fontSize:10,fontWeight:700,color:THEME.accent,fontFamily:"monospace"}}>Event {e.event_id}</span>
+                                      <span style={{fontSize:10,color:THEME.textDim}}>{e.source}</span>
+                                    </div>
+                                    <div style={{fontSize:11,color:THEME.textMid,marginBottom:4}}>{e.description}</div>
+                                    {e.key_fields&&<div style={{display:"flex",flexWrap:"wrap",gap:4}}>{Object.entries(e.key_fields).map(([k,v])=><span key={k} style={{fontSize:9,fontFamily:"monospace",background:THEME.accent+"10",border:"1px solid "+THEME.accent+"25",borderRadius:3,padding:"1px 6px",color:THEME.accent}}>{k}={String(v)}</span>)}</div>}
+                                  </div>
+                                ))}</div>}
+                                {s.detection_signals?.length>0&&<div><div style={{fontSize:10,color:THEME.textDim,fontWeight:600,marginBottom:4}}>DETECTION SIGNALS</div>{s.detection_signals.map((sig,i)=><div key={i} style={{fontSize:11,fontFamily:"monospace",color:THEME.success,padding:"2px 0"}}>→ {sig}</div>)}</div>}
+                                {s.artifacts?.length>0&&<div><div style={{fontSize:10,color:THEME.textDim,fontWeight:600,marginBottom:4}}>ARTIFACTS CREATED</div>{s.artifacts.map((a,i)=><div key={i} style={{fontSize:11,color:THEME.textMid,padding:"1px 0"}}>• {a}</div>)}</div>}
+                                {s.cleanup_result&&<div style={{background:THEME.success+"08",border:"1px solid "+THEME.success+"25",borderRadius:6,padding:"8px 10px"}}><div style={{fontSize:10,color:THEME.success,fontWeight:600,marginBottom:2}}>AUTO-CLEANUP</div><div style={{fontSize:11,color:THEME.textMid}}>{s.cleanup_result}</div></div>}
+                                <button style={{...S.btn("p"),padding:"6px 14px",fontSize:11,alignSelf:"flex-start"}} onClick={()=>generateDetection(test,`AI Simulation signals:\n${s.detection_signals?.join("\n")}\n\nEvent IDs: ${s.event_logs?.map(e=>e.event_id).join(", ")}`)}>Build Detection from Simulation →</button>
+                              </div>
+                            );
+                          })():<div style={{fontSize:12,color:THEME.textDim,textAlign:"center",padding:16}}>Click "Run Simulation" — AI will generate expected process tree, event logs, and detection signals without executing anything real.</div>}
+                        </div>
+                      )}
+
+                      {/* Mode B: Agent */}
+                      {runMode[test.id]==="agent"&&(()=>{
+                        const job=agentJobs[test.id];
+                        return(
+                          <div style={{background:THEME.bgCard,border:"1px solid "+THEME.border,borderRadius:8,padding:14}}>
+                            <div style={{fontSize:12,fontWeight:600,color:THEME.text,marginBottom:8}}>Run on your test machine</div>
+                            <div style={{fontSize:11,color:THEME.textMid,lineHeight:1.7,marginBottom:10}}>Install the DetectIQ agent on a <strong style={{color:THEME.warning}}>dedicated test VM only</strong> — never on production. The agent picks up jobs, runs them, auto-cleans up, and sends logs back here.</div>
+                            <div style={{marginBottom:10}}>
+                              <div style={{fontSize:10,color:THEME.textDim,fontWeight:600,marginBottom:4}}>YOUR AGENT KEY</div>
+                              <code style={{fontSize:11,fontFamily:"monospace",color:THEME.accent,background:THEME.accent+"10",border:"1px solid "+THEME.accent+"25",borderRadius:4,padding:"4px 10px",display:"block",wordBreak:"break-all"}}>{agentKey}</code>
+                            </div>
+                            <div style={{display:"flex",gap:8,marginBottom:12}}>
+                              <a href={`/api/atomic/agent-script?platform=windows&key=${agentKey}`} download="detectiq-agent.ps1" style={{...S.btn(),padding:"5px 12px",fontSize:11,textDecoration:"none",display:"inline-flex",alignItems:"center",gap:4}}>⬇ Windows Agent (.ps1)</a>
+                              <a href={`/api/atomic/agent-script?platform=linux&key=${agentKey}`} download="detectiq-agent.sh" style={{...S.btn(),padding:"5px 12px",fontSize:11,textDecoration:"none",display:"inline-flex",alignItems:"center",gap:4}}>⬇ Linux Agent (.sh)</a>
+                            </div>
+                            {!job?(
+                              <button style={{...S.btn("p"),padding:"6px 16px",fontSize:12}} onClick={()=>runOnAgent(test)}>Queue Job on Agent</button>
+                            ):(
+                              <div>
+                                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                                  <span style={{width:8,height:8,borderRadius:"50%",background:job.status==="completed"?THEME.success:job.status==="failed"?THEME.danger:THEME.warning,display:"inline-block"}}/>
+                                  <span style={{fontSize:12,fontWeight:600,color:THEME.text,textTransform:"capitalize"}}>{job.status}</span>
+                                  {(job.status==="pending"||job.status==="running")&&<><Spinner/><span style={{fontSize:11,color:THEME.textMid}}>waiting for agent...</span></>}
+                                </div>
+                                {job.output&&<div style={{marginBottom:8}}><div style={{fontSize:10,color:THEME.textDim,fontWeight:600,marginBottom:3}}>OUTPUT</div><pre style={{...S.code,fontSize:11,whiteSpace:"pre-wrap",padding:"8px 12px",maxHeight:200,overflowY:"auto"}}>{job.output}</pre></div>}
+                                {job.cleanup_output&&<div style={{marginBottom:8}}><div style={{fontSize:10,color:THEME.success,fontWeight:600,marginBottom:3}}>CLEANUP OUTPUT</div><pre style={{...S.code,fontSize:11,whiteSpace:"pre-wrap",padding:"8px 12px",borderColor:THEME.success+"33"}}>{job.cleanup_output}</pre></div>}
+                                {job.error&&<div style={{fontSize:11,color:THEME.danger,marginBottom:8}}>Error: {job.error}</div>}
+                                {job.status==="completed"&&<button style={{...S.btn("p"),padding:"6px 14px",fontSize:11}} onClick={()=>generateDetection(test,"Real execution output:\n"+job.output)}>Build Detection from Output →</button>}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      {/* Mode C: Paste Logs */}
+                      {runMode[test.id]==="paste"&&(
+                        <div style={{background:THEME.bgCard,border:"1px solid "+THEME.border,borderRadius:8,padding:14}}>
+                          <div style={{fontSize:12,fontWeight:600,color:THEME.text,marginBottom:6}}>Paste logs from your own test run</div>
+                          <div style={{fontSize:11,color:THEME.textMid,marginBottom:8}}>Run the test manually on your lab machine, then paste the resulting SIEM logs, event viewer output, or terminal output here.</div>
+                          <textarea value={pasteLogs[test.id]||""} onChange={e=>setPasteLogs(p=>({...p,[test.id]:e.target.value}))}
+                            style={{...S.input,width:"100%",height:120,fontFamily:"monospace",fontSize:11,resize:"vertical",padding:"8px 10px"}}
+                            placeholder="Paste Windows Event logs, Sysmon output, auditd logs, terminal output..."/>
+                          <div style={{display:"flex",gap:8,marginTop:8}}>
+                            <button style={{...S.btn("p"),padding:"6px 14px",fontSize:11}} disabled={analyzingPaste===test.id||!pasteLogs[test.id]?.trim()} onClick={()=>analyzePasteLogs(test)}>
+                              {analyzingPaste===test.id?<><Spinner/>Analyzing...</>:"Analyze Logs"}
+                            </button>
+                            {pasteAnalysis[test.id]&&<button style={{...S.btn(),padding:"6px 14px",fontSize:11}} onClick={()=>generateDetection(test,"Real log analysis:\n"+pasteAnalysis[test.id])}>Build Detection →</button>}
+                          </div>
+                          {pasteAnalysis[test.id]&&(
+                            <div style={{marginTop:10,fontSize:12,color:THEME.textMid,lineHeight:1.7,background:THEME.bg,border:"1px solid "+THEME.border,borderRadius:6,padding:"10px 12px",whiteSpace:"pre-wrap"}}>{pasteAnalysis[test.id]}</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {tests.length===0&&<div style={{...S.card,textAlign:"center",padding:40,color:THEME.textMid}}>No tests found for these filters.</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function UseCaseRepository({onImport, onBuildOn}){
   const[search,setSearch]=useState("");const[tactic,setTactic]=useState("All");const[sev,setSev]=useState("All");const[tool,setTool]=useState("All");const[diff,setDiff]=useState("All");const[selected,setSelected]=useState(null);
   useEffect(()=>{const p=new URLSearchParams(window.location.search);const id=p.get("id");if(id){const u=MITRE_USECASES.find(x=>x.id===id);if(u)setSelected(u);}},[]);
@@ -1300,9 +2976,39 @@ function UseCaseRepository({onImport, onBuildOn}){
 
 
 function QueryTranslator({prefill}){
-  const[inputQuery,setInputQuery]=useState("");const[fromTool,setFromTool]=useState(TOOLS[0]);
-  useEffect(()=>{if(prefill?.query){setInputQuery(prefill.query);const t=TOOLS.find(t=>t.id===prefill.tool);if(t)setFromTool(t);}},[prefill]);const[toTool,setToTool]=useState(TOOLS[1]);const[result,setResult]=useState("");const[loading,setLoading]=useState(false);const[err,setErr]=useState("");
-  async function translate(){if(!inputQuery.trim()){setErr("Paste a query first.");return;}setErr("");setLoading(true);setResult("");try{const txt=await callClaude([{role:"user",content:"Translate this "+fromTool.lang+" query to "+toTool.lang+" for "+toTool.name+". Preserve all logic. Return ONLY the translated query.\n\n"+inputQuery}],"Expert in all SIEM query languages.",2000);setResult(txt);}catch(e){setErr("Translation failed: "+e.message);}setLoading(false);}
+  const[inputQuery,setInputQuery]=useState("");
+  const[fromTool,setFromTool]=useState(TOOLS[0]);
+  useEffect(()=>{if(prefill?.query){setInputQuery(prefill.query);const t=TOOLS.find(t=>t.id===prefill.tool);if(t)setFromTool(t);}},[prefill]);
+  const[toTool,setToTool]=useState(TOOLS[1]);
+  const[result,setResult]=useState("");
+  const[loading,setLoading]=useState(false);
+  const[err,setErr]=useState("");
+  // Analyze panel
+  const[analyzeMode,setAnalyzeMode]=useState(null); // null | "score" | "enrich" | "ml"
+  const[analyzeData,setAnalyzeData]=useState(null);
+  const[analyzing,setAnalyzing]=useState(false);
+
+  async function translate(){if(!inputQuery.trim()){setErr("Paste a query first.");return;}setErr("");setLoading(true);setResult("");try{await callClaudeStream([{role:"user",content:"Translate this "+fromTool.lang+" query to "+toTool.lang+" for "+toTool.name+". Preserve all logic. Return ONLY the translated query.\n\n"+inputQuery}],"Expert in all SIEM query languages.",2000,(partial)=>setResult(partial));}catch(e){setErr("Translation failed: "+e.message);}setLoading(false);}
+
+  async function analyzeQuery(mode){
+    if(!inputQuery.trim()){setErr("Paste a query first.");return;}
+    setAnalyzeMode(mode); setAnalyzeData(null); setAnalyzing(true); setErr("");
+    try{
+      if(mode==="score"){
+        const res=await fetch("/api/detection/quality-score",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:"Query Analysis",query:inputQuery,queryType:fromTool.lang,tactic:"Unknown",severity:"Medium"})});
+        const data=await res.json(); if(data.error)throw new Error(data.error); setAnalyzeData(data);
+      } else if(mode==="enrich"){
+        const txt=await callClaude([{role:"user",content:`Enrich this ${fromTool.lang} detection query.\n\nQuery:\n${inputQuery}\n\nReturn ONLY valid JSON:\n{"attack_path_summary":"...","next_tactics":["tactic1"],"adjacent_detections":[{"name":"...","why":"..."}],"high_value_targets":"...","quick_win":"...","gap_warning":"..."}`}],"Expert detection engineer. Return ONLY valid JSON.",1200);
+        const m=txt.match(/\{[\s\S]*\}/); if(m)setAnalyzeData(JSON.parse(m[0].replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,"").replace(/\\(?!["\\/bfnrtu])/g,"\\\\")));
+      } else if(mode==="ml"){
+        const res=await fetch("/api/detection/ml-enhance",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:"Query Analysis",query:inputQuery,queryType:fromTool.lang,tactic:"Unknown",severity:"Medium",threat:""})});
+        const init=await res.json(); if(init.error)throw new Error(init.error);
+        const data=init.jobId?await pollJob(init.jobId):init; setAnalyzeData(data);
+      }
+    }catch(e){setErr("Analysis failed: "+e.message);}
+    setAnalyzing(false);
+  }
+
   return(
     <div>
       <SectionHeader icon="🔄" title="Query Translator" color={THEME.purple}><span style={S.badge(THEME.purple)}>10 Platforms</span></SectionHeader>
@@ -1316,20 +3022,55 @@ function QueryTranslator({prefill}){
           <div><label style={S.label}>Source ({fromTool.lang})</label><textarea style={{...S.textarea,minHeight:200,fontFamily:"monospace",fontSize:12}} value={inputQuery} onChange={e=>setInputQuery(e.target.value)} placeholder={"Paste your "+fromTool.lang+" query here..."}/></div>
           <div><label style={S.label}>Translated ({toTool.lang})</label>{result?<div style={{position:"relative"}}><div style={{...S.code,minHeight:200}}>{result}</div><div style={{position:"absolute",top:8,right:8}}><CopyBtn text={result}/></div></div>:<div style={{...S.textarea,minHeight:200,display:"flex",alignItems:"center",justifyContent:"center",color:THEME.textDim,fontSize:13,fontStyle:"italic"}}>Translation will appear here...</div>}</div>
         </div>
-        <div style={{marginTop:14}}><button style={{...S.btn("p"),padding:"10px 22px"}} onClick={translate} disabled={loading}>{loading&&<Spinner/>}{loading?"Translating...":"Translate Query"}</button></div>
+        <div style={{marginTop:14,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <button style={{...S.btn("p"),padding:"10px 22px"}} onClick={translate} disabled={loading}>{loading&&<Spinner/>}{loading?"Translating...":"Translate Query"}</button>
+          <div style={{borderLeft:"1px solid "+THEME.border,height:24,margin:"0 4px"}}/>
+          <span style={{fontSize:11,color:THEME.textDim}}>Analyze source query:</span>
+          <button style={{...S.btn(),padding:"7px 14px",fontSize:11}} onClick={()=>analyzeQuery("score")} disabled={analyzing&&analyzeMode==="score"}>{analyzing&&analyzeMode==="score"?<><Spinner/>Scoring...</>:"🏅 Score"}</button>
+          <button style={{...S.btn(),padding:"7px 14px",fontSize:11}} onClick={()=>analyzeQuery("enrich")} disabled={analyzing&&analyzeMode==="enrich"}>{analyzing&&analyzeMode==="enrich"?<><Spinner/>Enriching...</>:"🔍 Enrich"}</button>
+          <button style={{...S.btn(),padding:"7px 14px",fontSize:11}} onClick={()=>analyzeQuery("ml")} disabled={analyzing&&analyzeMode==="ml"}>{analyzing&&analyzeMode==="ml"?<><Spinner/>Generating...</>:"🧠 ML/UBA"}</button>
+        </div>
         {err&&<StatusBar msg={err} type="error"/>}
       </div>
+
+      {/* Analysis results */}
+      {analyzeData&&analyzeMode==="score"&&(
+        <div style={S.card}>
+          <div style={{...S.row,marginBottom:14}}><div style={S.cardTitle}><span>🏅</span> Quality Score</div><span style={{fontSize:28,fontWeight:900,color:analyzeData.overall>=80?THEME.success:analyzeData.overall>=60?THEME.warning:THEME.danger}}>{analyzeData.overall}/100</span></div>
+          {analyzeData.breakdown&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>{Object.entries(analyzeData.breakdown).map(([k,v])=><div key={k} style={{padding:"8px 12px",background:"rgba(255,255,255,0.02)",borderRadius:7,border:"1px solid "+THEME.border}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><span style={{fontSize:11,color:THEME.textMid,textTransform:"capitalize"}}>{k.replace(/_/g," ")}</span><span style={{fontWeight:700,color:v.score>=80?THEME.success:v.score>=60?THEME.warning:THEME.danger,fontSize:12}}>{v.score}</span></div><div style={{fontSize:10,color:THEME.textDim}}>{v.notes}</div></div>)}</div>}
+          {analyzeData.recommendations?.length>0&&<div>{analyzeData.recommendations.map((r,i)=><div key={i} style={{fontSize:12,color:THEME.textMid,padding:"5px 10px",borderLeft:"2px solid "+THEME.purple+"44",marginBottom:4}}>→ {r}</div>)}</div>}
+        </div>
+      )}
+      {analyzeData&&analyzeMode==="enrich"&&(
+        <div style={S.card}>
+          <div style={{...S.cardTitle,marginBottom:14}}><span>🔍</span> Threat Enrichment</div>
+          {analyzeData.attack_path_summary&&<div style={{marginBottom:10,fontSize:13,color:THEME.textMid,padding:"10px 14px",background:"rgba(0,212,255,0.04)",borderRadius:8,border:"1px solid "+THEME.borderBright}}>{analyzeData.attack_path_summary}</div>}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            {analyzeData.quick_win&&<div style={{padding:"10px 14px",background:"rgba(0,255,136,0.04)",borderRadius:8,border:"1px solid rgba(0,255,136,0.15)"}}><div style={{fontSize:10,fontWeight:800,color:THEME.success,marginBottom:4}}>QUICK WIN</div><div style={{fontSize:12,color:THEME.textMid}}>{analyzeData.quick_win}</div></div>}
+            {analyzeData.gap_warning&&<div style={{padding:"10px 14px",background:"rgba(255,61,85,0.04)",borderRadius:8,border:"1px solid rgba(255,61,85,0.15)"}}><div style={{fontSize:10,fontWeight:800,color:THEME.danger,marginBottom:4}}>COVERAGE GAP</div><div style={{fontSize:12,color:THEME.textMid}}>{analyzeData.gap_warning}</div></div>}
+          </div>
+        </div>
+      )}
+      {analyzeData&&analyzeMode==="ml"&&(
+        <div style={S.card}>
+          <div style={{...S.cardTitle,marginBottom:14}}><span>🧠</span> ML/UBA Enhancement</div>
+          <div style={{fontSize:12,color:THEME.textMid,marginBottom:10,padding:"8px 12px",background:"rgba(0,212,255,0.04)",borderRadius:7}}>{analyzeData.ml_approach}</div>
+          <label style={S.label}>ML-Enhanced Query</label>
+          <div style={{position:"relative"}}><div style={S.code}>{analyzeData.ml_query}</div><div style={{position:"absolute",top:8,right:8}}><CopyBtn text={analyzeData.ml_query||""}/></div></div>
+          {analyzeData.risk_modifier_rule&&<><label style={{...S.label,marginTop:12}}>Risk Modifier Rule</label><div style={{position:"relative"}}><div style={S.code}>{analyzeData.risk_modifier_rule}</div><div style={{position:"absolute",top:8,right:8}}><CopyBtn text={analyzeData.risk_modifier_rule||""}/></div></div></>}
+        </div>
+      )}
     </div>
   );
 }
 
 function DetectionExplainer({prefill}){
-  const[query,setQuery]=useState(()=>{if(window.location.pathname!=="/explainer")return "";const p=new URLSearchParams(window.location.search);return p.get("query")?decodeURIComponent(p.get("query")):"";});
+  const[query,setQuery]=useState(()=>{if(window.location.pathname!=="/explainer")return "";const p=new URLSearchParams(window.location.search);return p.get("query")||"";});
   const[tool,setTool]=useState(()=>{const p=new URLSearchParams(window.location.search);return TOOLS.find(t=>t.id===p.get("tool"))||TOOLS[0];});
   const[result,setResult]=useState("");const[loading,setLoading]=useState(false);const[err,setErr]=useState("");
   useEffect(()=>{if(query&&window.location.pathname==="/explainer"){window.history.replaceState({},"","/explainer?query="+encodeURIComponent(query)+"&tool="+tool.id);}},[query,tool.id]);
   useEffect(()=>{if(prefill?.query){setQuery(prefill.query);const t=TOOLS.find(t=>t.id===prefill.tool);if(t)setTool(t);}},[prefill]);
-  async function explain(){if(!query.trim()){setErr("Paste a query first.");return;}setErr("");setLoading(true);setResult("");try{const txt=await callClaude([{role:"user",content:"Analyze and explain this "+tool.lang+" detection query.\n\n1. PLAIN ENGLISH SUMMARY\n2. LOGIC BREAKDOWN\n3. WHAT IT DETECTS\n4. MITRE ATT&CK techniques\n5. FALSE POSITIVE RISKS\n6. IMPROVEMENT SUGGESTIONS\n\nQuery:\n"+query}],"Expert SOC analyst.",2000);setResult(txt);}catch(e){setErr("Error: "+e.message);}setLoading(false);}
+  async function explain(){if(!query.trim()){setErr("Paste a query first.");return;}setErr("");setLoading(true);setResult("");try{await callClaudeStream([{role:"user",content:"Analyze and explain this "+tool.lang+" detection query.\n\n1. PLAIN ENGLISH SUMMARY\n2. LOGIC BREAKDOWN\n3. WHAT IT DETECTS\n4. MITRE ATT&CK techniques\n5. FALSE POSITIVE RISKS\n6. IMPROVEMENT SUGGESTIONS\n\nQuery:\n"+query}],"Expert SOC analyst.",2000,(partial)=>setResult(partial));}catch(e){setErr("Error: "+e.message);}setLoading(false);}
   return(
     <div>
       <SectionHeader icon="🔍" title="Detection Explainer" color={THEME.warning}><span style={S.badge(THEME.warning)}>AI Analysis</span></SectionHeader>
@@ -1346,6 +3087,7 @@ function DetectionExplainer({prefill}){
 }
 
 function DetectionLibrary({detections, onDelete, onUpdate, onBuildOn, onSendToTriage, onExplain, onTranslate}){
+  const toast = useToast();
   const[search,setSearch]=useState("");
   const[ft,setFt]=useState("All");
   const[fc,setFc]=useState("All");
@@ -1380,6 +3122,33 @@ function DetectionLibrary({detections, onDelete, onUpdate, onBuildOn, onSendToTr
   const[sigmaModal,setSigmaModal]=useState(null);
   const[sigmaContent,setSigmaContent]=useState("");
   const[loadingSigma,setLoadingSigma]=useState(false);
+  const[logscaleUrl,setLogscaleUrl]=useState(LS.get("logscale_url",""));
+  const[logscaleToken,setLogscaleToken]=useState(LS.get("logscale_token",""));
+  const[logscaleRepo,setLogscaleRepo]=useState(LS.get("logscale_repo",""));
+  const[sumoUrl,setSumoUrl]=useState(LS.get("sumo_url",""));
+  const[sumoAccessId,setSumoAccessId]=useState(LS.get("sumo_access_id",""));
+  const[sumoAccessKey,setSumoAccessKey]=useState(LS.get("sumo_access_key",""));
+  const[generatedRule,setGeneratedRule]=useState("");
+  const[generatingRule,setGeneratingRule]=useState(false);
+  const [testModal, setTestModal] = useState(null);
+  const [testResult, setTestResult] = useState(null);
+  const [testLoading, setTestLoading] = useState(false);
+  const[bulkSelected,setBulkSelected]=useState(new Set());
+  const[bulkMode,setBulkMode]=useState(false);
+  const[importing,setImporting]=useState(false);
+  const[importMsg,setImportMsg]=useState("");
+  const[versionHistory,setVersionHistory]=useState({});
+  const[loadingVersions,setLoadingVersions]=useState(null);
+  const[showVersions,setShowVersions]=useState(null);
+  const[saveVersionNote,setSaveVersionNote]=useState("");
+  const[savingVersion,setSavingVersion]=useState(false);
+  const[playbookModal,setPlaybookModal]=useState(null);
+  const[playbookContent,setPlaybookContent]=useState("");
+  const[generatingPlaybook,setGeneratingPlaybook]=useState(false);
+  const[scoreModal,setScoreModal]=useState(null);
+  const[qualityResult,setQualityResult]=useState(null);
+  const[scoringDet,setScoringDet]=useState(null);
+  const[diffModal,setDiffModal]=useState(null);
 
   const filtered=detections.filter(d=>
     (!search||d.name.toLowerCase().includes(search.toLowerCase())||d.threat?.toLowerCase().includes(search.toLowerCase()))
@@ -1405,7 +3174,7 @@ function DetectionLibrary({detections, onDelete, onUpdate, onBuildOn, onSendToTr
     "Impact":             {next:[], color:THEME.danger},
   };
 
-  async function scoreDetection(det){
+  async function scoreDetectionQuick(det){
     setScoring(det.id);setScoreResult("");
     try{const txt=await callClaude([{role:"user",content:"Score this detection 1-10. Give score and 3 improvements.\n\nName: "+det.name+"\nType: "+det.queryType+"\nQuery:\n"+det.query}],"Expert detection engineer.",1000);
     setScoreResult(txt);const m=txt.match(/(\d+)\s*\/\s*10/);if(m)onUpdate({...det,score:parseInt(m[1])});}
@@ -1538,8 +3307,13 @@ Return ONLY valid JSON:
         else setPushResult("error:"+(data.error||"Push failed. Check your Splunk URL and credentials."));
       }
     }catch(e){
+      const isSelfSignedUrl = splunkUrl && (splunkUrl.includes(".local") || splunkUrl.includes("192.168") || splunkUrl.includes("10.") || splunkUrl.includes("localhost"));
       if(e.message.includes("Failed to fetch")||e.message.includes("NetworkError")){
-        setPushResult("error:Could not reach Splunk. If CORS is blocking, add DetectIQ's origin to Splunk's web.conf: crossOriginSharingPolicy = *");
+        if(isSelfSignedUrl){
+          setPushResult("error:SSL_CERT:"+splunkUrl);
+        } else {
+          setPushResult("error:Could not reach Splunk. If CORS is blocking, add DetectIQ's origin to Splunk's web.conf: crossOriginSharingPolicy = *");
+        }
       } else {
         setPushResult("error:"+e.message);
       }
@@ -1673,9 +3447,43 @@ Return ONLY valid JSON:
     setLoadingSigma(false);
   }
 
+  async function pushToLogScale(det){
+    if(!logscaleUrl||!logscaleToken||!logscaleRepo){setPushResult("error:LogScale URL, token, and repository are required.");return;}
+    LS.set("logscale_url",logscaleUrl);LS.set("logscale_token",logscaleToken);LS.set("logscale_repo",logscaleRepo);
+    setPushing(true);setPushResult("");
+    try{
+      const res=await fetch("/api/siem/push/logscale",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:logscaleUrl,token:logscaleToken,repo:logscaleRepo,name:det.name,query:det.query,description:det.threat||det.description||""})});
+      const data=await res.json();
+      if(data.success){setPushResult("success:"+data.message);}else{setPushResult("error:"+(data.error||"LogScale push failed."));}
+    }catch(e){setPushResult("error:Request failed: "+e.message);}
+    setPushing(false);
+  }
+
+  async function pushToSumo(det){
+    if(!sumoUrl||!sumoAccessId||!sumoAccessKey){setPushResult("error:Sumo Logic URL, Access ID, and Access Key are required.");return;}
+    LS.set("sumo_url",sumoUrl);LS.set("sumo_access_id",sumoAccessId);LS.set("sumo_access_key",sumoAccessKey);
+    setPushing(true);setPushResult("");
+    try{
+      const res=await fetch("/api/siem/push/sumo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:sumoUrl,accessId:sumoAccessId,accessKey:sumoAccessKey,name:det.name,query:det.query,description:det.threat||det.description||""})});
+      const data=await res.json();
+      if(data.success){setPushResult("success:"+data.message);}else{setPushResult("error:"+(data.error||"Sumo Logic push failed."));}
+    }catch(e){setPushResult("error:Request failed: "+e.message);}
+    setPushing(false);
+  }
+
+  async function generatePlatformRule(det,platform){
+    setGeneratingRule(true);setGeneratedRule("");setPushResult("");
+    try{
+      const res=await fetch("/api/siem/push/"+platform,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(platform==="panther"?{detection:{name:det.name,query:det.query,tactic:det.tactic,technique:det.technique||"",severity:det.severity,queryType:det.queryType,tool:det.tool,threat:det.threat||det.description||""}}:{name:det.name,query:det.query,severity:det.severity,tactic:det.tactic,description:det.threat||det.description||""})});
+      const data=await res.json();
+      if(data.rule){setGeneratedRule(data.rule);}else{setPushResult("error:"+(data.error||"Generation failed."));}
+    }catch(e){setPushResult("error:Request failed: "+e.message);}
+    setGeneratingRule(false);
+  }
+
   async function generateTicket(det){
     setGeneratingTicket(true);setTicketModal(det);setTicketContent("");
-    try{const txt=await callClaude([{role:"user",content:"Write a JIRA/ServiceNow ticket for deploying this detection rule.\n\nDetection: "+det.name+"\nSeverity: "+det.severity+"\nTactic: "+det.tactic+"\nPlatform: "+det.queryType+"\nQuery:\n"+det.query+"\n\nInclude: Summary, Description, Acceptance Criteria, Testing Steps, Rollback Plan. Keep it concise."}],"SOC engineer.",1000);
+    try{const txt=await callClaude([{role:"user",content:"Brief JIRA ticket for: "+det.name+" ("+det.severity+"/"+det.tactic+"/"+det.queryType+")\n\nSections (2-3 lines each max): Summary, Description, Acceptance Criteria, Test Steps, Rollback."}],"SOC engineer.",1000);
     setTicketContent(txt);}
     catch(e){setTicketContent("Error: "+e.message);}
     setGeneratingTicket(false);
@@ -1713,6 +3521,140 @@ level: ${(det.severity||"medium").toLowerCase()}
     a.download=det.name.replace(/\s+/g,"_")+".yml";a.click();
   }
 
+  // Export full library as JSON
+  function exportLibraryJSON() {
+    const blob = new Blob([JSON.stringify(detections, null, 2)], { type: "application/json" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = "detectiq-library-" + new Date().toISOString().split("T")[0] + ".json"; a.click();
+  }
+
+  // Export full library as CSV
+  function exportLibraryCSV() {
+    const cols = ["name","queryType","tactic","severity","score","threat","created"];
+    const escape = v => '"' + String(v||"").replace(/"/g,'""') + '"';
+    const rows = [cols.join(","), ...detections.map(d => cols.map(c=>escape(d[c])).join(","))];
+    const blob = new Blob([rows.join("\n")], { type: "text/csv" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = "detectiq-library-" + new Date().toISOString().split("T")[0] + ".csv"; a.click();
+  }
+
+  // Import JSON bundle
+  async function importLibraryJSON(e) {
+    const file = e.target.files?.[0]; if (!file) return;
+    setImporting(true); setImportMsg("");
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const items = Array.isArray(parsed) ? parsed : parsed.detections || [];
+      if (!items.length) { setImportMsg("error:No detections found in file."); setImporting(false); return; }
+      let imported = 0;
+      for (const det of items.slice(0, 50)) {
+        const newDet = { ...det, id: uid(), created: new Date().toISOString() };
+        if (typeof onSaveDetection === "function") { try { await onSaveDetection(newDet); imported++; } catch {} }
+      }
+      setImportMsg("success:Imported " + imported + " detections.");
+    } catch(e) { setImportMsg("error:Invalid JSON file: " + e.message); }
+    setImporting(false);
+    e.target.value = "";
+  }
+
+  // Bulk delete
+  async function bulkDelete() {
+    if (!bulkSelected.size) return;
+    if (!window.confirm("Delete " + bulkSelected.size + " selected detection(s)?")) return;
+    for (const id of bulkSelected) { try { await onDelete(id); } catch {} }
+    setBulkSelected(new Set()); setBulkMode(false);
+    toast?.(`Deleted ${bulkSelected.size} detection${bulkSelected.size>1?"s":""}`, "success");
+  }
+
+  function toggleBulkSelect(id) {
+    setBulkSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+
+  async function saveVersion(det) {
+    setSavingVersion(true);
+    try {
+      await fetch("/api/detections/version", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ detectionId: det.id, userId: det.user_id || "demo", query: det.query, name: det.name, notes: saveVersionNote })
+      });
+      setSaveVersionNote("");
+      loadVersions(det.id);
+      toast?.("Version saved successfully", "success");
+    } catch(e) { console.error(e); toast?.("Failed to save version", "error"); }
+    setSavingVersion(false);
+  }
+
+  async function loadVersions(detectionId) {
+    setLoadingVersions(detectionId);
+    try {
+      const res = await fetch("/api/detections/versions/" + detectionId);
+      const data = await res.json();
+      setVersionHistory(prev => ({ ...prev, [detectionId]: data.versions || [] }));
+    } catch(e) { console.error(e); }
+    setLoadingVersions(null);
+  }
+
+  function restoreVersion(det, version) {
+    if (!window.confirm("Restore this version? Current query will be overwritten.")) return;
+    onUpdate({ ...det, query: version.query });
+    toast?.("Version restored", "success");
+  }
+
+  async function generatePlaybook(det) {
+    setPlaybookModal(det); setPlaybookContent(""); setGeneratingPlaybook(true);
+    try {
+      const txt = await callClaudeStream(
+        [{ role: "user", content: `Short IR playbook for: ${det.name} (${det.tactic}, ${det.severity})
+
+Keep each section to 2-3 bullets, one line each:
+1. TRIAGE
+2. ENRICH
+3. CONTAIN
+4. ERADICATE
+5. ESCALATE WHEN
+6. FP FILTERS
+7. PSEUDO-CODE (5 lines max)` }],
+        "Expert SOC analyst and SOAR engineer writing incident response playbooks.", 2000,
+        (partial) => setPlaybookContent(partial)
+      );
+      setPlaybookContent(txt);
+    } catch(e) { setPlaybookContent("Error: " + e.message); }
+    setGeneratingPlaybook(false);
+  }
+
+  async function scoreDetection(det) {
+    setScoreModal(det); setQualityResult(null); setScoringDet(det.id);
+    try {
+      const res = await fetch("/api/detection/quality-score", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: det.name, query: det.query, queryType: det.queryType, tactic: det.tactic, severity: det.severity, description: det.threat })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setQualityResult(data);
+      // Auto-apply score to detection (overall/10 rounded to 1dp, stored as 0-10)
+      const score10 = Math.round(data.overall / 10 * 10) / 10;
+      onUpdate({ ...det, score: score10, qualityBreakdown: data.breakdown });
+      toast?.(`Quality score applied: ${data.overall}/100 → ${score10}/10`, "success");
+    } catch(e) { setQualityResult({ error: e.message }); }
+    setScoringDet(null);
+  }
+
+  async function testDetection(det) {
+    setTestModal(det); setTestResult(null); setTestLoading(true);
+    try {
+      const res = await fetch("/api/detection/test", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: det.name, query: det.query, queryType: det.queryType, tool: det.tool, tactic: det.tactic, severity: det.severity, threat: det.threat })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setTestResult(data);
+    } catch(e) { setTestResult({ error: e.message }); }
+    setTestLoading(false);
+  }
+
   const[statusType,statusMsg]=pushResult.split(/:(.+)/);
 
   return(
@@ -1720,16 +3662,31 @@ level: ${(det.severity||"medium").toLowerCase()}
       <SectionHeader icon="📦" title="Detection Library" color={THEME.success}>
         <div style={S.flex}>
           <span style={S.badge(THEME.success)}>{detections.length} rules</span>
+          {bulkMode && bulkSelected.size > 0 && <span style={S.badge(THEME.warning)}>{bulkSelected.size} selected</span>}
           <span style={{...S.badge(THEME.purple),fontSize:9}}>BETA</span>
         </div>
       </SectionHeader>
 
       <div style={S.card}>
-        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:10}}>
           <input style={{...S.input,flex:1,minWidth:180}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search detections..."/>
           <select style={{...S.input,width:150}} value={ft} onChange={e=>setFt(e.target.value)}><option>All</option>{TOOLS.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select>
           <select style={{...S.input,width:190}} value={fc} onChange={e=>setFc(e.target.value)}><option>All</option>{TACTICS.map(t=><option key={t}>{t}</option>)}</select>
         </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <button style={{...S.btn(),padding:"5px 12px",fontSize:11}} onClick={()=>{setBulkMode(b=>!b);setBulkSelected(new Set());}}>{bulkMode?"Exit Bulk Mode":"Bulk Select"}</button>
+          {bulkMode && <button style={{...S.btn(),padding:"5px 12px",fontSize:11,color:THEME.danger,borderColor:THEME.danger+"44"}} onClick={bulkDelete} disabled={!bulkSelected.size}>Delete Selected ({bulkSelected.size})</button>}
+          {bulkMode && bulkSelected.size < filtered.length && <button style={{...S.btn(),padding:"5px 12px",fontSize:11}} onClick={()=>setBulkSelected(new Set(filtered.map(d=>d.id)))}>Select All ({filtered.length})</button>}
+          {bulkMode && bulkSelected.size > 0 && <button style={{...S.btn(),padding:"5px 12px",fontSize:11}} onClick={()=>setBulkSelected(new Set())}>Clear</button>}
+          <div style={{flex:1}}/>
+          <button style={{...S.btn(),padding:"5px 12px",fontSize:11}} onClick={exportLibraryJSON} title="Export all detections as JSON">Export JSON</button>
+          <button style={{...S.btn(),padding:"5px 12px",fontSize:11}} onClick={exportLibraryCSV} title="Export detections as CSV spreadsheet">Export CSV</button>
+          <label style={{...S.btn(),padding:"5px 12px",fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center"}} title="Import detections from JSON">
+            {importing ? <><Spinner/>Importing...</> : "Import JSON"}
+            <input type="file" accept=".json" style={{display:"none"}} onChange={importLibraryJSON}/>
+          </label>
+        </div>
+        {importMsg && <div style={{marginTop:8}}><StatusBar msg={importMsg.split(/:(.+)/)[1]||importMsg} type={importMsg.startsWith("success")?"success":"error"}/></div>}
       </div>
 
       {filtered.length===0&&<div style={{...S.card,textAlign:"center",color:THEME.textDim,padding:50}}><div style={{fontSize:36,marginBottom:12}}>📦</div>No detections found.</div>}
@@ -1740,28 +3697,39 @@ level: ${(det.severity||"medium").toLowerCase()}
         const enrich=enrichData[det.id];
         const chainInfo=ATTACK_CHAIN[det.tactic];
         return(
-          <div key={det.id} style={{...S.card,borderColor:isSelected?THEME.accent+"66":THEME.border}}>
+          <div key={det.id} style={{...S.card,borderColor:bulkMode&&bulkSelected.has(det.id)?THEME.warning+"66":isSelected?THEME.accent+"66":THEME.border}}>
             {/* Header */}
-            <div style={{...S.row,cursor:"pointer",marginBottom:10}} onClick={()=>setSelected(isSelected?null:det)}>
+            {(()=>{const daysSince=det.created?Math.floor((Date.now()-new Date(det.created).getTime())/(1000*60*60*24)):0; const isStale=daysSince>=90; return(
+            <div style={{...S.row,cursor:"pointer",marginBottom:10}} onClick={()=>bulkMode?toggleBulkSelect(det.id):setSelected(isSelected?null:det)}>
+              {bulkMode&&<input type="checkbox" checked={bulkSelected.has(det.id)} onChange={()=>toggleBulkSelect(det.id)} onClick={e=>e.stopPropagation()} style={{marginRight:4,cursor:"pointer"}}/>}
               <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                 <span style={S.badge(sevColor[det.severity]||THEME.textDim)}>{det.severity||"Medium"}</span>
                 <span style={S.badge(t?t.color:THEME.purple)}>{det.queryType}</span>
                 {det.ads&&<span style={{...S.badge(THEME.accent),fontSize:9}}>ADS</span>}
                 {det.score>0&&<span style={S.badge(THEME.success)}>{det.score}/10</span>}
+                {isStale&&<span style={{...S.badge(THEME.warning),fontSize:9}} title={`Last updated ${daysSince} days ago — consider reviewing this detection`}>⚠ {daysSince}d old</span>}
                 <span style={{fontSize:14,fontWeight:700,color:THEME.text}}>{det.name}</span>
               </div>
               <span style={{fontSize:16,color:THEME.textDim}}>{isSelected?"▲":"▼"}</span>
             </div>
+            );})()}
 
             {det.threat&&<div style={{fontSize:12,color:THEME.textDim,marginBottom:12}}>{det.threat.slice(0,120)}</div>}
 
             {/* Action buttons — FREE */}
             <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}} onClick={e=>e.stopPropagation()}>
-              <button style={{...S.btn("p"),padding:"5px 11px",fontSize:11}} onClick={()=>onBuildOn&&onBuildOn(det.name+" — "+(det.threat||""),det.tactic)}>Build on This</button>
+              <button style={{...S.btn("p"),padding:"5px 11px",fontSize:11}} onClick={()=>{
+                const recs=det.qualityBreakdown?Object.entries(det.qualityBreakdown).filter(([,v])=>v.score<70).map(([k,v])=>`- ${k.replace(/_/g," ")}: ${v.notes}`).join("\n"):"";
+                const prompt=det.name+" — "+(det.threat||"")+(recs?"\n\nQuality improvements needed:\n"+recs:"");
+                onBuildOn&&onBuildOn(prompt,det.tactic);
+              }}>Build on This</button>
+              <button style={{...S.btn(),padding:"5px 11px",fontSize:11}} onClick={e=>{e.stopPropagation();setShowVersions(showVersions===det.id?null:det.id);if(showVersions!==det.id)loadVersions(det.id);}}>
+                📜 Versions{(versionHistory[det.id]||[]).length>0?<span style={{marginLeft:4,background:THEME.accent+"22",color:THEME.accent,borderRadius:10,padding:"0 5px",fontSize:10}}>{(versionHistory[det.id]||[]).length}</span>:""}
+              </button>
               <button style={{...S.btn(),padding:"5px 11px",fontSize:11}} onClick={()=>onSendToTriage&&onSendToTriage(det.query)}>Triage</button>
               <button style={{...S.btn(),padding:"5px 11px",fontSize:11}} onClick={()=>onExplain&&onExplain(det.query,det.tool)}>Explain</button>
               <button style={{...S.btn(),padding:"5px 11px",fontSize:11}} onClick={()=>onTranslate&&onTranslate(det.query,det.tool)}>Translate</button>
-              <button style={{...S.btn(),padding:"5px 11px",fontSize:11}} onClick={e=>{e.stopPropagation();scoreDetection(det);}} disabled={scoring===det.id}>{scoring===det.id?<><Spinner/>Scoring...</>:"Score"}</button>
+              <button style={{...S.btn(),padding:"5px 11px",fontSize:11}} onClick={e=>{e.stopPropagation();scoreDetectionQuick(det);}} disabled={scoring===det.id}>{scoring===det.id?<><Spinner/>Scoring...</>:"Score"}</button>
               <button style={{...S.btn(),padding:"5px 11px",fontSize:11}} onClick={e=>{e.stopPropagation();enrichDetection(det);}} disabled={enriching===det.id}>{enriching===det.id?<><Spinner/>Enriching...</>:"Enrich"}</button>
               <button style={{...S.btn(),padding:"5px 11px",fontSize:11}} onClick={e=>{e.stopPropagation();exportDet(det,"query");}}>Export</button>
               <button style={{...S.btn(),padding:"5px 11px",fontSize:11}} onClick={e=>{e.stopPropagation();exportSigma(det);}}>SIGMA</button>
@@ -1775,8 +3743,50 @@ level: ${(det.severity||"medium").toLowerCase()}
               <button style={{...S.btn(),padding:"5px 11px",fontSize:11,borderColor:THEME.purple+"44",color:THEME.purple}} onClick={e=>{e.stopPropagation();setPushModal({det,tab:"elastic"});setPushResult("");}}>Push to Elastic</button>
               <button style={{...S.btn(),padding:"5px 11px",fontSize:11,borderColor:THEME.purple+"44",color:THEME.purple}} onClick={e=>{e.stopPropagation();setPushModal({det,tab:"soar"});setPushResult("");}}>Push to SOAR</button>
               <button style={{...S.btn(),padding:"5px 11px",fontSize:11,borderColor:THEME.purple+"44",color:THEME.purple}} onClick={e=>{e.stopPropagation();generateTicket(det);}}>Create Ticket</button>
+              <button style={{...S.btn(),padding:"5px 11px",fontSize:11}} onClick={e=>{e.stopPropagation();testDetection(det);}}>🧪 Test</button>
+              <button style={{...S.btn(),padding:"5px 11px",fontSize:11}} onClick={e=>{e.stopPropagation();scoreDetection(det);}} disabled={scoringDet===det.id}>{scoringDet===det.id?<><Spinner/>Scoring...</>:"⭐ Score"}</button>
+              <button style={{...S.btn(),padding:"5px 11px",fontSize:11}} onClick={e=>{e.stopPropagation();generatePlaybook(det);}}>🎭 Playbook</button>
               <button style={{...S.btn("d"),padding:"5px 11px",fontSize:11,marginLeft:"auto"}} onClick={e=>{e.stopPropagation();if(confirm("Delete?"))onDelete(det.id);}}>Delete</button>
             </div>
+
+            {/* Version History panel */}
+            {showVersions===det.id&&(
+              <div style={{marginTop:16,padding:16,background:"#050d18",borderRadius:10,border:"1px solid #1a2a3a"}}>
+                <div style={{...S.row,marginBottom:12}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{fontSize:13,fontWeight:700,color:THEME.textMid}}>📜 Version History</div>
+                    {(versionHistory[det.id]||[]).length>0&&(
+                      <button style={{...S.btn(),padding:"4px 12px",fontSize:11,borderColor:THEME.accent+"55",color:THEME.accent,fontWeight:700}} onClick={()=>setDiffModal({det,vA:(versionHistory[det.id]||[])[0],vB:{query:det.query,created_at:new Date().toISOString(),notes:"Current"},labelA:`Latest saved`,labelB:"Current"})}>⟷ Compare Latest vs Current</button>
+                    )}
+                  </div>
+                  <div style={{display:"flex",gap:8}}>
+                    <input style={{...S.input,fontSize:11,padding:"4px 10px",width:200}} value={saveVersionNote} onChange={e=>setSaveVersionNote(e.target.value)} placeholder="Change note (optional)"/>
+                    <button style={{...S.btn("p"),padding:"4px 12px",fontSize:11}} onClick={()=>saveVersion(det)} disabled={savingVersion}>{savingVersion?<><Spinner/>Saving...</>:"💾 Save Version"}</button>
+                  </div>
+                </div>
+                {loadingVersions===det.id&&<div style={{color:THEME.textDim,fontSize:12,textAlign:"center",padding:16}}><Spinner/> Loading versions...</div>}
+                {(versionHistory[det.id]||[]).map((v,i,arr)=>(
+                  <div key={v.id||i} style={{padding:"10px 0",borderBottom:"1px solid #1a2a3a"}}>
+                    <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                      <div style={{flex:1}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <span style={{fontSize:11,color:THEME.textDim}}>{new Date(v.created_at).toLocaleString()}</span>
+                          {i===0&&<span style={{...S.badge(THEME.success),fontSize:9}}>LATEST</span>}
+                        </div>
+                        {v.notes&&<div style={{fontSize:12,color:THEME.textMid,marginTop:3}}>{v.notes}</div>}
+                        <div style={{fontSize:11,fontFamily:"monospace",color:THEME.accent,marginTop:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:400}}>{v.query?.slice(0,80)}...</div>
+                      </div>
+                      <div style={{display:"flex",gap:6,flexShrink:0}}>
+                        <button style={{...S.btn(),padding:"4px 10px",fontSize:11}} title="Compare this version with current query" onClick={()=>setDiffModal({det,vA:v,vB:{query:det.query,created_at:new Date().toISOString(),notes:"Current"},labelA:`v${arr.length-i} (saved)`,labelB:"Current"})}>⟷ vs Now</button>
+                        {i<arr.length-1&&<button style={{...S.btn(),padding:"4px 10px",fontSize:11}} title="Compare with previous version" onClick={()=>setDiffModal({det,vA:arr[i+1],vB:v,labelA:`v${arr.length-i-1}`,labelB:`v${arr.length-i}`})}>⟷ vs Prev</button>}
+                        <button style={{...S.btn(),padding:"4px 10px",fontSize:11}} onClick={()=>restoreVersion(det,v)}>Restore</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {!loadingVersions&&!(versionHistory[det.id]||[]).length&&<div style={{color:THEME.textDim,fontSize:12,textAlign:"center",padding:24}}><div style={{fontSize:28,marginBottom:8}}>📜</div><div style={{fontWeight:600,color:THEME.text,marginBottom:4}}>No versions saved yet</div><div style={{fontSize:11}}>Click "Save Version" above to snapshot the current query before making changes.</div></div>}
+              </div>
+            )}
 
             {/* Enrichment panel */}
             {enrich&&!enrich.error&&(
@@ -1830,6 +3840,27 @@ level: ${(det.severity||"medium").toLowerCase()}
             )}
             {enrich?.error&&<div style={{marginTop:8,fontSize:12,color:THEME.danger}}>{enrich.error}</div>}
             {scoreResult&&scoring===null&&selected?.id===det.id&&<div style={{marginTop:10,padding:12,background:"#02040a",borderRadius:8,fontSize:12,color:THEME.textMid,whiteSpace:"pre-wrap",lineHeight:1.7,border:"1px solid "+THEME.border}}>{scoreResult}</div>}
+            {det.qualityBreakdown&&(
+              <div style={{marginTop:10,padding:"10px 14px",background:"rgba(255,170,0,0.05)",border:"1px solid rgba(255,170,0,0.2)",borderRadius:8}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                  <span style={{fontSize:11,fontWeight:700,color:THEME.warning}}>⭐ Quality Breakdown</span>
+                  <span style={{...S.badge(det.score>=8?THEME.success:det.score>=6?THEME.warning:THEME.danger),fontSize:10}}>{det.score}/10</span>
+                </div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {Object.entries(det.qualityBreakdown).map(([k,v])=>(
+                    <div key={k} style={{padding:"3px 9px",borderRadius:5,fontSize:10,background:v.score>=70?"rgba(0,232,122,0.08)":v.score>=50?"rgba(255,170,0,0.08)":"rgba(255,45,85,0.08)",border:"1px solid "+(v.score>=70?"rgba(0,232,122,0.25)":v.score>=50?"rgba(255,170,0,0.25)":"rgba(255,45,85,0.25)"),color:v.score>=70?THEME.success:v.score>=50?THEME.warning:THEME.danger,display:"flex",alignItems:"center",gap:5}}>
+                      <span style={{fontWeight:700}}>{v.score}</span>
+                      <span style={{opacity:0.8,textTransform:"capitalize"}}>{k.replace(/_/g," ")}</span>
+                    </div>
+                  ))}
+                </div>
+                {Object.entries(det.qualityBreakdown).some(([,v])=>v.score<70)&&(
+                  <div style={{marginTop:8,fontSize:10,color:THEME.textDim}}>
+                    💡 Weak areas: {Object.entries(det.qualityBreakdown).filter(([,v])=>v.score<70).map(([k,v])=>v.notes).join(" · ")}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Expanded query */}
             {isSelected&&(
@@ -1854,11 +3885,12 @@ level: ${(det.severity||"medium").toLowerCase()}
             <div style={{fontSize:17,fontWeight:900,color:THEME.text,marginBottom:16}}>{pushModal.det.name}</div>
 
             {/* Platform tabs */}
-            <div style={{display:"flex",gap:6,marginBottom:20}}>
-              {[{id:"splunk",label:"Splunk",color:"#ff5733"},{id:"elastic",label:"Elastic",color:"#f4bd19"},{id:"soar",label:"SOAR / Webhook",color:THEME.success},{id:"github",label:"GitHub",color:"#adbac7"}].map(p=>(
-                <button key={p.id} style={{...S.btn(pushModal.tab===p.id?"p":""),padding:"7px 14px",fontSize:12,borderColor:pushModal.tab===p.id?p.color+"88":THEME.border,color:pushModal.tab===p.id?p.color:THEME.textDim,background:pushModal.tab===p.id&&p.id==="github"?"#24292e":undefined}} onClick={()=>{setPushModal({...pushModal,tab:p.id});setDataReqs(null);setIndexOverride("");setSourcetypeOverride("");}}>{p.label}</button>
+            <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
+              {[{id:"splunk",label:"Splunk",color:"#ff5733"},{id:"elastic",label:"Elastic",color:"#f4bd19"},{id:"soar",label:"SOAR",color:THEME.success},{id:"github",label:"GitHub",color:"#adbac7"},{id:"crowdstrike",label:"CrowdStrike",color:"#e1292b"},{id:"logscale",label:"LogScale",color:"#ff6b35"},{id:"tanium",label:"Tanium",color:"#00a1e0"},{id:"panther",label:"Panther",color:"#7c3aed"},{id:"sumo",label:"Sumo Logic",color:"#000099"}].map(p=>(
+                <button key={p.id} style={{...S.btn(pushModal.tab===p.id?"p":""),padding:"6px 12px",fontSize:11,borderColor:pushModal.tab===p.id?p.color+"88":THEME.border,color:pushModal.tab===p.id?p.color:THEME.textDim,background:pushModal.tab===p.id&&p.id==="github"?"#24292e":undefined}} onClick={()=>{setPushModal({...pushModal,tab:p.id});setDataReqs(null);setIndexOverride("");setSourcetypeOverride("");setGeneratedRule("");setPushResult("");}}>{p.label}</button>
               ))}
             </div>
+            <div style={{height:12}}/>
 
             {/* Splunk config */}
             {pushModal.tab==="splunk"&&(
@@ -2117,8 +4149,63 @@ level: ${(det.severity||"medium").toLowerCase()}
                 <button style={{...S.btn("p"),width:"100%",padding:"10px",background:"#24292e",borderColor:"#444c56"}} onClick={()=>pushToGitHub(pushModal.det)} disabled={pushing}>{pushing?<><Spinner/>Pushing to GitHub...</>:"Push to GitHub"}</button>
               </div>
             )}
-            {pushResult&&<StatusBar msg={statusMsg||pushResult} type={statusType==="success"?"success":"error"}/>}
-            <button style={{...S.btn(),width:"100%",padding:"8px",marginTop:10,fontSize:12}} onClick={()=>{setPushModal(null);setPushResult("");}}>Close</button>
+            {/* CrowdStrike */}
+            {pushModal.tab==="crowdstrike"&&(
+              <div>
+                <div style={{fontSize:12,color:THEME.textMid,marginBottom:14,lineHeight:1.6}}>Generates a CrowdStrike FQL Custom IOA rule. Copy or download, then import via Falcon Console &gt; Endpoint Security &gt; Custom IOA Rules.</div>
+                <button style={{...S.btn("p"),width:"100%",padding:"10px",marginBottom:10,borderColor:"#e1292b88",color:"#e1292b",background:"rgba(225,41,43,0.08)"}} onClick={()=>generatePlatformRule(pushModal.det,"crowdstrike")} disabled={generatingRule}>{generatingRule?<><Spinner/>Generating...</>:"Generate FQL Rule"}</button>
+                {generatedRule&&(<div style={{position:"relative",marginTop:8}}><div style={{...S.code,maxHeight:220,overflowY:"auto",fontSize:11}}>{generatedRule}</div><div style={{position:"absolute",top:8,right:8,display:"flex",gap:6}}><CopyBtn text={generatedRule}/><button style={{...S.btn(),padding:"4px 10px",fontSize:10}} onClick={()=>{const b=new Blob([generatedRule],{type:"text/plain"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=pushModal.det.name.replace(/\s+/g,"_")+".fql";a.click();}}>↓</button></div></div>)}
+              </div>
+            )}
+            {/* Falcon LogScale */}
+            {pushModal.tab==="logscale"&&(
+              <div>
+                <div style={{fontSize:12,color:THEME.textMid,marginBottom:14,lineHeight:1.6}}>Pushes a saved query to a Falcon LogScale (Humio) repository via REST API.</div>
+                <label style={S.label}>LogScale URL</label>
+                <input style={{...S.input,marginBottom:10}} value={logscaleUrl} onChange={e=>setLogscaleUrl(e.target.value)} placeholder="https://cloud.humio.com"/>
+                <label style={S.label}>API Token</label>
+                <input style={{...S.input,marginBottom:10}} type="password" value={logscaleToken} onChange={e=>setLogscaleToken(e.target.value)} placeholder="your-api-token"/>
+                <label style={S.label}>Repository Name</label>
+                <input style={{...S.input,marginBottom:14}} value={logscaleRepo} onChange={e=>setLogscaleRepo(e.target.value)} placeholder="my-repo"/>
+                <button style={{...S.btn("p"),width:"100%",padding:"10px",borderColor:"#ff6b3588",color:"#ff6b35",background:"rgba(255,107,53,0.08)"}} onClick={()=>pushToLogScale(pushModal.det)} disabled={pushing}>{pushing?<><Spinner/>Pushing...</>:"Push to LogScale"}</button>
+              </div>
+            )}
+            {/* Tanium */}
+            {pushModal.tab==="tanium"&&(
+              <div>
+                <div style={{fontSize:12,color:THEME.textMid,marginBottom:14,lineHeight:1.6}}>Generates a Tanium Signal JSON. Import via Tanium Console &gt; Threat Response &gt; Signals.</div>
+                <button style={{...S.btn("p"),width:"100%",padding:"10px",marginBottom:10,borderColor:"#00a1e088",color:"#00a1e0",background:"rgba(0,161,224,0.08)"}} onClick={()=>generatePlatformRule(pushModal.det,"tanium")} disabled={generatingRule}>{generatingRule?<><Spinner/>Generating...</>:"Generate Tanium Signal"}</button>
+                {generatedRule&&(<div style={{position:"relative",marginTop:8}}><div style={{...S.code,maxHeight:220,overflowY:"auto",fontSize:11}}>{generatedRule}</div><div style={{position:"absolute",top:8,right:8,display:"flex",gap:6}}><CopyBtn text={generatedRule}/><button style={{...S.btn(),padding:"4px 10px",fontSize:10}} onClick={()=>{const b=new Blob([generatedRule],{type:"text/plain"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=pushModal.det.name.replace(/\s+/g,"_")+".json";a.click();}}>↓</button></div></div>)}
+              </div>
+            )}
+            {/* Panther */}
+            {pushModal.tab==="panther"&&(
+              <div>
+                <div style={{fontSize:12,color:THEME.textMid,marginBottom:14,lineHeight:1.6}}>Generates a Panther Python detection rule using AI. Import via Panther Console &gt; Detections &gt; Create Detection.</div>
+                <button style={{...S.btn("p"),width:"100%",padding:"10px",marginBottom:10,borderColor:"#7c3aed88",color:"#7c3aed",background:"rgba(124,58,237,0.08)"}} onClick={()=>generatePlatformRule(pushModal.det,"panther")} disabled={generatingRule}>{generatingRule?<><Spinner/>Generating Python rule...</>:"Generate Panther Rule"}</button>
+                {generatedRule&&(<div style={{position:"relative",marginTop:8}}><div style={{...S.code,maxHeight:240,overflowY:"auto",fontSize:11}}>{generatedRule}</div><div style={{position:"absolute",top:8,right:8,display:"flex",gap:6}}><CopyBtn text={generatedRule}/><button style={{...S.btn(),padding:"4px 10px",fontSize:10}} onClick={()=>{const b=new Blob([generatedRule],{type:"text/plain"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=pushModal.det.name.replace(/\s+/g,"_")+".py";a.click();}}>↓</button></div></div>)}
+              </div>
+            )}
+            {/* Sumo Logic */}
+            {pushModal.tab==="sumo"&&(
+              <div>
+                <div style={{fontSize:12,color:THEME.textMid,marginBottom:14,lineHeight:1.6}}>Creates a scheduled saved search in Sumo Logic (runs every 15 min) via REST API.</div>
+                <label style={S.label}>API Endpoint</label>
+                <input style={{...S.input,marginBottom:10}} value={sumoUrl} onChange={e=>setSumoUrl(e.target.value)} placeholder="https://api.us2.sumologic.com"/>
+                <div style={S.grid2}>
+                  <div><label style={S.label}>Access ID</label><input style={{...S.input}} value={sumoAccessId} onChange={e=>setSumoAccessId(e.target.value)} placeholder="su..."/></div>
+                  <div><label style={S.label}>Access Key</label><input style={{...S.input}} type="password" value={sumoAccessKey} onChange={e=>setSumoAccessKey(e.target.value)} placeholder="your-access-key"/></div>
+                </div>
+                <div style={{height:14}}/>
+                <button style={{...S.btn("p"),width:"100%",padding:"10px",borderColor:"#0000aa88",color:"#4444ff",background:"rgba(0,0,153,0.08)"}} onClick={()=>pushToSumo(pushModal.det)} disabled={pushing}>{pushing?<><Spinner/>Pushing...</>:"Push to Sumo Logic"}</button>
+              </div>
+            )}
+            {pushResult&&statusType==="error"&&statusMsg?.startsWith("SSL_CERT:")?(
+              <SslCertGuide url={statusMsg.replace("SSL_CERT:","")}/>
+            ):(
+              pushResult&&<StatusBar msg={statusMsg||pushResult} type={statusType==="success"?"success":"error"}/>
+            )}
+            <button style={{...S.btn(),width:"100%",padding:"8px",marginTop:10,fontSize:12}} onClick={()=>{setPushModal(null);setPushResult("");setGeneratedRule("");}}>Close</button>
           </div>
         </div>
       )}
@@ -2153,6 +4240,202 @@ level: ${(det.severity||"medium").toLowerCase()}
               <div style={{position:"relative"}}><div style={S.code}>{ticketContent}</div><div style={{position:"absolute",top:8,right:8}}><CopyBtn text={ticketContent}/></div></div>
             )}
             <button style={{...S.btn(),width:"100%",padding:"8px",marginTop:14,fontSize:12}} onClick={()=>{setTicketModal(null);setTicketContent("");}}>Close</button>
+          </div>
+        </div>
+      )}
+
+      {/* Test Modal */}
+      {testModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>{setTestModal(null);setTestResult(null);}}>
+          <div style={{background:"#0d1825",border:"1px solid "+THEME.accent+"33",borderRadius:14,width:"100%",maxWidth:680,maxHeight:"88vh",overflow:"hidden",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+            <div style={{padding:"18px 24px",borderBottom:"1px solid #1a2a3a",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{fontWeight:800,color:THEME.text,fontSize:15}}>🧪 Detection Test — {testModal.name}</div>
+              <button style={{...S.btn(),padding:"5px 12px",fontSize:12}} onClick={()=>{setTestModal(null);setTestResult(null);}}>✕ Close</button>
+            </div>
+            <div style={{flex:1,overflowY:"auto",padding:"20px 24px"}}>
+              {testLoading&&<div style={{textAlign:"center",padding:48,color:THEME.textDim}}><Spinner/><div style={{marginTop:12}}>Running detection against simulated logs...</div></div>}
+              {testResult?.error&&<div style={{color:THEME.danger,padding:16,background:THEME.danger+"11",borderRadius:8}}>{testResult.error}</div>}
+              {testResult&&!testResult.error&&(
+                <div>
+                  <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap"}}>
+                    <div style={{flex:1,minWidth:140,padding:"16px 18px",background:testResult.verdict==="MATCH"?THEME.success+"15":testResult.verdict==="PARTIAL_MATCH"?THEME.warning+"15":THEME.danger+"15",border:"1px solid "+(testResult.verdict==="MATCH"?THEME.success:testResult.verdict==="PARTIAL_MATCH"?THEME.warning:THEME.danger)+"44",borderRadius:10,textAlign:"center"}}>
+                      <div style={{fontSize:28,marginBottom:6}}>{testResult.verdict==="MATCH"?"✅":testResult.verdict==="PARTIAL_MATCH"?"⚠️":"❌"}</div>
+                      <div style={{fontSize:13,fontWeight:800,color:testResult.verdict==="MATCH"?THEME.success:testResult.verdict==="PARTIAL_MATCH"?THEME.warning:THEME.danger}}>{testResult.verdict?.replace("_"," ")}</div>
+                      <div style={{fontSize:11,color:THEME.textDim,marginTop:4}}>Confidence: {testResult.confidence}%</div>
+                    </div>
+                    <div style={{flex:1,minWidth:140,padding:"16px 18px",background:"#050d18",border:"1px solid #1a2a3a",borderRadius:10,textAlign:"center"}}>
+                      <div style={{fontSize:11,color:THEME.textDim,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.08em"}}>FP Rate</div>
+                      <div style={{fontSize:20,fontWeight:800,color:testResult.estimated_fp_rate==="Low"?THEME.success:testResult.estimated_fp_rate==="High"?THEME.danger:THEME.warning}}>{testResult.estimated_fp_rate||"—"}</div>
+                    </div>
+                    <div style={{flex:2,minWidth:200,padding:"16px 18px",background:"#050d18",border:"1px solid #1a2a3a",borderRadius:10}}>
+                      <div style={{fontSize:11,color:THEME.textDim,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.08em"}}>Data Sources Required</div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:4}}>{(testResult.data_sources_required||[]).map((s,i)=><span key={i} style={{...S.badge(THEME.accent),fontSize:10}}>{s}</span>)}</div>
+                    </div>
+                  </div>
+                  <div style={{marginBottom:16}}>
+                    <div style={{fontSize:12,fontWeight:700,color:THEME.textMid,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>Test Logs</div>
+                    {(testResult.test_logs||[]).map((log,i)=>(
+                      <div key={i} style={{marginBottom:10,padding:"12px 14px",background:log.matches?"#00e87a0a":"#ff3d550a",border:"1px solid "+(log.matches?THEME.success:THEME.danger)+"33",borderRadius:8}}>
+                        <div style={{display:"flex",gap:8,marginBottom:6}}>
+                          <span style={{fontSize:11,fontWeight:800,color:log.matches?THEME.success:THEME.danger}}>{log.matches?"▶ MATCH":"✗ NO MATCH"}</span>
+                        </div>
+                        <div style={{fontFamily:"monospace",fontSize:11,color:THEME.textMid,background:"#050d18",padding:"8px 10px",borderRadius:6,marginBottom:6,lineHeight:1.6,wordBreak:"break-all"}}>{log.log}</div>
+                        <div style={{fontSize:11,color:THEME.textDim,fontStyle:"italic"}}>{log.reason}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+                    <div style={{padding:"12px 14px",background:"#050d18",border:"1px solid "+THEME.success+"22",borderRadius:8}}>
+                      <div style={{fontSize:11,fontWeight:700,color:THEME.success,marginBottom:6}}>✅ TRUE POSITIVE SCENARIO</div>
+                      <div style={{fontSize:12,color:THEME.textMid,lineHeight:1.6}}>{testResult.true_positive_scenario}</div>
+                    </div>
+                    <div style={{padding:"12px 14px",background:"#050d18",border:"1px solid "+THEME.warning+"22",borderRadius:8}}>
+                      <div style={{fontSize:11,fontWeight:700,color:THEME.warning,marginBottom:6}}>⚠️ FALSE POSITIVE SCENARIO</div>
+                      <div style={{fontSize:12,color:THEME.textMid,lineHeight:1.6}}>{testResult.false_positive_scenario}</div>
+                    </div>
+                  </div>
+                  {testResult.coverage_gaps?.length>0&&<div style={{padding:"12px 14px",background:"#050d18",border:"1px solid "+THEME.danger+"22",borderRadius:8,marginBottom:12}}>
+                    <div style={{fontSize:11,fontWeight:700,color:THEME.danger,marginBottom:8}}>🕳 COVERAGE GAPS</div>
+                    {testResult.coverage_gaps.map((g,i)=><div key={i} style={{fontSize:12,color:THEME.textMid,marginBottom:4}}>• {g}</div>)}
+                  </div>}
+                  {testResult.tuning_suggestion&&<div style={{padding:"12px 14px",background:"#050d18",border:"1px solid "+THEME.accent+"22",borderRadius:8}}>
+                    <div style={{fontSize:11,fontWeight:700,color:THEME.accent,marginBottom:6}}>💡 TUNING SUGGESTION</div>
+                    <div style={{fontSize:12,color:THEME.textMid,lineHeight:1.6}}>{testResult.tuning_suggestion}</div>
+                  </div>}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quality Score Modal */}
+      {scoreModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>{setScoreModal(null);setQualityResult(null);}}>
+          <div style={{background:"#0d1825",border:"1px solid "+THEME.warning+"33",borderRadius:14,width:"100%",maxWidth:680,maxHeight:"85vh",overflow:"auto"}} onClick={e=>e.stopPropagation()}>
+            <div style={{padding:"20px 24px",borderBottom:"1px solid #1a2a3a",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{fontWeight:800,color:THEME.text,fontSize:15}}>⭐ Quality Score — {scoreModal.name}</div>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                {qualityResult&&!qualityResult.error&&(
+                  <button style={{...S.btn("p"),padding:"5px 14px",fontSize:11}} onClick={()=>{const score10=Math.round(qualityResult.overall/10*10)/10;onUpdate({...scoreModal,score:score10,qualityBreakdown:qualityResult.breakdown});toast?.("Score applied to library","success");}}>
+                    ✓ Apply to Library
+                  </button>
+                )}
+                <button style={S.btn()} onClick={()=>{setScoreModal(null);setQualityResult(null);}}>✕</button>
+              </div>
+            </div>
+            <div style={{padding:"20px 24px"}}>
+              {!qualityResult&&<div style={{textAlign:"center",padding:32,color:THEME.textDim}}><Spinner/><div style={{marginTop:12}}>AI is analyzing your detection rule...</div></div>}
+              {qualityResult&&!qualityResult.error&&<div style={{padding:"8px 12px",background:"rgba(0,232,122,0.08)",border:"1px solid rgba(0,232,122,0.2)",borderRadius:7,marginBottom:16,fontSize:11,color:THEME.success,display:"flex",alignItems:"center",gap:8}}>✓ Score automatically applied to library card · <strong>{Math.round(qualityResult.overall/10*10)/10}/10</strong> badge is now visible on the detection.</div>}
+              {qualityResult?.error&&<div style={{color:THEME.danger,padding:16}}>Error: {qualityResult.error}</div>}
+              {qualityResult&&!qualityResult.error&&(
+                <div>
+                  <div style={{textAlign:"center",marginBottom:24}}>
+                    <div style={{display:"inline-flex",flexDirection:"column",alignItems:"center",padding:"20px 32px",borderRadius:16,background:qualityResult.overall>=80?"rgba(0,232,122,0.08)":qualityResult.overall>=60?"rgba(255,170,0,0.08)":"rgba(255,45,85,0.08)",border:"1px solid "+(qualityResult.overall>=80?THEME.success:qualityResult.overall>=60?THEME.warning:THEME.danger)+"33"}}>
+                      <div style={{fontSize:56,fontWeight:900,color:qualityResult.overall>=80?THEME.success:qualityResult.overall>=60?THEME.warning:THEME.danger,fontFamily:"'Syne',sans-serif",lineHeight:1}}>{qualityResult.overall}</div>
+                      <div style={{fontSize:12,color:THEME.textDim,marginTop:4}}>Overall Score / 100</div>
+                      <div style={{fontSize:13,fontWeight:700,color:THEME.text,marginTop:6}}>{qualityResult.overall>=80?"Production Ready":qualityResult.overall>=60?"Needs Tuning":"Needs Work"}</div>
+                    </div>
+                  </div>
+                  <div style={{marginBottom:20}}>
+                    <div style={{fontSize:12,fontWeight:700,color:THEME.textMid,marginBottom:12,letterSpacing:"0.08em"}}>SCORE BREAKDOWN</div>
+                    {Object.entries(qualityResult.breakdown||{}).map(([k,v])=>(
+                      <div key={k} style={{marginBottom:10}}>
+                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                          <span style={{fontSize:11,color:THEME.textMid,textTransform:"capitalize"}}>{k.replace(/_/g," ")}</span>
+                          <span style={{fontSize:11,fontWeight:700,color:v.score>=80?THEME.success:v.score>=60?THEME.warning:THEME.danger}}>{v.score}/100</span>
+                        </div>
+                        <div style={{height:6,borderRadius:3,background:"#1a2a3a",overflow:"hidden",marginBottom:3}}>
+                          <div style={{height:"100%",width:v.score+"%",borderRadius:3,background:v.score>=80?THEME.success:v.score>=60?THEME.warning:THEME.danger,transition:"width 0.8s ease"}}/>
+                        </div>
+                        <div style={{fontSize:10,color:THEME.textDim}}>{v.notes}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
+                    {qualityResult.strengths?.length>0&&<div style={{padding:"12px 14px",background:"rgba(0,232,122,0.06)",border:"1px solid rgba(0,232,122,0.2)",borderRadius:8}}>
+                      <div style={{fontSize:11,fontWeight:700,color:THEME.success,marginBottom:8}}>✅ STRENGTHS</div>
+                      {qualityResult.strengths.map((s,i)=><div key={i} style={{fontSize:11,color:THEME.textMid,marginBottom:4}}>• {s}</div>)}
+                    </div>}
+                    {qualityResult.weaknesses?.length>0&&<div style={{padding:"12px 14px",background:"rgba(255,45,85,0.06)",border:"1px solid rgba(255,45,85,0.2)",borderRadius:8}}>
+                      <div style={{fontSize:11,fontWeight:700,color:THEME.danger,marginBottom:8}}>⚠ WEAKNESSES</div>
+                      {qualityResult.weaknesses.map((w,i)=><div key={i} style={{fontSize:11,color:THEME.textMid,marginBottom:4}}>• {w}</div>)}
+                    </div>}
+                  </div>
+                  {qualityResult.recommendations?.length>0&&<div style={{padding:"12px 14px",background:"rgba(0,212,255,0.06)",border:"1px solid rgba(0,212,255,0.2)",borderRadius:8}}>
+                    <div style={{fontSize:11,fontWeight:700,color:THEME.accent,marginBottom:8}}>💡 RECOMMENDATIONS</div>
+                    {qualityResult.recommendations.map((r,i)=><div key={i} style={{fontSize:11,color:THEME.textMid,marginBottom:4}}>{i+1}. {r}</div>)}
+                  </div>}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Diff Viewer Modal */}
+      {diffModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setDiffModal(null)}>
+          <div style={{background:"#0d1825",border:"1px solid "+THEME.accent+"33",borderRadius:14,width:"100%",maxWidth:900,maxHeight:"85vh",overflow:"hidden",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+            <div style={{padding:"16px 24px",borderBottom:"1px solid #1a2a3a",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{fontWeight:800,color:THEME.text,fontSize:15}}>⟷ Version Diff — {diffModal.det.name}</div>
+              <button style={S.btn()} onClick={()=>setDiffModal(null)}>✕</button>
+            </div>
+            <div style={{padding:"16px 24px",overflow:"auto",flex:1}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                {[{label:diffModal.labelA,v:diffModal.vA,color:THEME.danger},{label:diffModal.labelB,v:diffModal.vB,color:THEME.success}].map(({label,v,color})=>(
+                  <div key={label}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                      <span style={{...S.badge(color)}}>{label}</span>
+                      <span style={{fontSize:11,color:THEME.textDim}}>{new Date(v.created_at).toLocaleString()}</span>
+                    </div>
+                    {v.notes&&<div style={{fontSize:11,color:THEME.textDim,marginBottom:8,padding:"4px 8px",background:"#0a1520",borderRadius:4}}>{v.notes}</div>}
+                    <pre style={{background:"#050d18",border:"1px solid "+color+"22",borderRadius:8,padding:14,fontSize:11,fontFamily:"'JetBrains Mono',monospace",color:THEME.textMid,overflow:"auto",whiteSpace:"pre-wrap",wordBreak:"break-word",minHeight:200,maxHeight:400}}>{v.query}</pre>
+                  </div>
+                ))}
+              </div>
+              {/* Line-level diff highlight */}
+              <div style={{marginTop:16}}>
+                <div style={{fontSize:12,fontWeight:700,color:THEME.textMid,marginBottom:10,letterSpacing:"0.08em"}}>CHANGES</div>
+                {(()=>{
+                  const aLines=(diffModal.vA.query||"").split("\n");
+                  const bLines=(diffModal.vB.query||"").split("\n");
+                  const maxLen=Math.max(aLines.length,bLines.length);
+                  const diffs=[];
+                  for(let i=0;i<maxLen;i++){
+                    const a=aLines[i]??"";const b=bLines[i]??"";
+                    if(a!==b)diffs.push({line:i+1,removed:a,added:b});
+                  }
+                  if(diffs.length===0)return<div style={{color:THEME.success,fontSize:12,padding:12,textAlign:"center"}}>✓ Queries are identical</div>;
+                  return diffs.map(({line,removed,added})=>(
+                    <div key={line} style={{marginBottom:8,background:"#050d18",borderRadius:6,overflow:"hidden",border:"1px solid #1a2a3a"}}>
+                      <div style={{fontSize:10,color:THEME.textDim,padding:"3px 10px",background:"#0a1520"}}>Line {line}</div>
+                      {removed&&<div style={{padding:"4px 10px",background:"rgba(255,45,85,0.08)",fontFamily:"monospace",fontSize:11,color:"#ff8098"}}>− {removed}</div>}
+                      {added&&<div style={{padding:"4px 10px",background:"rgba(0,232,122,0.08)",fontFamily:"monospace",fontSize:11,color:"#00e87a"}}>+ {added}</div>}
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Playbook Modal */}
+      {playbookModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setPlaybookModal(null)}>
+          <div style={{background:"#0d1825",border:"1px solid "+THEME.accent+"33",borderRadius:14,width:"100%",maxWidth:700,maxHeight:"85vh",overflow:"hidden",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+            <div style={{padding:"20px 24px",borderBottom:"1px solid #1a2a3a",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{fontWeight:800,color:THEME.text,fontSize:15}}>🎭 SOAR Playbook — {playbookModal.name}</div>
+              <div style={{display:"flex",gap:8}}>
+                <CopyBtn text={playbookContent}/>
+                <button style={{...S.btn(),padding:"5px 12px",fontSize:12}} onClick={()=>setPlaybookModal(null)}>✕ Close</button>
+              </div>
+            </div>
+            <div style={{flex:1,overflowY:"auto",padding:"20px 24px"}}>
+              {generatingPlaybook&&!playbookContent&&<div style={{textAlign:"center",padding:40,color:THEME.textDim}}><Spinner/> Generating playbook...</div>}
+              <div style={{fontSize:13,color:THEME.textMid,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{playbookContent}{generatingPlaybook&&<span style={{color:THEME.accent}}>▋</span>}</div>
+            </div>
           </div>
         </div>
       )}
@@ -2268,20 +4551,23 @@ function AttackHeatmap({detections}){
 }
 
 function AlertTriage({prefillAlert}){
-  const[alert,setAlert]=useState(()=>{if(prefillAlert)return prefillAlert;if(window.location.pathname!=="/triage")return "";const p=new URLSearchParams(window.location.search);return p.get("alert")?decodeURIComponent(p.get("alert")):"";});
+  const[alert,setAlert]=useState(()=>{if(prefillAlert)return prefillAlert;if(window.location.pathname!=="/triage")return "";const p=new URLSearchParams(window.location.search);return p.get("alert")||"";});
   const[context,setContext]=useState("");const[result,setResult]=useState(null);const[loading,setLoading]=useState(false);const[err,setErr]=useState("");const[history,setHistory]=useState(LS.get("detectiq_triage",[]).slice(0,8));
   useEffect(()=>{if(alert&&window.location.pathname==="/triage"){window.history.replaceState({},"","/triage?alert="+encodeURIComponent(alert));}},[alert]);
   useEffect(()=>{if(prefillAlert){setAlert(prefillAlert);}},[prefillAlert]);
   async function triageAlert(){
     if(!alert.trim()){setErr("Paste alert data first.");return;}
-    setErr("");setLoading(true);setResult(null);
+    setErr("");setLoading(true);
+    setResult({text:"",verdict:"ANALYZING",confidence:0,streaming:true,ts:new Date().toISOString(),preview:alert.slice(0,70)});
     try{
-      const txt=await callClaude([{role:"user",content:"Triage this security alert.\n\n1. VERDICT: TRUE_POSITIVE or FALSE_POSITIVE\n2. CONFIDENCE: 0-100%\n3. SEVERITY\n4. SUMMARY\n5. KEY INDICATORS\n6. RECOMMENDED ACTIONS\n\nAlert:\n"+alert+(context?"\n\nContext:\n"+context:"")}],"Senior SOC analyst.",2000);
+      const txt=await callClaudeStream([{role:"user",content:"Triage this security alert.\n\n1. VERDICT: TRUE_POSITIVE or FALSE_POSITIVE\n2. CONFIDENCE: 0-100%\n3. SEVERITY\n4. SUMMARY\n5. KEY INDICATORS\n6. RECOMMENDED ACTIONS\n\nAlert:\n"+alert+(context?"\n\nContext:\n"+context:"")}],"Senior SOC analyst.",2000,
+        (partial)=>setResult(r=>({...r,text:partial}))
+      );
       const isTP=txt.toLowerCase().includes("true_positive")||txt.toLowerCase().includes("true positive");
       const cm=txt.match(/confidence[:\s]+(\d+)/i);
-      const r={text:txt,verdict:isTP?"TRUE_POSITIVE":"FALSE_POSITIVE",confidence:cm?parseInt(cm[1]):75,ts:new Date().toISOString(),preview:alert.slice(0,70)};
+      const r={text:txt,verdict:isTP?"TRUE_POSITIVE":"FALSE_POSITIVE",confidence:cm?parseInt(cm[1]):75,streaming:false,ts:new Date().toISOString(),preview:alert.slice(0,70)};
       setResult(r);const h=[r,...history].slice(0,8);setHistory(h);LS.set("detectiq_triage",h);
-    }catch(e){setErr("Error: "+e.message);}
+    }catch(e){setErr("Error: "+e.message);setResult(null);}
     setLoading(false);
   }
   return(
@@ -2297,10 +4583,13 @@ function AlertTriage({prefillAlert}){
         {err&&<StatusBar msg={err} type="error"/>}
       </div>
       {result&&(
-        <div style={{...S.card,borderColor:result.verdict==="TRUE_POSITIVE"?THEME.danger+"44":THEME.success+"44"}}>
-          <div style={S.row}><div style={S.cardTitle}><span>📊</span> Result</div><div style={S.flex}><span style={{...S.badge(result.verdict==="TRUE_POSITIVE"?THEME.danger:THEME.success),padding:"5px 14px",fontSize:12}}>{result.verdict}</span><span style={S.badge(THEME.accent)}>Confidence: {result.confidence}%</span></div></div>
-          <div style={{width:"100%",height:6,background:THEME.border,borderRadius:3,marginBottom:16}}><div style={{width:result.confidence+"%",height:"100%",background:result.verdict==="TRUE_POSITIVE"?THEME.danger:THEME.success,borderRadius:3}}/></div>
-          <div style={{fontSize:13,color:THEME.textMid,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{result.text}</div>
+        <div style={{...S.card,borderColor:result.streaming?THEME.accent+"44":result.verdict==="TRUE_POSITIVE"?THEME.danger+"44":THEME.success+"44"}}>
+          <div style={S.row}><div style={S.cardTitle}><span>📊</span> {result.streaming?"Analyzing...":"Result"}</div><div style={S.flex}>
+            <span style={{...S.badge(result.streaming?THEME.accent:result.verdict==="TRUE_POSITIVE"?THEME.danger:THEME.success),padding:"5px 14px",fontSize:12}}>{result.streaming?<><Spinner/>ANALYZING</>:result.verdict}</span>
+            {!result.streaming&&<span style={S.badge(THEME.accent)}>Confidence: {result.confidence}%</span>}
+          </div></div>
+          {!result.streaming&&<div style={{width:"100%",height:6,background:THEME.border,borderRadius:3,marginBottom:16}}><div style={{width:result.confidence+"%",height:"100%",background:result.verdict==="TRUE_POSITIVE"?THEME.danger:THEME.success,borderRadius:3}}/></div>}
+          <div style={{fontSize:13,color:THEME.textMid,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{result.text}{result.streaming&&<span style={{animation:"pulse 1s infinite",color:THEME.accent}}>▋</span>}</div>
         </div>
       )}
       {history.length>0&&<div style={S.card}><div style={S.cardTitle}><span>🕐</span> History</div>{history.map((h,i)=><div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 0",borderBottom:"1px solid "+THEME.border}}><div style={{fontSize:12,color:THEME.textMid,flex:1,marginRight:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h.preview}...</div><div style={S.flex}><span style={S.badge(h.verdict==="TRUE_POSITIVE"?THEME.danger:THEME.success)}>{h.verdict}</span><span style={{fontSize:11,color:THEME.textDim}}>{new Date(h.ts).toLocaleTimeString()}</span></div></div>)}</div>}
@@ -2317,6 +4606,7 @@ function AttackChainBuilder({ onBuildDetection }){
   const[exportLoading,setExportLoading]=useState(false);
   const[reportText,setReportText]=useState("");
   const[mode,setMode]=useState("blue"); // blue=defender, red=attacker
+  const[streamTokens,setStreamTokens]=useState(0);
 
   const QUICK_CAMPAIGNS=[
     {label:"Ransomware (LockBit)",scenario:"LockBit ransomware campaign targeting enterprise Windows environment via phishing email with malicious attachment"},
@@ -2373,7 +4663,10 @@ Return ONLY valid JSON:
 
 Generate 6-8 realistic steps showing the full campaign progression. Make log_artifact look like real SIEM output.`;
 
-      const result=await callClaude([{role:"user",content:prompt}],"Expert red team operator and detection engineer. Return ONLY valid JSON.",4000);
+      setStreamTokens(0);
+      const result=await callClaudeStream([{role:"user",content:prompt}],"Expert red team operator and detection engineer. Return ONLY valid JSON.",4000,
+        (partial)=>setStreamTokens(partial.length)
+      );
             const m=result.match(/\{[\s\S]*\}/);
       if(!m) throw new Error("Could not parse response.");
       let cleaned=m[0]
@@ -2477,7 +4770,7 @@ Generate 6-8 realistic steps showing the full campaign progression. Make log_art
 
         <label style={S.label}>Campaign Scenario</label>
         <textarea style={{...S.textarea,minHeight:70,marginBottom:14}} value={scenario} onChange={e=>setScenario(e.target.value)} placeholder="Describe the attack campaign in detail — threat actor, target, initial vector..."/>
-        <button style={{...S.btn("d"),padding:"11px 26px",fontSize:13}} onClick={buildChain} disabled={loading}>{loading&&<Spinner/>}{loading?"Building campaign...":"Build Attack Campaign"}</button>
+        <button style={{...S.btn("d"),padding:"11px 26px",fontSize:13}} onClick={buildChain} disabled={loading}>{loading&&<Spinner/>}{loading?`Building campaign... (${streamTokens} chars)`:"Build Attack Campaign"}</button>
         {err&&<StatusBar msg={err} type="error"/>}
       </div>
 
@@ -2637,6 +4930,480 @@ Generate 6-8 realistic steps showing the full campaign progression. Make log_art
   );
 }
 
+// ── Detection Health ──────────────────────────────────────────────────────────
+function DetectionHealth({detections,onUpdate,onBuildOn,onNav}){
+  const toast=useToast();
+  const[scoring,setScoring]=useState(false);
+  const[scored,setScored]=useState(0);
+
+  const unscored=detections.filter(d=>!d.score||d.score===0);
+  const lowScore=detections.filter(d=>d.score&&d.score<6);
+  const missingTactic=detections.filter(d=>!d.tactic||d.tactic==="General");
+  const missingSeverity=detections.filter(d=>!d.severity);
+  const healthScore=detections.length===0?0:Math.round(100-(
+    (unscored.length/detections.length)*40+
+    (lowScore.length/detections.length)*30+
+    (missingTactic.length/detections.length)*30
+  ));
+
+  async function scoreAll(){
+    if(!unscored.length){toast?.("All detections already scored","info");return;}
+    setScoring(true);setScored(0);
+    for(const det of unscored.slice(0,10)){
+      try{
+        const res=await fetch("/api/detection/quality-score",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:det.name,query:det.query,queryType:det.tool||det.queryType,tactic:det.tactic,severity:det.severity})});
+        const data=await res.json();
+        if(data.overall){const s=Math.round(data.overall/10*10)/10;onUpdate({...det,score:s,qualityBreakdown:data.breakdown});}
+      }catch(e){}
+      setScored(p=>p+1);
+    }
+    setScoring(false);
+    toast?.("Scoring complete","success");
+  }
+
+  const statBox=(label,count,color,action)=>(
+    <div style={{...S.card,marginBottom:0,display:"flex",flexDirection:"column",gap:8}}>
+      <div style={{fontSize:26,fontWeight:800,color:count===0?THEME.success:color,lineHeight:1}}>{count}</div>
+      <div style={{fontSize:12,color:THEME.textMid,fontWeight:500}}>{label}</div>
+      {count>0&&action&&<button style={{...S.btn(),padding:"4px 10px",fontSize:11,marginTop:4}} onClick={action}>{action.label||"Fix"}</button>}
+    </div>
+  );
+
+  return(
+    <div>
+      <SectionHeader icon="❤" title="Detection Health">
+        <span style={{fontSize:11,color:THEME.textMid}}>Library quality score · Gap finder · Bulk fix</span>
+      </SectionHeader>
+
+      {detections.length===0?(
+        <div style={{...S.card,textAlign:"center",padding:48}}>
+          <div style={{fontSize:32,marginBottom:12,opacity:0.4}}>❤</div>
+          <div style={{fontSize:15,fontWeight:600,color:THEME.text,marginBottom:8}}>No detections yet</div>
+          <div style={{fontSize:13,color:THEME.textMid,marginBottom:20}}>Build your first detection to start tracking library health.</div>
+          <button style={{...S.btn("p"),padding:"8px 20px"}} onClick={()=>onNav("builder")}>Build Detection →</button>
+        </div>
+      ):(
+        <>
+          {/* Health score bar */}
+          <div style={{...S.card,marginBottom:16}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+              <div style={{fontSize:13,fontWeight:600,color:THEME.text}}>Overall Library Health</div>
+              <div style={{fontSize:24,fontWeight:800,color:healthScore>=70?THEME.success:healthScore>=40?THEME.warning:THEME.danger}}>{healthScore}%</div>
+            </div>
+            <div style={{height:6,background:THEME.bgCard,borderRadius:3,overflow:"hidden",marginBottom:8}}>
+              <div style={{height:"100%",width:healthScore+"%",background:healthScore>=70?"linear-gradient(90deg,"+THEME.success+",#00c46a)":healthScore>=40?"linear-gradient(90deg,"+THEME.warning+",#ff8800)":"linear-gradient(90deg,"+THEME.danger+",#ff1a3a)",borderRadius:3,transition:"width 1s ease"}}/>
+            </div>
+            <div style={{fontSize:11,color:THEME.textMid}}>{detections.length} detections · {detections.filter(d=>d.score>=7).length} high quality · {unscored.length} unscored</div>
+          </div>
+
+          {/* Stats grid */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:16}}>
+            <div style={{...S.card,marginBottom:0}}>
+              <div style={{fontSize:26,fontWeight:800,color:unscored.length===0?THEME.success:THEME.warning,lineHeight:1,marginBottom:6}}>{unscored.length}</div>
+              <div style={{fontSize:12,color:THEME.textMid,marginBottom:8}}>Unscored</div>
+              {unscored.length>0&&<button style={{...S.btn("p"),padding:"4px 10px",fontSize:11}} onClick={scoreAll} disabled={scoring}>{scoring?<><Spinner/>{scored}/{Math.min(unscored.length,10)}</>:"Score All"}</button>}
+            </div>
+            <div style={{...S.card,marginBottom:0}}>
+              <div style={{fontSize:26,fontWeight:800,color:lowScore.length===0?THEME.success:THEME.danger,lineHeight:1,marginBottom:6}}>{lowScore.length}</div>
+              <div style={{fontSize:12,color:THEME.textMid,marginBottom:8}}>Low Quality (&lt;6/10)</div>
+              {lowScore.length>0&&<button style={{...S.btn(),padding:"4px 10px",fontSize:11}} onClick={()=>onNav("library")}>View in Library</button>}
+            </div>
+            <div style={{...S.card,marginBottom:0}}>
+              <div style={{fontSize:26,fontWeight:800,color:missingTactic.length===0?THEME.success:THEME.textMid,lineHeight:1,marginBottom:6}}>{missingTactic.length}</div>
+              <div style={{fontSize:12,color:THEME.textMid,marginBottom:8}}>Missing Tactic</div>
+            </div>
+            <div style={{...S.card,marginBottom:0}}>
+              <div style={{fontSize:26,fontWeight:800,color:missingSeverity.length===0?THEME.success:THEME.textMid,lineHeight:1,marginBottom:6}}>{missingSeverity.length}</div>
+              <div style={{fontSize:12,color:THEME.textMid,marginBottom:8}}>Missing Severity</div>
+            </div>
+          </div>
+
+          {/* Low score detections */}
+          {lowScore.length>0&&(
+            <div style={{...S.card,marginBottom:16}}>
+              <div style={{...S.cardTitle,marginBottom:12}}>Low Quality Detections <span style={{fontSize:11,fontWeight:400,color:THEME.textMid}}>score below 6/10</span></div>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {lowScore.map(d=>(
+                  <div key={d.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:THEME.bgCard,border:"1px solid "+THEME.border,borderRadius:8}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:12,fontWeight:600,color:THEME.text}}>{d.name}</div>
+                      <div style={{fontSize:11,color:THEME.textMid}}>{d.tactic||"No tactic"} · {d.queryType}</div>
+                    </div>
+                    <span style={{fontSize:13,fontWeight:700,color:d.score>=4?THEME.warning:THEME.danger}}>{d.score}/10</span>
+                    <button style={{...S.btn("p"),padding:"4px 10px",fontSize:11}} onClick={()=>onBuildOn&&onBuildOn(d.name+" — "+d.threat,d.tactic)}>Improve →</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Unscored detections */}
+          {unscored.length>0&&(
+            <div style={S.card}>
+              <div style={{...S.cardTitle,marginBottom:12}}>Unscored Detections <span style={{fontSize:11,fontWeight:400,color:THEME.textMid}}>{unscored.length} need quality scoring</span></div>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {unscored.slice(0,8).map(d=>(
+                  <div key={d.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:THEME.bgCard,border:"1px solid "+THEME.border,borderRadius:8}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:12,fontWeight:600,color:THEME.text}}>{d.name}</div>
+                      <div style={{fontSize:11,color:THEME.textMid}}>{d.tactic||"No tactic"} · {d.queryType}</div>
+                    </div>
+                    <span style={{fontSize:11,color:THEME.textDim}}>Not scored</span>
+                  </div>
+                ))}
+                {unscored.length>8&&<div style={{fontSize:11,color:THEME.textMid,textAlign:"center",padding:8}}>+{unscored.length-8} more — click "Score All" above</div>}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Adversary SIEM ─────────────────────────────────────────────────────────────
+const ADV_TECHNIQUES = [
+  "T1059 - Command and Scripting Interpreter","T1078 - Valid Accounts","T1110 - Brute Force",
+  "T1190 - Exploit Public-Facing Application","T1566 - Phishing","T1003 - OS Credential Dumping",
+  "T1055 - Process Injection","T1547 - Boot or Logon Autostart Execution","T1053 - Scheduled Task/Job",
+  "T1036 - Masquerading","T1027 - Obfuscated Files or Information","T1071 - Application Layer Protocol",
+  "T1486 - Data Encrypted for Impact","T1490 - Inhibit System Recovery","T1562 - Impair Defenses",
+  "T1021 - Remote Services","T1082 - System Information Discovery","T1083 - File and Directory Discovery",
+  "T1105 - Ingress Tool Transfer","T1070 - Indicator Removal","T1112 - Modify Registry",
+  "T1135 - Network Share Discovery","T1046 - Network Service Discovery","T1018 - Remote System Discovery",
+];
+const ADV_GROUPS = ["Custom","APT28 (Fancy Bear)","APT29 (Cozy Bear)","APT41","Lazarus Group","FIN7","REvil","BlackCat/ALPHV","Conti","LockBit","Scattered Spider"];
+const ADV_PLATFORMS = ["Windows","Linux","macOS","Cloud/AWS","Cloud/Azure","Active Directory","Web Application"];
+const ADV_LOG_TYPES = ["Windows Event Logs","Sysmon","Zeek/Network","Web Access Logs","Endpoint EDR","Linux Auditd","Cloud Trail"];
+
+function AdversarySIEM({ detections }) {
+  const [technique, setTechnique] = useState(ADV_TECHNIQUES[0]);
+  const [customTech, setCustomTech] = useState("");
+  const [group, setGroup] = useState("Custom");
+  const [platform, setPlatform] = useState("Windows");
+  const [logType, setLogType] = useState("Windows Event Logs");
+  const [logCount, setLogCount] = useState(8);
+  const [generating, setGenerating] = useState(false);
+  const [logs, setLogs] = useState([]);
+  const [testing, setTesting] = useState(false);
+  const [results, setResults] = useState(null);
+  const [activeLog, setActiveLog] = useState(null);
+  const [streamText, setStreamText] = useState("");
+  const toast = useToast();
+
+  async function generateLogs() {
+    setGenerating(true); setLogs([]); setResults(null); setStreamText(""); setActiveLog(null);
+    const tech = customTech.trim() || technique;
+    const groupCtx = group !== "Custom" ? ` Simulate logs as if from ${group}.` : "";
+    const prompt = `You are a red team expert simulating adversary activity for detection testing.
+Generate exactly ${logCount} realistic ${logType} log entries for technique: ${tech}.
+Platform: ${platform}.${groupCtx}
+
+CRITICAL: Return ONLY a raw JSON array. No markdown. No code fences. No comments. No explanation. Start your response with [ and end with ].
+
+Each element must have these exact keys:
+{"id":1,"timestamp":"2024-03-24T10:23:11Z","event_id":"4688","log_type":"${logType}","source":"HOSTNAME-01","severity":"high","summary":"brief description","raw":"full raw log line here","ioc":["ioc1","ioc2"],"technique_id":"T1059.001"}
+
+Make logs realistic with real hostnames, IPs, usernames, paths, commands. Vary timestamps over 30 minutes.`;
+
+    try {
+      let full = "";
+      await callClaudeStream([{role:"user",content:prompt}], "Expert red team adversary simulation engine.", 3000,
+        chunk => { full += chunk; setStreamText(full); }
+      );
+      const m = full.match(/\[[\s\S]*\]/);
+      if (m) {
+        // Clean AI response: strip control chars, line-comments, trailing commas
+        const clean = m[0]
+          .replace(/[\x00-\x09\x0b\x0c\x0e-\x1f]/g, " ")   // control chars
+          .replace(/^\s*\/\/[^\n]*/gm, "")                   // lines starting with //
+          .replace(/\/\*[\s\S]*?\*\//g, "")                  // /* block comments */
+          .replace(/,\s*([\]}])/g, "$1");                    // trailing commas
+        let parsed;
+        try { parsed = JSON.parse(clean); }
+        catch(parseErr) {
+          // Last resort: extract individual objects
+          const objs = [];
+          const objRx = /\{[^{}]*\}/g; let om;
+          while((om = objRx.exec(clean)) !== null) { try { objs.push(JSON.parse(om[0])); } catch{} }
+          if (objs.length) parsed = objs;
+          else throw parseErr;
+        }
+        setLogs(parsed);
+        setStreamText("");
+        toast?.("Generated "+parsed.length+" adversary log events", "success");
+      } else {
+        toast?.("Could not parse logs — try again", "error");
+        setStreamText("");
+      }
+    } catch(e) { toast?.("Generation failed: "+e.message, "error"); setStreamText(""); }
+    setGenerating(false);
+  }
+
+  async function testDetections() {
+    if (!logs.length) return;
+    if (!detections.length) { toast?.("No detections in library to test against", "error"); return; }
+    setTesting(true); setResults(null);
+    const logSample = logs.map(l => `[${l.timestamp}] ${l.raw}`).join("\n");
+    const detSample = detections.slice(0,12).map(d => `ID:${d.id} | ${d.name} | ${d.queryType} | Query: ${d.query.slice(0,200)}`).join("\n---\n");
+    const prompt = `You are a detection validation expert. Given these adversary logs and detection rules, determine which rules would FIRE (true positive) vs MISS.
+
+ADVERSARY LOGS:
+${logSample}
+
+DETECTION RULES:
+${detSample}
+
+Return ONLY valid JSON:
+{
+  "coverage_pct": 72,
+  "fired": ["detection-id-1","detection-id-2"],
+  "missed": ["detection-id-3"],
+  "partial": ["detection-id-4"],
+  "gaps": ["Gap description 1","Gap description 2"],
+  "recommendations": ["Add detection for X","Tune rule Y to catch Z"]
+}
+
+Be realistic — only mark as fired if the rule logic genuinely matches the log patterns. Partial = rule concept matches but query wouldn't execute correctly.`;
+    try {
+      const txt = await callClaude([{role:"user",content:prompt}], "Senior detection engineer.", 2000);
+      const m = txt.match(/\{[\s\S]*\}/);
+      if (m) {
+        const clean2 = m[0]
+          .replace(/[\x00-\x09\x0b\x0c\x0e-\x1f]/g," ")
+          .replace(/^\s*\/\/[^\n]*/gm,"")
+          .replace(/\/\*[\s\S]*?\*\//g,"")
+          .replace(/,\s*([\]}])/g,"$1");
+        const r = JSON.parse(clean2);
+        // resolve by ID or name (AI may return either)
+        const byId = Object.fromEntries(detections.map(d=>[d.id,d]));
+        const byName = Object.fromEntries(detections.map(d=>[d.name.toLowerCase().trim(),d]));
+        const resolve = v => byId[v] || byName[(v||"").toLowerCase().trim()] || null;
+        const firedDets = (r.fired||[]).map(resolve).filter(Boolean);
+        const missedDets = (r.missed||[]).map(resolve).filter(Boolean);
+        const partialDets = (r.partial||[]).map(resolve).filter(Boolean);
+        // if AI returned names that matched nothing, show all detections as tested
+        const anyMatched = firedDets.length||missedDets.length||partialDets.length;
+        setResults({
+          ...r,
+          firedDets,
+          missedDets: anyMatched ? missedDets : detections.slice(0,12).filter(d=>!firedDets.includes(d)),
+          partialDets,
+        });
+      } else { toast?.("Could not parse results","error"); }
+    } catch(e) { toast?.("Testing failed: "+e.message,"error"); }
+    setTesting(false);
+  }
+
+  const sevColor2 = {high:THEME.danger,medium:THEME.warning,low:THEME.success};
+
+  return (
+    <div>
+      <SectionHeader icon="⚔️" title="Adversary SIEM">
+        <span style={{fontSize:11,padding:"3px 10px",borderRadius:5,background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",color:"#f87171",fontWeight:500}}>Red Team Lab</span>
+        <span style={{fontSize:12,color:THEME.textDim}}>Generate adversary logs · Test detections · Find gaps</span>
+      </SectionHeader>
+
+      {/* Config Panel */}
+      <div style={{...S.card,marginBottom:16}}>
+        <div style={{...S.cardTitle,marginBottom:14}}>Adversary Profile</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
+          <div>
+            <label style={S.label}>ATT&CK Technique</label>
+            <select style={S.input} value={technique} onChange={e=>setTechnique(e.target.value)}>
+              {ADV_TECHNIQUES.map(t=><option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={S.label}>Adversary Group</label>
+            <select style={S.input} value={group} onChange={e=>setGroup(e.target.value)}>
+              {ADV_GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={S.label}>Platform</label>
+            <select style={S.input} value={platform} onChange={e=>setPlatform(e.target.value)}>
+              {ADV_PLATFORMS.map(p=><option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={S.label}>Log Type</label>
+            <select style={S.input} value={logType} onChange={e=>setLogType(e.target.value)}>
+              {ADV_LOG_TYPES.map(l=><option key={l} value={l}>{l}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={S.label}>Custom Technique (optional)</label>
+            <input style={S.input} value={customTech} onChange={e=>setCustomTech(e.target.value)} placeholder="e.g. LSASS dump via ProcDump"/>
+          </div>
+          <div>
+            <label style={S.label}>Log Count</label>
+            <select style={S.input} value={logCount} onChange={e=>setLogCount(Number(e.target.value))}>
+              {[5,8,12,15,20].map(n=><option key={n} value={n}>{n} events</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <button style={{...S.btn("p"),padding:"9px 20px",fontSize:13,fontWeight:600}} onClick={generateLogs} disabled={generating}>
+            {generating?<><Spinner/>Generating...</>:"Generate Adversary Logs"}
+          </button>
+          {logs.length>0&&<button style={{...S.btn(),padding:"9px 20px",fontSize:13}} onClick={testDetections} disabled={testing}>
+            {testing?<><Spinner/>Testing...</>:"Test My Detections"}
+          </button>}
+          {logs.length>0&&!results&&!testing&&<span style={{fontSize:12,color:THEME.textMid}}>← Run against your {detections.length} detections to find gaps</span>}
+          {logs.length>0&&results&&<span style={{fontSize:12,color:THEME.textMid}}>{logs.length} events tested</span>}
+        </div>
+      </div>
+
+      {/* Streaming output */}
+      {streamText&&(
+        <div style={{...S.card,marginBottom:16}}>
+          <div style={{fontSize:11,color:THEME.textMid,marginBottom:8,fontWeight:500}}>Generating adversary activity...</div>
+          <div style={{...S.code,maxHeight:200,overflowY:"auto",fontSize:11}}>{streamText}</div>
+        </div>
+      )}
+
+      {/* Log Stream + Coverage side by side */}
+      {(logs.length>0||results)&&(
+        <div style={{display:"grid",gridTemplateColumns:results?"1fr 1fr":"1fr",gap:16}}>
+
+          {/* Log Stream */}
+          {logs.length>0&&(
+            <div style={S.card}>
+              <div style={{...S.cardTitle,marginBottom:14}}>Log Stream <span style={{fontSize:11,fontWeight:400,color:THEME.textMid,marginLeft:4}}>{logs.length} events</span></div>
+              <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:520,overflowY:"auto"}}>
+                {logs.map((log,i)=>(
+                  <div key={i} onClick={()=>setActiveLog(activeLog===i?null:i)}
+                    style={{background:activeLog===i?THEME.bgCardHover:"transparent",border:"1px solid "+(activeLog===i?THEME.borderBright:THEME.border),borderRadius:8,padding:"10px 12px",cursor:"pointer",transition:"all 0.15s"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:activeLog===i?8:0}}>
+                      <span style={{...S.badge(sevColor2[log.severity]||THEME.textDim),fontSize:9}}>{(log.severity||"med").toUpperCase()}</span>
+                      <span style={{fontSize:10,color:THEME.textDim,fontFamily:"monospace"}}>{log.timestamp?.slice(11,19)||"--:--:--"}</span>
+                      <span style={{fontSize:10,color:THEME.accent,fontFamily:"monospace"}}>{log.event_id}</span>
+                      <span style={{fontSize:11,color:THEME.text,fontWeight:600,flex:1}}>{log.summary}</span>
+                    </div>
+                    {activeLog===i&&(
+                      <div>
+                        <div style={{...S.code,fontSize:10,marginBottom:8,padding:"8px 10px"}}>{log.raw}</div>
+                        {log.ioc?.length>0&&(
+                          <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                            <span style={{fontSize:10,color:THEME.textDim,fontWeight:700}}>IOCs:</span>
+                            {log.ioc.map((ioc,j)=><span key={j} style={{fontSize:9,fontFamily:"monospace",padding:"2px 7px",borderRadius:4,background:THEME.bgCard,border:"1px solid "+THEME.border,color:THEME.textMid}}>{ioc}</span>)}
+                          </div>
+                        )}
+                        {log.technique_id&&<div style={{marginTop:6}}><span style={S.badge(THEME.purple)}>{log.technique_id}</span></div>}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Detection Coverage */}
+          {results&&(
+            <div style={{...S.card,borderColor:"#1a2a3a"}}>
+              <div style={S.cardTitle}>Detection Coverage</div>
+
+              {/* Coverage meter */}
+              <div style={{marginBottom:16}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                  <span style={{fontSize:12,color:THEME.textMid}}>Detection Rate</span>
+                  <span style={{fontSize:18,fontWeight:800,color:results.coverage_pct>=70?THEME.success:results.coverage_pct>=40?THEME.warning:THEME.danger}}>{results.coverage_pct}%</span>
+                </div>
+                <div style={{height:8,background:"#0a0e1a",borderRadius:4,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:results.coverage_pct+"%",background:results.coverage_pct>=70?"linear-gradient(90deg,"+THEME.success+",#00c46a)":results.coverage_pct>=40?"linear-gradient(90deg,"+THEME.warning+",#ff8800)":"linear-gradient(90deg,"+THEME.danger+",#ff1a3a)",borderRadius:4,transition:"width 0.8s ease"}}/>
+                </div>
+                <div style={{display:"flex",gap:16,marginTop:8}}>
+                  <span style={{fontSize:11,color:THEME.success}}>✓ {results.firedDets?.length||0} fired</span>
+                  <span style={{fontSize:11,color:THEME.warning}}>~ {results.partialDets?.length||0} partial</span>
+                  <span style={{fontSize:11,color:THEME.danger}}>✗ {results.missedDets?.length||0} missed</span>
+                </div>
+              </div>
+
+              {/* Fired */}
+              {results.firedDets?.length>0&&(
+                <div style={{marginBottom:12}}>
+                  <div style={{fontSize:11,fontWeight:600,color:THEME.success,marginBottom:6}}>Fired</div>
+                  {results.firedDets.map((d,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 8px",background:"rgba(0,232,122,0.05)",border:"1px solid rgba(0,232,122,0.15)",borderRadius:6,marginBottom:4}}>
+                      <span style={{fontSize:10,color:THEME.success}}>●</span>
+                      <span style={{fontSize:11,color:THEME.text,fontWeight:600}}>{d.name}</span>
+                      <span style={{...S.badge(THEME.success),fontSize:9,marginLeft:"auto"}}>{d.queryType}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Partial */}
+              {results.partialDets?.length>0&&(
+                <div style={{marginBottom:12}}>
+                  <div style={{fontSize:11,fontWeight:600,color:THEME.warning,marginBottom:6}}>Partial match</div>
+                  {results.partialDets.map((d,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 8px",background:"rgba(255,170,0,0.05)",border:"1px solid rgba(255,170,0,0.15)",borderRadius:6,marginBottom:4}}>
+                      <span style={{fontSize:10,color:THEME.warning}}>◐</span>
+                      <span style={{fontSize:11,color:THEME.text,fontWeight:600}}>{d.name}</span>
+                      <span style={{...S.badge(THEME.warning),fontSize:9,marginLeft:"auto"}}>{d.queryType}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Missed */}
+              {results.missedDets?.length>0&&(
+                <div style={{marginBottom:12}}>
+                  <div style={{fontSize:11,fontWeight:600,color:THEME.danger,marginBottom:6}}>Not detected</div>
+                  {results.missedDets.map((d,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 8px",background:"rgba(255,61,85,0.05)",border:"1px solid rgba(255,61,85,0.15)",borderRadius:6,marginBottom:4}}>
+                      <span style={{fontSize:10,color:THEME.danger}}>✗</span>
+                      <span style={{fontSize:11,color:THEME.text,fontWeight:600}}>{d.name}</span>
+                      <span style={{...S.badge(THEME.danger),fontSize:9,marginLeft:"auto"}}>{d.queryType}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Gaps */}
+              {results.gaps?.length>0&&(
+                <div style={{marginBottom:12,padding:12,background:"rgba(255,61,85,0.04)",border:"1px solid rgba(255,61,85,0.15)",borderRadius:8}}>
+                  <div style={{fontSize:11,fontWeight:700,color:THEME.danger,marginBottom:8}}>⚠ Detection Gaps</div>
+                  {results.gaps.map((g,i)=><div key={i} style={{fontSize:11,color:THEME.textMid,padding:"3px 0",borderBottom:"1px solid #1a2030"}}>• {g}</div>)}
+                </div>
+              )}
+
+              {/* Recommendations */}
+              {results.recommendations?.length>0&&(
+                <div style={{padding:12,background:"rgba(0,212,255,0.04)",border:"1px solid rgba(0,212,255,0.15)",borderRadius:8}}>
+                  <div style={{fontSize:11,fontWeight:700,color:THEME.accent,marginBottom:8}}>💡 Recommendations</div>
+                  {results.recommendations.map((r,i)=><div key={i} style={{fontSize:11,color:THEME.textMid,padding:"3px 0",borderBottom:"1px solid #1a2030"}}>→ {r}</div>)}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!logs.length&&!generating&&!streamText&&(
+        <div style={{...S.card,textAlign:"center",padding:"48px 32px"}}>
+          <div style={{fontSize:32,marginBottom:12,opacity:0.4}}>⚔️</div>
+          <div style={{fontSize:16,fontWeight:600,color:THEME.text,marginBottom:6}}>No logs generated yet</div>
+          <div style={{fontSize:13,color:THEME.textMid,maxWidth:420,margin:"0 auto",lineHeight:1.7,marginBottom:24}}>
+            Configure an adversary profile above and generate logs to test your detection coverage.
+          </div>
+          <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
+            {["T1003 · LSASS Dump","T1059 · PowerShell","T1486 · Ransomware","T1566 · Phishing"].map(t=>(
+              <button key={t} style={{fontSize:11,padding:"5px 12px",borderRadius:6,background:"transparent",border:"1px solid "+THEME.border,color:THEME.textMid,cursor:"pointer",fontFamily:"inherit"}}
+                onClick={()=>{setTechnique(ADV_TECHNIQUES.find(x=>x.includes(t.split("·")[0].trim().split(" ")[0]))||ADV_TECHNIQUES[0]);}}>
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ThreatIntel({ onBuildDetection, onSimulate, onHunt }){
   const[kevData,setKevData]=useState([]);const[kevLoading,setKevLoading]=useState(false);const[aptFeed,setAptFeed]=useState([]);const[aptLoading,setAptLoading]=useState(false);const[kevErr,setKevErr]=useState("");const[search,setSearch]=useState("");const[huntResult,setHuntResult]=useState("");const[huntLoading,setHuntLoading]=useState(false);
   async function loadKEV(){setKevLoading(true);setKevErr("");try{const res=await fetch("/api/kev");if(!res.ok)throw new Error("HTTP "+res.status);const data=await res.json();setKevData((data.vulnerabilities||[]).slice(0,60));}catch(e){setKevErr("Failed: "+e.message);}setKevLoading(false);}
@@ -2697,6 +5464,488 @@ function ThreatIntel({ onBuildDetection, onSimulate, onHunt }){
   );
 }
 
+// ── Detection Chain Builder ────────────────────────────────────────────────────
+function DetectionChain({detections}){
+  const[nameA,setNameA]=useState(""); const[queryA,setQueryA]=useState("");
+  const[nameB,setNameB]=useState(""); const[queryB,setQueryB]=useState("");
+  const[correlField,setCorrelField]=useState("host");
+  const[timeWindow,setTimeWindow]=useState("15");
+  const[platform,setPlatform]=useState("Splunk");
+  const[loading,setLoading]=useState(false);
+  const[result,setResult]=useState(null);
+  const[err,setErr]=useState("");
+  const[activeOut,setActiveOut]=useState("splunk");
+  const[copyDet,setCopyDet]=useState(null);
+  function loadDet(which,det){
+    if(which==="a"){setNameA(det.name);setQueryA(det.query||"");}
+    else{setNameB(det.name);setQueryB(det.query||"");}
+  }
+  async function generate(){
+    if(!nameA||!nameB){setErr("Enter both detection names.");return;}
+    setLoading(true);setErr("");setResult(null);
+    try{
+      const res=await fetch("/api/detection/chain",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({nameA,queryA,nameB,queryB,queryType:"SPL",correlField,timeWindowMin:parseInt(timeWindow)||15,platform})});
+      const data=await res.json(); if(data.error)throw new Error(data.error); setResult(data);
+    }catch(e){setErr(e.message);}
+    setLoading(false);
+  }
+  const outTabs=[{id:"splunk",label:"Splunk ES",key:"splunk_correlation"},{id:"elastic",label:"Elastic EQL",key:"elastic_query"},{id:"sentinel",label:"Sentinel KQL",key:"sentinel_kql"},{id:"chronicle",label:"Chronicle",key:"chronicle_udm"}];
+  return(
+    <div>
+      <SectionHeader icon="🔗" title="Detection Chain Builder" color={THEME.accent}>
+        <span style={S.badge(THEME.accent)}>Multi-stage correlation</span>
+        <span style={{fontSize:11,color:THEME.textDim}}>Chain two detections into a Critical correlation rule</span>
+      </SectionHeader>
+      <HelpBox title="How Detection Chaining Works" color={THEME.accent} items={[
+        {icon:"🎯",title:"What it does",desc:"Combines two separate detections (e.g. Reconnaissance + Lateral Movement) into a single high-fidelity correlation rule. Only fires if both events occur on the same host/user within your time window."},
+        {icon:"⏱",title:"Time window",desc:"The correlation fires only if Detection B occurs within N minutes of Detection A on the same entity. Shorter windows = higher confidence but may miss slow-and-low attacks."},
+        {icon:"🔗",title:"Correlation field",desc:"The field used to link the two events (host, src_ip, user, etc.). Choose the field that uniquely identifies the entity moving through the kill chain."},
+        {icon:"📋",title:"Output",desc:"Get Splunk ES correlation, Elastic EQL, Microsoft Sentinel KQL, and Google Chronicle YARA-L versions of the combined rule — ready to paste into your SIEM."},
+      ]}/>
+      <div style={S.card}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+          {["a","b"].map(w=>(
+            <div key={w} style={{padding:"14px 16px",background:"rgba(255,255,255,0.02)",border:"1px solid "+(w==="a"?THEME.accentDim+"55":THEME.purple+"55"),borderRadius:8}}>
+              <div style={{fontSize:10,fontWeight:800,color:w==="a"?THEME.accent:THEME.purple,letterSpacing:"0.12em",marginBottom:10}}>DETECTION {w.toUpperCase()} — {w==="a"?"EARLY STAGE":"LATER STAGE"}</div>
+              <input style={{...S.input,marginBottom:8}} placeholder="Detection name..." value={w==="a"?nameA:nameB} onChange={e=>w==="a"?setNameA(e.target.value):setNameB(e.target.value)}/>
+              <textarea style={{...S.textarea,minHeight:80,fontSize:11,fontFamily:"monospace"}} placeholder="Paste detection query (optional)..." value={w==="a"?queryA:queryB} onChange={e=>w==="a"?setQueryA(e.target.value):setQueryB(e.target.value)}/>
+              {detections.length>0&&(
+                <div style={{marginTop:8}}>
+                  <select style={{...S.input,fontSize:11}} onChange={e=>{const d=detections.find(x=>x.id===e.target.value);if(d)loadDet(w,d);}}>
+                    <option value="">Load from library...</option>
+                    {detections.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:16}}>
+          <div>
+            <label style={S.label}>Correlation Field</label>
+            <select style={S.input} value={correlField} onChange={e=>setCorrelField(e.target.value)}>
+              {["host","src_ip","user","dest_ip","process_id","session_id"].map(f=><option key={f} value={f}>{f}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={S.label}>Time Window (minutes)</label>
+            <input style={S.input} type="number" min="1" max="1440" value={timeWindow} onChange={e=>setTimeWindow(e.target.value)} placeholder="15"/>
+          </div>
+          <div>
+            <label style={S.label}>Primary Platform</label>
+            <select style={S.input} value={platform} onChange={e=>setPlatform(e.target.value)}>
+              {["Splunk","Elastic","Microsoft Sentinel","Google Chronicle"].map(p=><option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+        </div>
+        <button style={{...S.btn("p"),padding:"10px 28px",fontSize:13,width:"100%"}} onClick={generate} disabled={loading}>{loading?<><Spinner/> Generating correlation rule...</>:"🔗 Generate Correlation Rule"}</button>
+        {err&&<div style={{color:THEME.danger,fontSize:12,marginTop:10}}>{err}</div>}
+      </div>
+      {result&&(
+        <div style={S.card}>
+          <div style={{marginBottom:14,padding:"14px 16px",background:"rgba(255,61,85,0.05)",border:"1px solid rgba(255,61,85,0.3)",borderRadius:8}}>
+            <div style={{fontSize:14,fontWeight:700,color:THEME.text,marginBottom:4}}>{result.correlation_name}</div>
+            <div style={{fontSize:12,color:THEME.textMid,marginBottom:8}}>{result.attack_narrative}</div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <span style={S.badge(THEME.danger)}>Risk: {result.risk_score}</span>
+              <span style={S.badge(THEME.danger)}>{result.severity}</span>
+              {(result.mitre_techniques||[]).map((t,i)=><span key={i} style={S.badge(THEME.warning)}>{t}</span>)}
+            </div>
+          </div>
+          <div style={{padding:"10px 14px",background:"rgba(0,212,255,0.04)",border:"1px solid "+THEME.borderBright,borderRadius:8,marginBottom:14}}>
+            <div style={{fontSize:10,fontWeight:800,color:THEME.warning,letterSpacing:"0.1em",marginBottom:4}}>RECOMMENDED RESPONSE</div>
+            <div style={{fontSize:12,color:THEME.textMid}}>{result.recommended_response}</div>
+          </div>
+          <div style={{display:"flex",gap:6,marginBottom:12}}>
+            {outTabs.map(t=><button key={t.id} onClick={()=>setActiveOut(t.id)} style={{padding:"6px 14px",borderRadius:6,border:"1px solid "+(activeOut===t.id?THEME.accentDim+"88":"transparent"),background:activeOut===t.id?"rgba(0,212,255,0.08)":"transparent",color:activeOut===t.id?THEME.accent:THEME.textDim,cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:activeOut===t.id?700:400}}>{t.label}</button>)}
+          </div>
+          {outTabs.map(t=>activeOut===t.id&&(
+            <div key={t.id}>
+              <div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><CopyBtn text={result[t.key]||""}/></div>
+              <div style={{...S.code,whiteSpace:"pre-wrap"}}>{result[t.key]||"Not generated for this platform."}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Log Replay ────────────────────────────────────────────────────────────────
+function LogReplay({detections=[]}){
+  const[query,setQuery]=useState("");
+  const[queryType,setQueryType]=useState("SPL");
+  const[logs,setLogs]=useState("");
+  const[loading,setLoading]=useState(false);
+  const[result,setResult]=useState(null);
+  const[err,setErr]=useState("");
+  const[loadedFrom,setLoadedFrom]=useState("");
+  const PLATFORMS=[{id:"SPL",label:"Splunk SPL"},{id:"KQL",label:"Elastic KQL"},{id:"KQL_SENTINEL",label:"Sentinel KQL"},{id:"EQL",label:"Elastic EQL"},{id:"YARA-L",label:"Chronicle YARA-L"}];
+  function loadFromLibrary(id){
+    const det=detections.find(d=>d.id===id); if(!det)return;
+    setQuery(det.query||""); setQueryType(det.queryType||"SPL"); setLoadedFrom(det.name); setResult(null);
+  }
+  async function runReplay(){
+    if(!query.trim()||!logs.trim()){setErr("Paste both a query and log lines first.");return;}
+    setLoading(true);setErr("");setResult(null);
+    try{
+      const res=await fetch("/api/detection/replay",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query,queryType,logs})});
+      const data=await res.json(); if(data.error)throw new Error(data.error); setResult(data);
+    }catch(e){setErr(e.message);}
+    setLoading(false);
+  }
+  function handleFile(e){
+    const file=e.target.files[0]; if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>setLogs(ev.target.result);
+    reader.readAsText(file);
+  }
+  return(
+    <div>
+      <SectionHeader icon="🎮" title="Log Replay" color={THEME.purple}>
+        <span style={S.badge(THEME.purple)}>Dry Run</span>
+        <span style={{fontSize:11,color:THEME.textDim}}>Test your detection against real log lines before deploying</span>
+      </SectionHeader>
+      <HelpBox title="How Log Replay Works" color={THEME.purple} items={[
+        {icon:"🎮",title:"What it does",desc:"AI reads your detection query and evaluates each log line to decide if it would match — simulating what your SIEM would do in production, without needing to actually run the query."},
+        {icon:"📁",title:"How to use it",desc:"Paste your detection query on the left, then paste or upload real log lines on the right (up to 200 lines). Click Run Replay to get matched/unmatched results with explanations."},
+        {icon:"🔧",title:"Tuning suggestions",desc:"The AI also flags which parts of your query are over-broad or too restrictive and suggests specific tuning steps to reduce false positives before you deploy."},
+        {icon:"💡",title:"Pro tip",desc:"Use the 'Load from library' dropdown above to auto-fill any saved detection, so you don't need to copy-paste the query manually."},
+      ]}/>
+      {detections.length===0&&!query&&(
+        <div style={{padding:"32px 24px",textAlign:"center",border:"1px dashed "+THEME.border,borderRadius:10,marginBottom:16}}>
+          <div style={{fontSize:36,marginBottom:10}}>🎮</div>
+          <div style={{fontSize:14,fontWeight:600,color:THEME.text,marginBottom:6}}>No detections in your library yet</div>
+          <div style={{fontSize:12,color:THEME.textDim,marginBottom:14,lineHeight:1.7}}>Build a detection first, then come back here to dry-run it against real log lines before deploying to your SIEM.</div>
+        </div>
+      )}
+      {detections.length>0&&(
+        <div style={{...S.card,padding:"12px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:10,background:"rgba(139,92,246,0.04)"}}>
+          <span style={{fontSize:11,color:THEME.textDim,flexShrink:0}}>Load from library:</span>
+          <select style={{...S.input,flex:1,fontSize:11,padding:"6px 10px"}} onChange={e=>loadFromLibrary(e.target.value)} value="">
+            <option value="">Select a detection to auto-fill query...</option>
+            {detections.map(d=><option key={d.id} value={d.id}>{d.name} ({d.queryType})</option>)}
+          </select>
+          {loadedFrom&&<span style={{...S.badge(THEME.purple),flexShrink:0,fontSize:10}}>Loaded: {loadedFrom}</span>}
+        </div>
+      )}
+      <div style={S.card}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <label style={S.label}>Detection Query</label>
+              <select style={{...S.input,width:"auto",padding:"4px 8px",fontSize:11}} value={queryType} onChange={e=>setQueryType(e.target.value)}>
+                {PLATFORMS.map(p=><option key={p.id} value={p.id}>{p.label}</option>)}
+              </select>
+            </div>
+            <textarea style={{...S.textarea,minHeight:180,fontFamily:"monospace",fontSize:12}} placeholder="Paste your SPL/KQL/EQL detection query here..." value={query} onChange={e=>setQuery(e.target.value)}/>
+          </div>
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <label style={S.label}>Log Lines (paste or upload)</label>
+              <label style={{...S.btn(),padding:"4px 10px",fontSize:11,cursor:"pointer"}}>
+                📁 Upload
+                <input type="file" accept=".log,.txt,.json,.csv" style={{display:"none"}} onChange={handleFile}/>
+              </label>
+            </div>
+            <textarea style={{...S.textarea,minHeight:180,fontFamily:"monospace",fontSize:11}} placeholder={"Paste log lines here (up to 200 lines)\n\nExample:\n2024-01-15 10:23:44 host=web01 user=jdoe process=cmd.exe CommandLine=powershell.exe -enc abc123\n2024-01-15 10:23:45 host=web01 user=admin process=explorer.exe CommandLine=explorer.exe"} value={logs} onChange={e=>setLogs(e.target.value)}/>
+          </div>
+        </div>
+        <button style={{...S.btn("p"),padding:"10px 28px",fontSize:13,width:"100%"}} onClick={runReplay} disabled={loading}>{loading?<><Spinner/> AI is evaluating log lines against query...</>:"🎮 Run Replay"}</button>
+        {err&&<div style={{color:THEME.danger,fontSize:12,marginTop:10}}>{err}</div>}
+      </div>
+      {result&&(
+        <div style={S.card}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
+            {[{label:"TOTAL LINES",val:result.total_lines,color:THEME.textMid},{label:"MATCHED",val:result.match_count,color:THEME.success},{label:"NOT MATCHED",val:result.unmatched_lines?.length||0,color:THEME.textDim}].map(({label,val,color})=>(
+              <div key={label} style={{padding:"14px 16px",background:"rgba(255,255,255,0.02)",border:"1px solid "+THEME.border,borderRadius:8,textAlign:"center"}}>
+                <div style={{fontSize:28,fontWeight:800,color}}>{val}</div>
+                <div style={{fontSize:10,color:THEME.textDim,letterSpacing:"0.1em",marginTop:2}}>{label}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{marginBottom:12,padding:"10px 14px",background:"rgba(0,212,255,0.04)",border:"1px solid "+THEME.borderBright,borderRadius:8}}>
+            <div style={{fontSize:11,color:THEME.textMid,marginBottom:4}}>{result.query_analysis}</div>
+            <div style={{fontSize:11,color:THEME.warning}}>{result.tuning_suggestion}</div>
+          </div>
+          {result.matched_lines?.length>0&&(
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:10,fontWeight:800,color:THEME.success,letterSpacing:"0.12em",marginBottom:8}}>✅ MATCHED LINES ({result.matched_lines.length})</div>
+              {result.matched_lines.map((line,i)=>(
+                <div key={i} style={{padding:"8px 12px",background:"rgba(0,232,122,0.05)",border:"1px solid rgba(0,232,122,0.2)",borderRadius:6,marginBottom:6,fontFamily:"monospace",fontSize:11,color:THEME.text}}>
+                  {result.match_explanations?.[String(result.match_indices?.[i])]&&<div style={{fontSize:10,color:THEME.success,marginBottom:4}}>{result.match_explanations[String(result.match_indices[i])]}</div>}
+                  {line}
+                </div>
+              ))}
+            </div>
+          )}
+          {result.unmatched_lines?.length>0&&(
+            <div>
+              <div style={{fontSize:10,fontWeight:800,color:THEME.textDim,letterSpacing:"0.12em",marginBottom:8}}>✗ NOT MATCHED ({result.unmatched_lines.length})</div>
+              <div style={{maxHeight:200,overflowY:"auto"}}>
+                {result.unmatched_lines.map((line,i)=>(
+                  <div key={i} style={{padding:"6px 12px",background:"rgba(255,255,255,0.01)",border:"1px solid "+THEME.border,borderRadius:6,marginBottom:4,fontFamily:"monospace",fontSize:11,color:THEME.textDim}}>{line}</div>
+                ))}
+              </div>
+              {result.non_match_reasons&&<div style={{marginTop:8,fontSize:11,color:THEME.textDim}}>{result.non_match_reasons}</div>}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Defend Page (Honeytoken + DNS Sinkhole) ───────────────────────────────────
+function DefendPage({detections=[]}){
+  const[subTab,setSubTab]=useState("honey");
+  const[threat,setThreat]=useState(""); const[tactic,setTactic]=useState(""); const[detName,setDetName]=useState(""); const[queryType,setQueryType]=useState("SPL");
+  const[loadedDetection,setLoadedDetection]=useState(null);
+
+  function loadDetection(id){
+    const det=detections.find(d=>d.id===id); if(!det)return;
+    setDetName(det.name||"");
+    setTactic(det.tactic||"");
+    setThreat(det.threat||det.ads?.attack_overview?.slice(0,200)||"");
+    setQueryType(det.queryType||"SPL");
+    setLoadedDetection(det);
+  }
+  const[honeytokenData,setHoneytokenData]=useState(null); const[honeytokenLoading,setHoneytokenLoading]=useState(false); const[honeytokenErr,setHoneytokenErr]=useState("");
+  const[sinkholeData,setSinkholeData]=useState(null); const[sinkholeLoading,setSinkholeLoading]=useState(false); const[sinkholeErr,setSinkholeErr]=useState("");
+
+  async function runHoneytoken(){
+    if(!detName&&!tactic){setHoneytokenErr("Enter at least a detection name or tactic.");return;}
+    setHoneytokenLoading(true);setHoneytokenErr("");setHoneytokenData(null);
+    try{
+      const res=await fetch("/api/detection/honeytoken",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:detName||tactic,queryType,tactic,threat})});
+      const data=await res.json(); if(data.error)throw new Error(data.error); setHoneytokenData(data);
+    }catch(e){setHoneytokenErr(e.message);}
+    setHoneytokenLoading(false);
+  }
+  async function runSinkhole(){
+    if(!detName&&!threat){setSinkholeErr("Enter detection name or threat context.");return;}
+    setSinkholeLoading(true);setSinkholeErr("");setSinkholeData(null);
+    try{
+      const res=await fetch("/api/detection/dns-sinkhole",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:detName||threat,tactic,threat})});
+      const data=await res.json(); if(data.error)throw new Error(data.error); setSinkholeData(data);
+    }catch(e){setSinkholeErr(e.message);}
+    setSinkholeLoading(false);
+  }
+
+  const HONEY_COLOR="#f59e0b"; const SINK_COLOR="#06b6d4";
+  const str=v=>Array.isArray(v)?v.join("\n"):v&&typeof v==="object"?JSON.stringify(v):String(v||"");
+
+  return(
+    <div>
+      <SectionHeader icon="🛡" title="Defend" color={THEME.purple}>
+        <span style={S.badge(THEME.purple)}>Zero-FP Traps</span>
+      </SectionHeader>
+      <HelpBox title="How the Defend tools work" color={THEME.purple} items={[
+        {icon:"🍯",title:"Honeytokens & Canaries",desc:"Fake credentials, files, AWS keys, and AD accounts that look real. Any access to them = 100% confidence alert with zero false positives. No tuning, no investigation — just instant attacker confirmation."},
+        {icon:"🕳",title:"DNS Sinkhole",desc:"Block C2 domains before malware calls home. DetectIQ generates Pi-hole blocklists, BIND9 RPZ zones, Windows DNS policies, and Unbound configs based on your threat context."},
+        {icon:"🔗",title:"Auto-fill from library",desc:"Use the 'Auto-fill' dropdown to load threat context from any saved detection. The tool will tailor the honeytoken or sinkhole config to match that specific threat scenario."},
+        {icon:"📋",title:"Deployment",desc:"Each generated config includes copy-paste deployment commands for your specific platform, plus a companion SIEM detection query to alert when the trap is triggered."},
+      ]}/>
+
+      {/* Hero cards */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
+        {[
+          {id:"honey",icon:"🍯",title:"Honeytokens & Canaries",color:HONEY_COLOR,bg:"rgba(245,158,11,0.06)",border:"rgba(245,158,11,0.25)",desc:"Plant fake credentials, canary files, and DNS tokens across your environment. Any access = 100% confidence alert with zero false positives.",pills:["Fake AD accounts","Canary files","AWS key tokens","DNS canaries","Honey shares"]},
+          {id:"sinkhole",icon:"🕳",title:"DNS Sinkhole",color:SINK_COLOR,bg:"rgba(6,182,212,0.06)",border:"rgba(6,182,212,0.25)",desc:"Block and detect C2 domains before the malware calls home. Generate Pi-hole, BIND9 RPZ, Windows DNS, and Unbound configs in one click.",pills:["Pi-hole blocklist","BIND9 RPZ zone","Windows DNS","Unbound config","SIEM detection"]},
+        ].map(card=>(
+          <div key={card.id} onClick={()=>setSubTab(card.id)} style={{padding:"20px 22px",background:subTab===card.id?card.bg:"rgba(255,255,255,0.02)",border:"1px solid "+(subTab===card.id?card.border:THEME.border),borderRadius:10,cursor:"pointer",transition:"all 0.15s"}}
+            onMouseEnter={e=>{e.currentTarget.style.background=card.bg;e.currentTarget.style.borderColor=card.border;}}
+            onMouseLeave={e=>{if(subTab!==card.id){e.currentTarget.style.background="rgba(255,255,255,0.02)";e.currentTarget.style.borderColor=THEME.border;}}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+              <div style={{width:36,height:36,borderRadius:8,background:card.bg,border:"1px solid "+card.border,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>{card.icon}</div>
+              <div style={{fontSize:13,fontWeight:700,color:subTab===card.id?card.color:THEME.text}}>{card.title}</div>
+              {subTab===card.id&&<span style={{...S.badge(card.color),marginLeft:"auto",fontSize:9}}>SELECTED</span>}
+            </div>
+            <div style={{fontSize:12,color:THEME.textMid,lineHeight:1.6,marginBottom:12}}>{card.desc}</div>
+            <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{card.pills.map((p,i)=><span key={i} style={{fontSize:9,padding:"2px 8px",borderRadius:4,background:subTab===card.id?card.bg:"rgba(255,255,255,0.04)",border:"1px solid "+(subTab===card.id?card.border:THEME.border),color:subTab===card.id?card.color:THEME.textDim}}>{p}</span>)}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Context inputs */}
+      <div style={{...S.card,marginBottom:16,background:"rgba(255,255,255,0.015)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <div style={{fontSize:10,fontWeight:800,color:THEME.textDim,letterSpacing:"0.1em"}}>THREAT CONTEXT</div>
+          {detections.length>0&&(
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:10,color:THEME.textDim}}>Auto-fill from library:</span>
+              <select style={{...S.input,width:"auto",padding:"5px 10px",fontSize:11,minWidth:220}} onChange={e=>loadDetection(e.target.value)} defaultValue="">
+                <option value="">Select a detection...</option>
+                {detections.map(d=><option key={d.id} value={d.id}>{d.name} ({d.queryType})</option>)}
+              </select>
+            </div>
+          )}
+        </div>
+        {loadedDetection&&(
+          <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",background:"rgba(79,142,247,0.07)",border:"1px solid "+THEME.accentDim+"44",borderRadius:7,marginBottom:12}}>
+            <span style={{fontSize:13}}>🔗</span>
+            <span style={{fontSize:11,color:THEME.accent,fontWeight:600}}>Context loaded from:</span>
+            <span style={{fontSize:11,color:THEME.text}}>{loadedDetection.name}</span>
+            <span style={{...S.badge(THEME.accent),fontSize:9}}>{loadedDetection.queryType}</span>
+            {loadedDetection.tactic&&<span style={{...S.badge(THEME.purple),fontSize:9}}>{loadedDetection.tactic}</span>}
+            <button style={{marginLeft:"auto",fontSize:10,color:THEME.textDim,background:"none",border:"none",cursor:"pointer"}} onClick={()=>{setLoadedDetection(null);setDetName("");setTactic("");setThreat("");setQueryType("SPL");}}>✕ Clear</button>
+          </div>
+        )}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
+          <div><label style={S.label}>Detection / Threat Name</label><input style={S.input} value={detName} onChange={e=>setDetName(e.target.value)} placeholder="e.g. Lateral Movement via WMI"/></div>
+          <div><label style={S.label}>MITRE Tactic</label><input style={S.input} value={tactic} onChange={e=>setTactic(e.target.value)} placeholder="e.g. Lateral Movement"/></div>
+          <div><label style={S.label}>Query Type</label>
+            <select style={S.input} value={queryType} onChange={e=>setQueryType(e.target.value)}>
+              {["SPL","KQL","EQL","YARA-L","KQL_SENTINEL"].map(q=><option key={q} value={q}>{q}</option>)}
+            </select>
+          </div>
+        </div>
+        <div><label style={S.label}>Threat Description (optional — helps generate more specific configs)</label><input style={S.input} value={threat} onChange={e=>setThreat(e.target.value)} placeholder="e.g. Attacker using DNS C2 to exfiltrate data from compromised hosts..."/></div>
+      </div>
+
+      {/* Generate button */}
+      {subTab==="honey"&&(
+        <div>
+          <button style={{...S.btn("p"),padding:"11px 28px",fontSize:13,marginBottom:16,background:"rgba(245,158,11,0.12)",borderColor:"rgba(245,158,11,0.4)",color:HONEY_COLOR}} onClick={runHoneytoken} disabled={honeytokenLoading}>
+            {honeytokenLoading?<><Spinner/> Designing honeytoken traps...</>:"🍯 Generate Honeytokens & Canaries"}
+          </button>
+          {honeytokenErr&&<div style={{color:THEME.danger,fontSize:13,padding:12,background:"rgba(255,61,85,0.06)",borderRadius:8,marginBottom:14}}>{honeytokenErr}</div>}
+          {!honeytokenData&&!honeytokenLoading&&!honeytokenErr&&(
+            <div style={{padding:"48px 24px",textAlign:"center",border:"1px dashed "+THEME.border,borderRadius:10}}>
+              <div style={{fontSize:40,marginBottom:12}}>🍯</div>
+              <div style={{fontSize:14,fontWeight:600,color:THEME.text,marginBottom:8}}>Plant traps. Catch attackers in the act.</div>
+              <div style={{fontSize:12,color:THEME.textDim,maxWidth:500,margin:"0 auto",lineHeight:1.7}}>Honeytokens are fake assets that look real to attackers. Any interaction triggers a 100%-confidence alert — no tuning, no FP investigation needed.</div>
+              <div style={{display:"flex",justifyContent:"center",gap:20,marginTop:20}}>
+                {["Fake AD Account","Canary S3 Bucket","DNS Token","Honey File","Fake API Key"].map((t,i)=>(
+                  <div key={i} style={{padding:"8px 14px",background:"rgba(245,158,11,0.06)",border:"1px solid rgba(245,158,11,0.2)",borderRadius:8,fontSize:11,color:HONEY_COLOR}}>{t}</div>
+                ))}
+              </div>
+            </div>
+          )}
+          {honeytokenData&&(
+            <div>
+              <div style={{marginBottom:16,padding:"14px 18px",background:"rgba(245,158,11,0.06)",border:"1px solid rgba(245,158,11,0.25)",borderRadius:10,display:"flex",gap:12,alignItems:"flex-start"}}>
+                <div style={{fontSize:28}}>🍯</div>
+                <div>
+                  <div style={{fontSize:13,fontWeight:700,color:HONEY_COLOR,marginBottom:4}}>{str(honeytokenData.coverage_benefit)}</div>
+                  <div style={{fontSize:11,color:THEME.textDim}}>Use managed canary tokens at <a href="https://canarytokens.org/generate" target="_blank" rel="noopener noreferrer" style={{color:THEME.accent}}>canarytokens.org ↗</a> for DNS/HTTP/AWS tokens without infrastructure</div>
+                </div>
+              </div>
+              <div style={{display:"grid",gap:12}}>
+                {(Array.isArray(honeytokenData.tokens)?honeytokenData.tokens:[]).map((t,i)=>(
+                  <div key={i} style={{border:"1px solid "+THEME.border,borderRadius:10,overflow:"hidden"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",background:"rgba(245,158,11,0.04)",borderBottom:"1px solid "+THEME.border}}>
+                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                        <div style={{width:32,height:32,borderRadius:6,background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>🍯</div>
+                        <div>
+                          <div style={{fontSize:13,fontWeight:700,color:THEME.text}}>{str(t.type||t.name)}</div>
+                          <div style={{fontSize:10,color:THEME.textDim}}>{str(t.platform)}</div>
+                        </div>
+                      </div>
+                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                        <span style={{padding:"3px 10px",borderRadius:4,background:"rgba(0,232,122,0.1)",border:"1px solid rgba(0,232,122,0.3)",fontSize:10,color:THEME.success,fontWeight:700}}>✓ {str(t.alert_confidence||"100%")}</span>
+                        <span style={S.badge(THEME.success)}>Zero FP</span>
+                      </div>
+                    </div>
+                    <div style={{padding:"14px 16px"}}>
+                      <div style={{fontSize:12,color:THEME.textMid,marginBottom:14,lineHeight:1.6}}>{str(t.description)}</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                        <div>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                            <span style={{fontSize:10,fontWeight:800,color:THEME.warning,letterSpacing:"0.1em"}}>DEPLOY COMMAND</span>
+                            <CopyBtn text={str(t.deployment_cmd||t.deploy_command||"")}/>
+                          </div>
+                          <div style={{...S.code,fontSize:10,padding:"8px 10px",whiteSpace:"pre-wrap"}}>{str(t.deployment_cmd||t.deploy_command)}</div>
+                        </div>
+                        <div>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                            <span style={{fontSize:10,fontWeight:800,color:THEME.accent,letterSpacing:"0.1em"}}>DETECTION QUERY</span>
+                            <CopyBtn text={str(t.detection_query||t.siem_query||"")}/>
+                          </div>
+                          <div style={{...S.code,fontSize:10,padding:"8px 10px",whiteSpace:"pre-wrap"}}>{str(t.detection_query||t.siem_query)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {honeytokenData.deployment_guide&&(
+                <div style={{marginTop:12,padding:"14px 16px",background:"rgba(255,255,255,0.02)",border:"1px solid "+THEME.border,borderRadius:10}}>
+                  <div style={{fontSize:10,fontWeight:800,color:THEME.textDim,letterSpacing:"0.1em",marginBottom:8}}>DEPLOYMENT GUIDE</div>
+                  <div style={{fontSize:12,color:THEME.textMid,lineHeight:1.8}}>{str(honeytokenData.deployment_guide)}</div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {subTab==="sinkhole"&&(
+        <div>
+          <button style={{...S.btn("p"),padding:"11px 28px",fontSize:13,marginBottom:16,background:"rgba(6,182,212,0.1)",borderColor:"rgba(6,182,212,0.4)",color:SINK_COLOR}} onClick={runSinkhole} disabled={sinkholeLoading}>
+            {sinkholeLoading?<><Spinner/> Generating sinkhole configs...</>:"🕳 Generate DNS Sinkhole Configs"}
+          </button>
+          {sinkholeErr&&<div style={{color:THEME.danger,fontSize:13,padding:12,background:"rgba(255,61,85,0.06)",borderRadius:8,marginBottom:14}}>{sinkholeErr}</div>}
+          {!sinkholeData&&!sinkholeLoading&&!sinkholeErr&&(
+            <div style={{padding:"48px 24px",textAlign:"center",border:"1px dashed "+THEME.border,borderRadius:10}}>
+              <div style={{fontSize:40,marginBottom:12}}>🕳</div>
+              <div style={{fontSize:14,fontWeight:600,color:THEME.text,marginBottom:8}}>Block C2 domains. Detect the attempt.</div>
+              <div style={{fontSize:12,color:THEME.textDim,maxWidth:500,margin:"0 auto",lineHeight:1.7}}>DNS sinkholes redirect malicious domain lookups to a controlled IP. The malware can't phone home — and the DNS query becomes your alert.</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8,marginTop:20,maxWidth:600,margin:"20px auto 0"}}>
+                {[{icon:"🐛",label:"Malware calls home"},{icon:"→",label:""},{icon:"🕳",label:"DNS Sinkhole intercepts"},{icon:"→",label:""},{icon:"🚨",label:"Alert fires in SIEM"}].map((s,i)=>(
+                  <div key={i} style={{textAlign:"center"}}>
+                    <div style={{fontSize:20,marginBottom:4}}>{s.icon}</div>
+                    <div style={{fontSize:9,color:THEME.textDim}}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {sinkholeData&&(
+            <div>
+              <div style={{marginBottom:16,padding:"14px 18px",background:"rgba(6,182,212,0.06)",border:"1px solid rgba(6,182,212,0.25)",borderRadius:10}}>
+                <div style={{fontSize:10,fontWeight:800,color:SINK_COLOR,letterSpacing:"0.12em",marginBottom:8}}>DOMAINS TO SINKHOLE — {(Array.isArray(sinkholeData.inferred_domains)?sinkholeData.inferred_domains:[]).length} identified</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{(Array.isArray(sinkholeData.inferred_domains)?sinkholeData.inferred_domains:[]).map((d,i)=><span key={i} style={{fontFamily:"monospace",fontSize:11,padding:"3px 10px",borderRadius:4,background:"rgba(255,61,85,0.1)",border:"1px solid rgba(255,61,85,0.3)",color:THEME.danger}}>{str(d)}</span>)}</div>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+                {[{label:"Pi-hole Blocklist",key:"pihole_blocklist",color:"#82c341",icon:"🍓"},{label:"BIND9 RPZ Zone",key:"bind9_rpz",color:THEME.warning,icon:"📋"},{label:"Windows DNS (PowerShell)",key:"windows_dns_rpz",color:THEME.accent,icon:"🖥"},{label:"Unbound Config",key:"unbound_conf",color:THEME.purple,icon:"🔒"}].map(({label,key,color,icon})=>(
+                  <div key={key} style={{border:"1px solid "+THEME.border,borderRadius:8,overflow:"hidden"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"rgba(255,255,255,0.02)",borderBottom:"1px solid "+THEME.border}}>
+                      <span style={{fontSize:11,fontWeight:700,color}}>{icon} {label}</span>
+                      <CopyBtn text={str(sinkholeData[key])}/>
+                    </div>
+                    <div style={{...S.code,fontSize:10,padding:"8px 12px",whiteSpace:"pre-wrap",maxHeight:120,overflow:"auto"}}>{str(sinkholeData[key])||"Not generated."}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{border:"1px solid rgba(255,61,85,0.3)",borderRadius:8,overflow:"hidden",marginBottom:12}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"rgba(255,61,85,0.05)",borderBottom:"1px solid rgba(255,61,85,0.2)"}}>
+                  <span style={{fontSize:11,fontWeight:700,color:THEME.danger}}>🚨 Sinkhole Hit Detection Query</span>
+                  <CopyBtn text={str(sinkholeData.sinkhole_detection_query||sinkholeData.detection_query)}/>
+                </div>
+                <div style={{...S.code,fontSize:11,padding:"10px 14px",whiteSpace:"pre-wrap"}}>{str(sinkholeData.sinkhole_detection_query||sinkholeData.detection_query)||"Not generated."}</div>
+              </div>
+              {sinkholeData.deployment_steps&&(
+                <div style={{padding:"14px 16px",background:"rgba(255,255,255,0.02)",border:"1px solid "+THEME.border,borderRadius:10}}>
+                  <div style={{fontSize:10,fontWeight:800,color:THEME.textDim,letterSpacing:"0.1em",marginBottom:10}}>DEPLOYMENT STEPS</div>
+                  <div style={{display:"grid",gap:8}}>
+                    {(Array.isArray(sinkholeData.deployment_steps)?sinkholeData.deployment_steps:[]).map((s,i)=>(
+                      <div key={i} style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                        <div style={{width:20,height:20,borderRadius:"50%",background:"rgba(6,182,212,0.1)",border:"1px solid rgba(6,182,212,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:SINK_COLOR,flexShrink:0}}>{i+1}</div>
+                        <div style={{fontSize:12,color:THEME.textMid,lineHeight:1.5,paddingTop:2}}>{str(s)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function GitHubExport({detections}){
   const[token,setToken]=useState(LS.get("gh_token",""));const[repo,setRepo]=useState(LS.get("gh_repo",""));const[branch,setBranch]=useState(LS.get("gh_branch","main"));const[path,setPath]=useState(LS.get("gh_path","detections/"));const[status,setStatus]=useState("");const[loading,setLoading]=useState(false);const[selected,setSelected]=useState([]);
   function toggleSelect(id){setSelected(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);}
@@ -2717,16 +5966,533 @@ function GitHubExport({detections}){
   );
 }
 
-function TeamWorkspace({detections}){
-  const[comments,setComments]=useState(LS.get("detectiq_comments",[]));const[activity,setActivity]=useState(LS.get("detectiq_activity",[]));const[newComment,setNewComment]=useState("");const[selectedDet,setSelectedDet]=useState("");const[author,setAuthor]=useState(LS.get("detectiq_author","Analyst"));
-  function postComment(){if(!newComment.trim())return;const c={id:uid(),author,text:newComment,detection:selectedDet,ts:new Date().toISOString()};const u=[c,...comments].slice(0,50);setComments(u);LS.set("detectiq_comments",u);const a=[{id:uid(),text:author+" commented on "+(selectedDet||"General"),ts:new Date().toISOString()},...activity].slice(0,20);setActivity(a);LS.set("detectiq_activity",a);setNewComment("");}
-  return(
+function TeamWorkspace({detections, user}){
+  // ── Team members — Supabase-first, localStorage fallback ─────────────────
+  const storageKey = "detectiq_team_" + (user?.id || "demo");
+  const [members, setMembers] = useState(() => LS.get(storageKey, []));
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("Analyst");
+  const [teamName, setTeamName] = useState(() => LS.get("detectiq_team_name", "Detection Team"));
+  const [inviting, setInviting] = useState(false);
+  const [inviteMsg, setInviteMsg] = useState("");
+  const [editingMember, setEditingMember] = useState(null);
+  // ── Comments ──────────────────────────────────────────────────────────────
+  const [comments, setComments] = useState(LS.get("detectiq_comments", []));
+  const [activity, setActivity] = useState(LS.get("detectiq_activity", []));
+  const [newComment, setNewComment] = useState("");
+  const [selectedDet, setSelectedDet] = useState("");
+  const [author, setAuthor] = useState(LS.get("detectiq_author", user?.email?.split("@")[0] || "Analyst"));
+
+  // Load team from Supabase on mount
+  useEffect(() => {
+    if (!user) return;
+    setMembersLoading(true);
+    supabase.from("team_members").select("*").eq("owner_user_id", user.id).neq("status","removed").order("invited_at", { ascending: true })
+      .then(({ data, error }) => {
+        if (!error && data) {
+          if (data.length > 0) {
+            const mapped = data.map(m => ({ id: m.id, name: m.member_name || m.member_email.split("@")[0], email: m.member_email, role: m.role, status: m.status, invitedAt: m.invited_at, joinedAt: m.joined_at }));
+            const hasOwner = mapped.find(m => m.role === "Owner");
+            const final = hasOwner ? mapped : [{ id: user.id, name: user.email?.split("@")[0] || "You", email: user.email || "", role: "Owner", status: "active", joinedAt: new Date().toISOString() }, ...mapped];
+            setMembers(final); LS.set(storageKey, final);
+          } else {
+            const ownerRow = { owner_user_id: user.id, member_email: user.email || "", member_name: user.email?.split("@")[0] || "You", member_user_id: user.id, role: "Owner", status: "active", team_name: teamName };
+            supabase.from("team_members").insert([ownerRow]).then(() => {});
+            const ownerLocal = [{ id: user.id, name: ownerRow.member_name, email: ownerRow.member_email, role: "Owner", status: "active", joinedAt: new Date().toISOString() }];
+            setMembers(ownerLocal); LS.set(storageKey, ownerLocal);
+          }
+        }
+      }).catch(() => {}).finally(() => setMembersLoading(false));
+  }, [user]);
+
+  function syncMembers(updated) { setMembers(updated); LS.set(storageKey, updated); }
+
+  async function sendInvite() {
+    if (!inviteEmail.includes("@")) { setInviteMsg("error:Enter a valid email address."); return; }
+    if (members.find(m => m.email === inviteEmail)) { setInviteMsg("error:This person is already on your team."); return; }
+    setInviting(true); setInviteMsg("");
+    try {
+      const res = await fetch("/api/teams/invite", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inviterUserId: user?.id, inviterEmail: user?.email, inviteeEmail: inviteEmail, teamName })
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (user) {
+          await supabase.from("team_members").upsert([{ owner_user_id: user.id, member_email: inviteEmail, member_name: inviteEmail.split("@")[0], role: inviteRole, status: "pending", team_name: teamName, invite_token: data.token }], { onConflict: "owner_user_id,member_email" });
+        }
+        const newMember = { id: uid(), name: inviteEmail.split("@")[0], email: inviteEmail, role: inviteRole, status: "pending", invitedAt: new Date().toISOString(), token: data.token };
+        syncMembers([...members, newMember]);
+        const a = [{ id: uid(), text: "Invited " + inviteEmail + " as " + inviteRole, ts: new Date().toISOString() }, ...activity].slice(0, 20);
+        setActivity(a); LS.set("detectiq_activity", a);
+        setInviteMsg("success:Invite sent to " + inviteEmail);
+        setInviteEmail("");
+      } else { setInviteMsg("error:" + (data.error || "Invite failed.")); }
+    } catch(e) { setInviteMsg("error:Request failed: " + e.message); }
+    setInviting(false);
+  }
+
+  async function removeMember(id) {
+    const m = members.find(x => x.id === id);
+    if (!m || m.role === "Owner") return;
+    if (user) { await supabase.from("team_members").update({ status: "removed" }).eq("owner_user_id", user.id).eq("member_email", m.email).catch(() => {}); }
+    syncMembers(members.filter(x => x.id !== id));
+    const a = [{ id: uid(), text: "Removed " + m.email + " from team", ts: new Date().toISOString() }, ...activity].slice(0, 20);
+    setActivity(a); LS.set("detectiq_activity", a);
+  }
+
+  async function changeRole(id, role) {
+    const m = members.find(x => x.id === id);
+    if (m && user) { await supabase.from("team_members").update({ role }).eq("owner_user_id", user.id).eq("member_email", m.email).catch(() => {}); }
+    syncMembers(members.map(x => x.id === id ? { ...x, role } : x));
+    setEditingMember(null);
+  }
+
+  function postComment() {
+    if (!newComment.trim()) return;
+    const c = { id: uid(), author, text: newComment, detection: selectedDet, ts: new Date().toISOString() };
+    const u = [c, ...comments].slice(0, 50); setComments(u); LS.set("detectiq_comments", u);
+    const a = [{ id: uid(), text: author + " commented on " + (selectedDet || "General"), ts: new Date().toISOString() }, ...activity].slice(0, 20);
+    setActivity(a); LS.set("detectiq_activity", a); setNewComment("");
+  }
+
+  const ROLES = ["Owner", "Admin", "Analyst", "Read-only"];
+  const roleColor = r => r === "Owner" ? THEME.accent : r === "Admin" ? THEME.purple : r === "Analyst" ? THEME.success : THEME.textDim;
+  const statusColor = s => s === "active" ? THEME.success : s === "pending" ? THEME.warning : THEME.textDim;
+  const [invMsgType, invMsgText] = inviteMsg.split(/:(.+)/);
+
+  return (
     <div>
-      <SectionHeader icon="👥" title="Team Workspace" color={THEME.purple}><span style={S.badge(THEME.purple)}>{comments.length} comments</span></SectionHeader>
+      <SectionHeader icon="👥" title="Team Workspace" color={THEME.purple}>
+        <div style={S.flex}>
+          <span style={S.badge(THEME.purple)}>{members.filter(m=>m.status==="active").length} active · {members.filter(m=>m.status==="pending").length} pending</span>
+        </div>
+      </SectionHeader>
+
       <div style={S.grid2}>
-        <div style={S.card}><div style={S.cardTitle}><span>💬</span> Comments</div><label style={S.label}>Your Name</label><input style={{...S.input,marginBottom:12}} value={author} onChange={e=>{setAuthor(e.target.value);LS.set("detectiq_author",e.target.value);}} placeholder="Your name..."/><label style={S.label}>Related Detection</label><select style={{...S.input,marginBottom:12}} value={selectedDet} onChange={e=>setSelectedDet(e.target.value)}><option value="">General</option>{detections.map(d=><option key={d.id} value={d.name}>{d.name}</option>)}</select><textarea style={{...S.textarea,minHeight:80}} value={newComment} onChange={e=>setNewComment(e.target.value)} placeholder="Share findings or notes..."/><button style={{...S.btn("p"),marginTop:12,width:"100%"}} onClick={postComment}>Post Comment</button><div style={{maxHeight:300,overflowY:"auto",marginTop:16}}>{comments.map(c=><div key={c.id} style={{padding:"12px 0",borderBottom:"1px solid "+THEME.border}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:12,fontWeight:700,color:THEME.accent}}>{c.author}</span><span style={{fontSize:11,color:THEME.textDim}}>{new Date(c.ts).toLocaleString()}</span></div>{c.detection&&<div style={{fontSize:11,color:THEME.purple,marginBottom:4}}>re: {c.detection}</div>}<div style={{fontSize:13,color:THEME.textMid,lineHeight:1.6}}>{c.text}</div></div>)}{!comments.length&&<div style={{color:THEME.textDim,fontSize:13,textAlign:"center",padding:20}}>No comments yet.</div>}</div></div>
-        <div><div style={S.card}><div style={S.cardTitle}><span>📡</span> Activity</div><div style={{maxHeight:220,overflowY:"auto"}}>{activity.map(a=><div key={a.id} style={{padding:"8px 0",borderBottom:"1px solid "+THEME.border,fontSize:12,color:THEME.textMid}}>{a.text}<span style={{color:THEME.textDim,marginLeft:8,fontSize:11}}>{new Date(a.ts).toLocaleTimeString()}</span></div>)}{!activity.length&&<div style={{color:THEME.textDim,fontSize:13}}>No activity yet.</div>}</div></div><div style={S.card}><div style={S.cardTitle}><span>📊</span> Statistics</div><div style={S.grid2}>{[["Detections",detections.length,THEME.accent],["Platforms",[...new Set(detections.map(d=>d.tool||d.queryType))].length,THEME.purple],["Tactics",[...new Set(detections.map(d=>d.tactic))].length,THEME.success],["Comments",comments.length,THEME.warning]].map(([label,val,color])=><div key={label} style={{textAlign:"center",padding:16,background:color+"08",borderRadius:10,border:"1px solid "+color+"20"}}><div style={{fontSize:28,fontWeight:900,color}}>{val}</div><div style={{fontSize:11,color:THEME.textMid,marginTop:4,fontWeight:700}}>{label}</div></div>)}</div></div></div>
+        {/* ── Left column: roster + invite ── */}
+        <div>
+          {/* Team Members */}
+          <div style={S.card}>
+            <div style={{...S.row, marginBottom: 14}}>
+              <div style={S.cardTitle}><span>👥</span> Team Members {membersLoading&&<Spinner/>}</div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <input style={{...S.input,width:140,fontSize:12,padding:"4px 10px"}} value={teamName} onChange={e=>{setTeamName(e.target.value);LS.set("detectiq_team_name",e.target.value);}} placeholder="Team name..."/>
+              </div>
+            </div>
+            {members.length === 0 && (
+              <div style={{color:THEME.textDim,fontSize:13,textAlign:"center",padding:"30px 20px"}}>
+                <div style={{fontSize:32,marginBottom:10}}>👤</div>
+                Invite teammates to get started
+              </div>
+            )}
+            {members.map(m => (
+              <div key={m.id} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 0",borderBottom:"1px solid "+THEME.border}}>
+                {/* Avatar */}
+                <div style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,"+roleColor(m.role)+"33,"+roleColor(m.role)+"11)",border:"1px solid "+roleColor(m.role)+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:roleColor(m.role),flexShrink:0}}>
+                  {(m.name||m.email||"?")[0].toUpperCase()}
+                </div>
+                {/* Info */}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:700,color:THEME.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.name || m.email.split("@")[0]}</div>
+                  <div style={{fontSize:11,color:THEME.textDim,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.email}</div>
+                </div>
+                {/* Role + status */}
+                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
+                  {editingMember === m.id ? (
+                    <select style={{...S.input,padding:"2px 8px",fontSize:11,width:100}} value={m.role} onChange={e=>changeRole(m.id,e.target.value)} onBlur={()=>setEditingMember(null)} autoFocus>
+                      {ROLES.filter(r=>r!=="Owner").map(r=><option key={r}>{r}</option>)}
+                    </select>
+                  ) : (
+                    <span onClick={()=>m.role!=="Owner"&&setEditingMember(m.id)} style={{...S.badge(roleColor(m.role)),cursor:m.role!=="Owner"?"pointer":"default",fontSize:10}}>{m.role}</span>
+                  )}
+                  <span style={{fontSize:10,color:statusColor(m.status),fontWeight:700,letterSpacing:"0.06em"}}>{m.status === "pending" ? "⏳ PENDING" : "● ACTIVE"}</span>
+                </div>
+                {/* Remove */}
+                {m.role !== "Owner" && (
+                  <button style={{...S.btn(),padding:"4px 8px",fontSize:11,color:THEME.danger,borderColor:THEME.danger+"44",flexShrink:0}} onClick={()=>removeMember(m.id)} title="Remove">✕</button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Invite */}
+          <div style={S.card}>
+            <div style={{...S.cardTitle,marginBottom:14}}><span>✉️</span> Invite Member</div>
+            <label style={S.label}>Email Address</label>
+            <input style={{...S.input,marginBottom:10}} type="email" value={inviteEmail} onChange={e=>setInviteEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendInvite()} placeholder="colleague@company.com"/>
+            <label style={S.label}>Role</label>
+            <select style={{...S.input,marginBottom:14}} value={inviteRole} onChange={e=>setInviteRole(e.target.value)}>
+              {["Admin","Analyst","Read-only"].map(r=><option key={r}>{r}</option>)}
+            </select>
+            <button style={{...S.btn("p"),width:"100%",padding:"10px"}} onClick={sendInvite} disabled={inviting}>{inviting?<><Spinner/>Sending invite...</>:"Send Invite"}</button>
+            {inviteMsg && <StatusBar msg={invMsgText||inviteMsg} type={invMsgType==="success"?"success":"error"}/>}
+            <div style={{marginTop:12,padding:"10px 12px",background:"rgba(0,212,255,0.04)",border:"1px solid rgba(0,212,255,0.12)",borderRadius:8,fontSize:11,color:THEME.textDim,lineHeight:1.6}}>
+              Invites are sent via email with a join link. The member will appear as <span style={{color:THEME.warning,fontWeight:700}}>PENDING</span> until they accept.
+            </div>
+          </div>
+        </div>
+
+        {/* ── Right column: activity, stats, comments ── */}
+        <div>
+          <div style={S.card}>
+            <div style={{...S.cardTitle,marginBottom:12}}><span>📡</span> Activity Feed</div>
+            <div style={{maxHeight:180,overflowY:"auto"}}>
+              {activity.map(a=><div key={a.id} style={{padding:"8px 0",borderBottom:"1px solid "+THEME.border,fontSize:12,color:THEME.textMid,display:"flex",justifyContent:"space-between",gap:8}}>
+                <span>{a.text}</span><span style={{color:THEME.textDim,flexShrink:0,fontSize:11}}>{new Date(a.ts).toLocaleTimeString()}</span>
+              </div>)}
+              {!activity.length && <div style={{color:THEME.textDim,fontSize:13,textAlign:"center",padding:16}}>No activity yet.</div>}
+            </div>
+          </div>
+
+          <div style={S.card}>
+            <div style={{...S.cardTitle,marginBottom:12}}><span>📊</span> Team Stats</div>
+            <div style={S.grid2}>
+              {[["Members",members.filter(m=>m.status==="active").length,THEME.accent],["Pending",members.filter(m=>m.status==="pending").length,THEME.warning],["Detections",detections.length,THEME.success],["Comments",comments.length,THEME.purple]].map(([label,val,color])=>(
+                <div key={label} style={{textAlign:"center",padding:14,background:color+"08",borderRadius:10,border:"1px solid "+color+"20"}}>
+                  <div style={{fontSize:26,fontWeight:900,color}}>{val}</div>
+                  <div style={{fontSize:11,color:THEME.textMid,marginTop:4,fontWeight:700}}>{label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={S.card}>
+            <div style={{...S.cardTitle,marginBottom:12}}><span>💬</span> Team Comments</div>
+            <label style={S.label}>Your Name</label>
+            <input style={{...S.input,marginBottom:10}} value={author} onChange={e=>{setAuthor(e.target.value);LS.set("detectiq_author",e.target.value);}} placeholder="Your name..."/>
+            <label style={S.label}>Related Detection</label>
+            <select style={{...S.input,marginBottom:10}} value={selectedDet} onChange={e=>setSelectedDet(e.target.value)}>
+              <option value="">General</option>
+              {detections.map(d=><option key={d.id} value={d.name}>{d.name}</option>)}
+            </select>
+            <textarea style={{...S.textarea,minHeight:70}} value={newComment} onChange={e=>setNewComment(e.target.value)} placeholder="Share findings, notes, or updates..."/>
+            <button style={{...S.btn("p"),marginTop:10,width:"100%"}} onClick={postComment}>Post Comment</button>
+            <div style={{maxHeight:240,overflowY:"auto",marginTop:14}}>
+              {comments.map(c=>(
+                <div key={c.id} style={{padding:"12px 0",borderBottom:"1px solid "+THEME.border}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                    <span style={{fontSize:12,fontWeight:700,color:THEME.accent}}>{c.author}</span>
+                    <span style={{fontSize:11,color:THEME.textDim}}>{new Date(c.ts).toLocaleString()}</span>
+                  </div>
+                  {c.detection && <div style={{fontSize:11,color:THEME.purple,marginBottom:4}}>re: {c.detection}</div>}
+                  <div style={{fontSize:13,color:THEME.textMid,lineHeight:1.6}}>{c.text}</div>
+                </div>
+              ))}
+              {!comments.length && <div style={{color:THEME.textDim,fontSize:13,textAlign:"center",padding:16}}>No comments yet.</div>}
+            </div>
+          </div>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function CommunityTab({ user, detections, onCloneDetection }) {
+  const [feed, setFeed] = useState([]);
+  const [feedLoading, setFeedLoading] = useState(false);
+  const [feedErr, setFeedErr] = useState("");
+  const [search, setSearch] = useState("");
+  const [filterTactic, setFilterTactic] = useState("All");
+  const [filterTool, setFilterTool] = useState("All");
+  const [sort, setSort] = useState("stars");
+  const [sharing, setSharing] = useState(null);
+  const [shareMsg, setShareMsg] = useState({});
+  const [cloning, setCloning] = useState(null);
+
+  useEffect(() => { loadFeed(); }, [filterTactic, filterTool, sort]);
+
+  async function loadFeed() {
+    setFeedLoading(true); setFeedErr("");
+    try {
+      const params = new URLSearchParams({ sort, limit: 40 });
+      if (filterTactic !== "All") params.set("tactic", filterTactic);
+      if (filterTool !== "All") params.set("tool", filterTool);
+      if (search) params.set("search", search);
+      const res = await fetch("/api/community/list?" + params);
+      const data = await res.json();
+      setFeed(data.detections || []);
+    } catch(e) { setFeedErr("Failed to load community feed."); }
+    setFeedLoading(false);
+  }
+
+  async function shareDetection(det) {
+    if (!user) { setShareMsg({[det.id]:"error:Sign in to share detections."}); return; }
+    setSharing(det.id);
+    try {
+      const res = await fetch("/api/community/share", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ detection: det, userId: user.id, authorName: user.email?.split("@")[0] })
+      });
+      const data = await res.json();
+      setShareMsg({[det.id]: data.success ? "success:Shared to community!" : "error:" + (data.error || "Share failed.")});
+    } catch(e) { setShareMsg({[det.id]:"error:" + e.message}); }
+    setSharing(null);
+  }
+
+  async function starDetection(id) {
+    try {
+      await fetch("/api/community/star", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+      setFeed(f => f.map(d => d.id === id ? { ...d, stars: (d.stars || 0) + 1 } : d));
+    } catch {}
+  }
+
+  async function cloneDetection(communityDet) {
+    if (!user) { alert("Sign in to clone detections."); return; }
+    setCloning(communityDet.id);
+    try {
+      const res = await fetch("/api/community/clone", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: communityDet.id, userId: user.id })
+      });
+      const data = await res.json();
+      if (data.success) { onCloneDetection && onCloneDetection(data.detection); alert("Cloned to your library!"); }
+      else alert("Clone failed: " + data.error);
+    } catch(e) { alert("Clone failed: " + e.message); }
+    setCloning(null);
+  }
+
+  const toolObj = TOOLS.reduce((a, t) => { a[t.id] = t; return a; }, {});
+
+  return (
+    <div>
+      <SectionHeader icon="🌍" title="Community Detections" color={THEME.accent}>
+        <div style={S.flex}>
+          <span style={S.badge(THEME.accent)}>{feed.length} rules</span>
+          <span style={S.badge(THEME.success)}>Open Source</span>
+        </div>
+      </SectionHeader>
+
+      {/* Your detections — share panel */}
+      {user && detections.length > 0 && (
+        <div style={S.card}>
+          <div style={{...S.cardTitle,marginBottom:12}}><span>📤</span> Share Your Detections</div>
+          <div style={{maxHeight:200,overflowY:"auto"}}>
+            {detections.slice(0,10).map(det => {
+              const msg = shareMsg[det.id] || "";
+              const [mt, mm] = msg.split(/:(.+)/);
+              return (
+                <div key={det.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:"1px solid "+THEME.border}}>
+                  <span style={{...S.badge(THEME.accent),fontSize:10,flexShrink:0}}>{det.queryType||det.tool}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:THEME.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{det.name}</span>
+                  {mm && <span style={{fontSize:11,color:mt==="success"?THEME.success:THEME.danger}}>{mm}</span>}
+                  <button style={{...S.btn("p"),padding:"4px 12px",fontSize:11,flexShrink:0}} onClick={()=>shareDetection(det)} disabled={sharing===det.id}>
+                    {sharing===det.id?<><Spinner/>Sharing...</>:"Share"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Community feed filters */}
+      <div style={S.card}>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+          <input style={{...S.input,flex:1,minWidth:160}} value={search} onChange={e=>setSearch(e.target.value)} onKeyDown={e=>e.key==="Enter"&&loadFeed()} placeholder="Search community rules..."/>
+          <select style={{...S.input,width:160}} value={filterTactic} onChange={e=>setFilterTactic(e.target.value)}><option>All</option>{TACTICS.map(t=><option key={t}>{t}</option>)}</select>
+          <select style={{...S.input,width:140}} value={filterTool} onChange={e=>setFilterTool(e.target.value)}><option value="All">All Platforms</option>{TOOLS.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select>
+          <select style={{...S.input,width:120}} value={sort} onChange={e=>setSort(e.target.value)}>
+            <option value="stars">Most Starred</option>
+            <option value="new">Newest</option>
+          </select>
+          <button style={S.btn("p")} onClick={loadFeed}>Search</button>
+        </div>
+      </div>
+
+      {feedErr && <StatusBar msg={feedErr} type="error"/>}
+      {feedLoading && <div style={{textAlign:"center",padding:40,color:THEME.textDim}}><Spinner/> Loading community feed...</div>}
+
+      {!feedLoading && feed.length === 0 && (
+        <div style={{...S.card,textAlign:"center",padding:"56px 32px"}}>
+          <div style={{fontSize:56,marginBottom:16}}>🌍</div>
+          <div style={{fontSize:17,fontWeight:800,color:THEME.text,marginBottom:10,fontFamily:"'Syne',sans-serif"}}>Community Feed is Empty</div>
+          <div style={{fontSize:13,color:THEME.textDim,maxWidth:400,margin:"0 auto 24px",lineHeight:1.7}}>
+            No detection rules have been shared yet. Be the first to contribute — open your Detection Library and click <strong style={{color:THEME.accent}}>Share</strong> on any rule.
+          </div>
+          <div style={{display:"flex",gap:16,justifyContent:"center",flexWrap:"wrap"}}>
+            {[{icon:"🛡",label:"Share a Detection",desc:"Publish rules to help the community"},
+              {icon:"⭐",label:"Star Rules",desc:"Upvote your favourites"},
+              {icon:"📋",label:"Clone & Adapt",desc:"Fork rules into your library"}].map(f=>(
+              <div key={f.label} style={{padding:"16px 20px",background:THEME.bgCard,border:"1px solid "+THEME.border,borderRadius:10,width:140}}>
+                <div style={{fontSize:24,marginBottom:6}}>{f.icon}</div>
+                <div style={{fontSize:12,fontWeight:700,color:THEME.text,marginBottom:4}}>{f.label}</div>
+                <div style={{fontSize:10,color:THEME.textDim}}>{f.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {feed.map(det => {
+        const t = toolObj[det.tool];
+        return (
+          <div key={det.id} style={S.card}>
+            <div style={{...S.row,marginBottom:10}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:6}}>
+                  <span style={S.badge(det.severity==="Critical"?THEME.danger:det.severity==="High"?"#ff7700":det.severity==="Medium"?THEME.warning:THEME.success)}>{det.severity||"Medium"}</span>
+                  <span style={{...S.badge(THEME.accent),fontSize:10}}>{det.query_type||det.tool||"Unknown"}</span>
+                  <span style={{...S.badge(THEME.purple),fontSize:10}}>{det.tactic||"Unknown"}</span>
+                </div>
+                <div style={{fontSize:14,fontWeight:800,color:THEME.text,marginBottom:4}}>{det.name}</div>
+                <div style={{fontSize:12,color:THEME.textDim}}>by {det.author_name||"Anonymous"} · {new Date(det.created_at).toLocaleDateString()}</div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8,flexShrink:0}}>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                  <button style={{...S.btn(),padding:"4px 10px",fontSize:11,display:"flex",alignItems:"center",gap:4}} onClick={()=>starDetection(det.id)}>⭐ {det.stars||0}</button>
+                  <button style={{...S.btn(),padding:"4px 10px",fontSize:11,display:"flex",alignItems:"center",gap:4}} onClick={()=>cloneDetection(det)} disabled={cloning===det.id}>
+                    {cloning===det.id?<><Spinner/>Cloning...</>:<>📋 Clone ({det.clone_count||0})</>}
+                  </button>
+                </div>
+                {det.score>0&&<span style={{fontSize:11,color:det.score>7?THEME.success:det.score>4?THEME.warning:THEME.textDim,fontWeight:700}}>Score: {det.score}/10</span>}
+              </div>
+            </div>
+            {det.threat&&<div style={{fontSize:12,color:THEME.textMid,marginBottom:10,lineHeight:1.6}}>{det.threat.slice(0,120)}{det.threat.length>120?"...":""}</div>}
+            <div style={{fontFamily:"monospace",fontSize:11,color:THEME.accent,background:"#050d18",padding:"10px 12px",borderRadius:8,lineHeight:1.6,maxHeight:80,overflow:"hidden",position:"relative"}}>
+              {det.query?.slice(0,200)}{det.query?.length>200?"...":""}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function MetricsDashboard({ detections }) {
+  const byTactic = TACTICS.reduce((acc, t) => { acc[t] = detections.filter(d => d.tactic === t).length; return acc; }, {});
+  const byTool = TOOLS.reduce((acc, t) => { acc[t.name] = detections.filter(d => d.tool === t.id || d.queryType === t.id).length; return acc; }, {});
+  const bySeverity = ["Critical","High","Medium","Low","Informational"].reduce((acc, s) => { acc[s] = detections.filter(d => d.severity === s).length; return acc; }, {});
+  const avgScore = detections.filter(d => d.score > 0).length ? (detections.filter(d => d.score > 0).reduce((a, d) => a + d.score, 0) / detections.filter(d => d.score > 0).length).toFixed(1) : "—";
+  const tacticsWithCoverage = Object.values(byTactic).filter(v => v > 0).length;
+  const coveragePct = Math.round((tacticsWithCoverage / TACTICS.length) * 100);
+  const platformsCovered = Object.values(byTool).filter(v => v > 0).length;
+  const highCritical = (bySeverity["Critical"] || 0) + (bySeverity["High"] || 0);
+
+  if (detections.length === 0) return (
+    <div>
+      <SectionHeader icon="📊" title="Metrics & ROI" color={THEME.accent}>
+        <span style={S.badge(THEME.accent)}>Detection Engineering KPIs</span>
+      </SectionHeader>
+      <div style={{...S.card,textAlign:"center",padding:"56px 32px"}}>
+        <div style={{fontSize:56,marginBottom:16}}>📊</div>
+        <div style={{fontSize:17,fontWeight:800,color:THEME.text,marginBottom:10,fontFamily:"'Syne',sans-serif"}}>No Data Yet</div>
+        <div style={{fontSize:13,color:THEME.textDim,maxWidth:380,margin:"0 auto 24px",lineHeight:1.7}}>
+          Build your first detection to start tracking KPIs — tactic coverage, severity breakdown, platform distribution, and ROI estimates will appear here automatically.
+        </div>
+        <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
+          {[["📈","MITRE Coverage","Track tactic % covered"],["🛡","Severity Split","Critical vs Low breakdown"],["💰","ROI Estimate","Time saved vs manual work"],["🌐","Platform Coverage","SIEMs with detections"]].map(([icon,label,desc])=>(
+            <div key={label} style={{padding:"14px 18px",background:THEME.bgCard,border:"1px solid "+THEME.border,borderRadius:10,textAlign:"left",minWidth:140}}>
+              <div style={{fontSize:20,marginBottom:6}}>{icon}</div>
+              <div style={{fontSize:12,fontWeight:700,color:THEME.text,marginBottom:3}}>{label}</div>
+              <div style={{fontSize:10,color:THEME.textDim}}>{desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div>
+      <SectionHeader icon="📊" title="Metrics & ROI" color={THEME.accent}>
+        <span style={S.badge(THEME.accent)}>Detection Engineering KPIs</span>
+      </SectionHeader>
+
+      {/* Top stats */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:20}}>
+        {[
+          ["Total Detections", detections.length, THEME.accent, "rules built"],
+          ["MITRE Coverage", coveragePct + "%", THEME.success, tacticsWithCoverage + " of " + TACTICS.length + " tactics"],
+          ["Platforms", platformsCovered, THEME.purple, "SIEMs covered"],
+          ["Avg Quality", avgScore, THEME.warning, "out of 10"],
+          ["High/Critical", highCritical, THEME.danger, "priority rules"],
+        ].map(([label, val, color, sub]) => (
+          <div key={label} style={{background:"#0d1825",border:"1px solid "+color+"22",borderRadius:12,padding:"18px 16px",textAlign:"center"}}>
+            <div style={{fontSize:32,fontWeight:900,color,lineHeight:1}}>{val}</div>
+            <div style={{fontSize:12,fontWeight:700,color:THEME.textMid,marginTop:6}}>{label}</div>
+            <div style={{fontSize:10,color:THEME.textDim,marginTop:3}}>{sub}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+        {/* Coverage by tactic */}
+        <div style={{background:"#0d1825",border:"1px solid #1a2a3a",borderRadius:12,padding:"18px 20px"}}>
+          <div style={{fontWeight:800,color:THEME.text,fontSize:13,marginBottom:14}}>Coverage by MITRE Tactic</div>
+          {TACTICS.map(t => {
+            const count = byTactic[t] || 0;
+            const pct = detections.length ? Math.min(100, Math.round((count / Math.max(...Object.values(byTactic), 1)) * 100)) : 0;
+            return (
+              <div key={t} style={{marginBottom:8}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:3}}>
+                  <span style={{color:count>0?THEME.textMid:THEME.textDim}}>{t}</span>
+                  <span style={{color:count>0?THEME.accent:THEME.textDim,fontWeight:700}}>{count}</span>
+                </div>
+                <div style={{height:4,background:"#1a2a3a",borderRadius:2}}>
+                  <div style={{height:"100%",width:pct+"%",background:count>2?THEME.success:count>0?THEME.warning:"transparent",borderRadius:2,transition:"width 0.3s"}}/>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Severity breakdown + platform coverage */}
+        <div>
+          <div style={{background:"#0d1825",border:"1px solid #1a2a3a",borderRadius:12,padding:"18px 20px",marginBottom:14}}>
+            <div style={{fontWeight:800,color:THEME.text,fontSize:13,marginBottom:14}}>Severity Breakdown</div>
+            {Object.entries(bySeverity).map(([sev, count]) => {
+              const color = sev==="Critical"?THEME.danger:sev==="High"?"#ff7700":sev==="Medium"?THEME.warning:sev==="Low"?THEME.success:THEME.textDim;
+              return (
+                <div key={sev} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                  <span style={{fontSize:11,fontWeight:700,color,minWidth:80}}>{sev}</span>
+                  <div style={{flex:1,height:6,background:"#1a2a3a",borderRadius:3}}>
+                    <div style={{height:"100%",width:detections.length?(count/detections.length*100)+"%":"0%",background:color,borderRadius:3}}/>
+                  </div>
+                  <span style={{fontSize:12,fontWeight:800,color,minWidth:20,textAlign:"right"}}>{count}</span>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{background:"#0d1825",border:"1px solid #1a2a3a",borderRadius:12,padding:"18px 20px"}}>
+            <div style={{fontWeight:800,color:THEME.text,fontSize:13,marginBottom:12}}>Platform Coverage</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {TOOLS.map(t => {
+                const count = byTool[t.name] || 0;
+                return <span key={t.id} style={{...S.badge(count>0?THEME.accent:THEME.textDim+"33"),fontSize:10}}>{t.name} {count>0?"("+count+")":"—"}</span>;
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ROI estimate */}
+      <div style={{background:"#0d1825",border:"1px solid "+THEME.success+"22",borderRadius:12,padding:"20px 24px"}}>
+        <div style={{fontWeight:800,color:THEME.text,fontSize:13,marginBottom:12}}>💰 Estimated ROI</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}>
+          {[
+            ["Manual Build Time Saved", (detections.length * 4) + "h", "~4h per detection manually"],
+            ["Translations Equivalent", (detections.length * TOOLS.length) + " queries", "1 rule × 10 platforms"],
+            ["Rules Ready to Deploy", highCritical, "High + Critical severity"],
+            ["Coverage Gaps", TACTICS.length - tacticsWithCoverage, "tactics still uncovered"],
+          ].map(([label, val, sub]) => (
+            <div key={label} style={{background:"#050d18",borderRadius:8,padding:"14px 16px"}}>
+              <div style={{fontSize:20,fontWeight:900,color:THEME.success}}>{val}</div>
+              <div style={{fontSize:11,fontWeight:700,color:THEME.textMid,marginTop:4}}>{label}</div>
+              <div style={{fontSize:10,color:THEME.textDim,marginTop:2}}>{sub}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {detections.length===0&&(
+        <div style={{textAlign:"center",color:THEME.textDim,padding:"60px 20px"}}>
+          <div style={{fontSize:48,marginBottom:16}}>📊</div>
+          <div style={{fontSize:15,fontWeight:700,color:THEME.textMid,marginBottom:8}}>No data yet</div>
+          <div style={{fontSize:13}}>Build your first detection to see metrics here.</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2735,12 +6501,16 @@ function GettingStarted({ onNav, detections }) {
   const [items, setItems] = useState(LS.get("getting_started", {
     built_detection: false, ran_simulation: false,
     checked_intel: false, enabled_autopilot: false,
+    tried_replay: false, used_defend: false, chained_detections: false,
   }));
   const checks = [
     {key:"built_detection", icon:"🔨", title:"Build your first detection", desc:"Use the ADS framework to create a production-ready rule", tab:"builder", color:THEME.accent},
-    {key:"ran_simulation", icon:"🎯", title:"Run an attack simulation", desc:"Generate realistic attack logs to test your coverage", tab:"simulator", color:THEME.danger},
+    {key:"ran_simulation", icon:"🎯", title:"Run an attack simulation", desc:"Generate realistic attack logs to test your coverage", tab:"adversary", color:THEME.danger},
+    {key:"tried_replay", icon:"🎮", title:"Dry-run with Log Replay", desc:"Test your detection against real log samples before deploying", tab:"replay", color:THEME.purple},
+    {key:"chained_detections", icon:"🔗", title:"Chain two detections", desc:"Build a multi-stage correlation rule that spans the kill chain", tab:"chain", color:THEME.warning},
+    {key:"used_defend", icon:"🛡", title:"Set up a honeytoken trap", desc:"Plant canary assets that trigger 100%-confidence alerts", tab:"defend", color:THEME.orange},
     {key:"checked_intel", icon:"🌐", title:"Check the live threat feed", desc:"See active CVEs and build detections from KEV entries", tab:"intel", color:THEME.success},
-    {key:"enabled_autopilot", icon:"🤖", title:"Enable Detection Autopilot", desc:"Let DetectIQ auto-draft detections for new vulnerabilities", tab:"autopilot", color:THEME.purple},
+    {key:"enabled_autopilot", icon:"🤖", title:"Enable Detection Autopilot", desc:"Let DetectIQ auto-draft detections for new vulnerabilities", tab:"autopilot", color:"#8b5cf6"},
   ];
   // Auto-check built_detection if detections exist
   useEffect(() => {
@@ -2770,7 +6540,7 @@ function GettingStarted({ onNav, detections }) {
           <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:THEME.accent}}>{Math.round(done/total*100)}%</div>
         </div>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:8}}>
         {checks.map(item=>{
           const checked = items[item.key];
           return(
@@ -2796,179 +6566,298 @@ function GettingStarted({ onNav, detections }) {
 }
 
 function DashboardHome({ detections, onNav, user }) {
-  const TACTIC_GRID=[
-    {name:"Initial Access",icon:"🚪",key:"Initial Access",color:THEME.danger},
-    {name:"Execution",icon:"⚡",key:"Execution",color:THEME.orange},
-    {name:"Persistence",icon:"🔒",key:"Persistence",color:THEME.warning},
-    {name:"Priv. Escalation",icon:"⬆️",key:"Privilege Escalation",color:THEME.accent},
-    {name:"Defense Evasion",icon:"🥷",key:"Defense Evasion",color:THEME.purple},
-    {name:"Credential Access",icon:"🔑",key:"Credential Access",color:THEME.danger},
-    {name:"Discovery",icon:"🔍",key:"Discovery",color:THEME.success},
-    {name:"Lateral Movement",icon:"➡️",key:"Lateral Movement",color:THEME.orange},
-    {name:"Collection",icon:"📦",key:"Collection",color:THEME.accent},
-    {name:"Command & Control",icon:"📡",key:"Command and Control",color:THEME.purple},
-    {name:"Exfiltration",icon:"📤",key:"Exfiltration",color:THEME.warning},
-    {name:"Impact",icon:"💥",key:"Impact",color:THEME.danger},
-    {name:"Reconnaissance",icon:"👁",key:"Reconnaissance",color:THEME.success},
-    {name:"Resource Dev",icon:"🛠",key:"Resource Development",color:THEME.accent},
-  ];
-  const TIPS=[
-    {cat:"Classic",color:"#00d4ff",setup:"Why do hackers prefer dark mode?",punchline:"Because light attracts bugs!"},
-    {cat:"Networking",color:"#7c55ff",setup:"Why did the router break up with the modem?",punchline:"There was no connection."},
-    {cat:"SOC Life",color:"#ffaa00",setup:"How many SOC analysts does it take to change a lightbulb?",punchline:"Unknown. Still investigating. Severity: Medium."},
-    {cat:"Passwords",color:"#00e87a",setup:"What did the firewall say to the hacker?",punchline:"You shall not pass! (But seriously, rotate your keys.)"},
-    {cat:"Malware",color:"#ff3d55",setup:"Why did the ransomware go to therapy?",punchline:"It had too many trust issues and kept encrypting its feelings."},
-    {cat:"Logs",color:"#00d4ff",setup:"Why do security engineers make terrible comedians?",punchline:"Their timing is always off by 3 seconds in the logs."},
-    {cat:"Phishing",color:"#ff7700",setup:"I got a phishing email saying I won a free cruise.",punchline:"I clicked. Turns out the boat was a C2 server."},
-    {cat:"Zero Days",color:"#7c55ff",setup:"What do you call a vulnerability with no patch?",punchline:"A feature in production."},
-    {cat:"Incident Response",color:"#00e87a",setup:"What did the CISO say after the breach?",punchline:"This is fine. (The office was on fire.)"},
-    {cat:"Compliance",color:"#ffaa00",setup:"Why did the pentester fail the audit?",punchline:"They were too transparent."},
-    {cat:"Cloud",color:"#00d4ff",setup:"Why is cloud security like marriage?",punchline:"Everyone assumes someone else is handling it."},
-    {cat:"Threat Intel",color:"#ff3d55",setup:"What do you call an APT group that only attacks on Fridays?",punchline:"A weekend threat actor."},
-    {cat:"SOC Life",color:"#ff7700",setup:"Why did the alert go to therapy?",punchline:"Too many false positives — it had trust issues."},
-    {cat:"Cryptography",color:"#7c55ff",setup:"Why don't cryptographers ever tell jokes in public?",punchline:"They always encrypt the punchline."},
-    {cat:"Detection",color:"#00e87a",setup:"What did the SIEM say to the noisy log source?",punchline:"You've got some serious alerting issues we need to talk about."},
-    {cat:"Passwords",color:"#00d4ff",setup:"My password is 'incorrect'.",punchline:"So when I forget it, my computer tells me: your password is incorrect."},
-  ];
+  const TACTICS_LIST=["Reconnaissance","Resource Development","Initial Access","Execution","Persistence","Privilege Escalation","Defense Evasion","Credential Access","Discovery","Lateral Movement","Collection","Command and Control","Exfiltration","Impact"];
   const[mitreCount,setMitreCount]=useState(216);
-  useEffect(()=>{
-    fetch("/api/mitre/techniques").then(r=>r.json()).then(d=>{if(d.count)setMitreCount(d.count);}).catch(()=>{});
-  },[]);
-  const tipIndex=Math.floor(Date.now()/(1000*60*60*24))%TIPS.length;
-  const tip=TIPS[tipIndex];
-  const recentDets=detections.slice(0,5);
-  const tacticMap={};
-  TACTIC_GRID.forEach(t=>{tacticMap[t.key]=detections.filter(d=>d.tactic===t.key).length;});
-  const coveredCount=TACTIC_GRID.filter(t=>tacticMap[t.key]>0).length;
-  const highCount=detections.filter(d=>d.severity==="Critical"||d.severity==="High").length;
-  const gapTactics=TACTIC_GRID.filter(t=>!tacticMap[t.key]);
-  return(
+  useEffect(()=>{ fetch("/api/mitre/techniques").then(r=>r.json()).then(d=>{if(d.count)setMitreCount(d.count);}).catch(()=>{}); },[]);
+
+  // ── computed stats ──────────────────────────────────────────────────────────
+  const total = detections.length;
+  const tacticCounts = TACTICS_LIST.reduce((a,t)=>{ a[t]=detections.filter(d=>(d.tactic||"").toLowerCase()===t.toLowerCase()).length; return a; },{});
+  const coveredCount = TACTICS_LIST.filter(t=>tacticCounts[t]>0).length;
+  const strongCount  = TACTICS_LIST.filter(t=>tacticCounts[t]>=3).length;
+  const coveragePct  = Math.round(coveredCount/14*100);
+  const maturityPct  = Math.round(strongCount/14*100);
+  const criticalCount= detections.filter(d=>d.severity==="Critical").length;
+  const highCount    = detections.filter(d=>d.severity==="High").length;
+  const medCount     = detections.filter(d=>d.severity==="Medium").length;
+  const scoredDets   = detections.filter(d=>d.score>0);
+  const avgScore     = scoredDets.length ? (scoredDets.reduce((s,d)=>s+d.score,0)/scoredDets.length).toFixed(1) : null;
+  const adsCount     = detections.filter(d=>d.ads).length;
+  const nowMs        = Date.now();
+  const staleCount   = detections.filter(d=>d.created&&(nowMs-new Date(d.created).getTime())>90*24*60*60*1000).length;
+  const gaps         = TACTICS_LIST.filter(t=>tacticCounts[t]===0);
+  const partial      = TACTICS_LIST.filter(t=>tacticCounts[t]>0&&tacticCounts[t]<3);
+  const recentDets   = [...detections].sort((a,b)=>new Date(b.created||0)-new Date(a.created||0)).slice(0,6);
+
+  // SIEM breakdown
+  const siemMap = detections.reduce((a,d)=>{ const k=d.queryType||d.tool||"Other"; a[k]=(a[k]||0)+1; return a; },{});
+  const siemBreakdown = Object.entries(siemMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  const GAP_TIPS={
+    "Reconnaissance":"Monitor external scanning — detect port/service enumeration with network flow alerts.",
+    "Resource Development":"Track infra abuse — flag new domains, cert issuance, and bulk account creation.",
+    "Initial Access":"Cover phishing, exploit attempts, and VPN anomalies. High ROI for first-alert coverage.",
+    "Execution":"PowerShell, cmd.exe, and script interpreters are your highest-signal telemetry sources.",
+    "Persistence":"Registry run keys, scheduled tasks, and new service creation are easy wins.",
+    "Privilege Escalation":"Focus on token impersonation, UAC bypass, and sudo/su anomalies.",
+    "Defense Evasion":"Log clearing, AV tampering, and process injection are critical blind spots.",
+    "Credential Access":"LSASS access, credential dumping, and Kerberoasting are top priorities.",
+    "Discovery":"Net commands, ADRecon, and BloodHound usage leave clear artifacts.",
+    "Lateral Movement":"PsExec, WMI remote exec, and RDP lateral movement are well-logged.",
+    "Collection":"Keyloggers, clipboard access, and staged archive creation are detectable.",
+    "Command and Control":"DNS tunneling, beacon jitter, and non-standard ports are detectable patterns.",
+    "Exfiltration":"Data staging + large outbound transfers to new IPs are your key signals.",
+    "Impact":"Ransomware shadow copy deletion and bulk file encryption are high-fidelity signals.",
+  };
+
+  return (
     <div>
-      {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <div style={{background:"linear-gradient(135deg,#0a1628 0%,#080e1c 100%)",border:"1px solid "+THEME.borderBright,borderRadius:16,padding:"28px 32px",marginBottom:20,position:"relative",overflow:"hidden"}}>
-        <div style={{position:"absolute",top:0,right:0,width:400,height:"100%",background:"radial-gradient(ellipse at 80% 50%,rgba(0,212,255,0.05) 0%,transparent 70%)",pointerEvents:"none"}}/>
-        <div style={{position:"absolute",bottom:-40,left:-40,width:200,height:200,background:"radial-gradient(circle,rgba(124,85,255,0.04),transparent 70%)",pointerEvents:"none"}}/>
-        <div style={{display:"flex",gap:28,alignItems:"center",flexWrap:"wrap",position:"relative"}}>
-          <div style={{flex:"1 1 320px"}}>
-            <div style={{fontSize:10,color:THEME.accentDim,fontWeight:700,letterSpacing:"0.18em",marginBottom:10,fontFamily:"'JetBrains Mono',monospace"}}>DETECTION ENGINEERING PLATFORM</div>
-            <div style={{fontSize:28,fontWeight:900,letterSpacing:"-0.02em",marginBottom:8,lineHeight:1.2}}>
-              {user?<>Welcome back, <span style={{color:THEME.accent}}>{user.email.split("@")[0]}</span>.</>:<>Welcome to <span style={{color:THEME.accent}}>DetectIQ</span>.</>}
+      {/* ── Hero ──────────────────────────────────────────────────────────── */}
+      <div style={{background:"linear-gradient(135deg,rgba(79,142,247,0.07) 0%,rgba(139,92,246,0.05) 100%)",border:"1px solid "+THEME.border,borderRadius:14,padding:"30px 32px",marginBottom:20,position:"relative",overflow:"hidden"}}>
+        {/* background grid decoration */}
+        <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(circle at 80% 50%, rgba(79,142,247,0.06) 0%, transparent 60%)",pointerEvents:"none"}}/>
+        <div style={{display:"flex",gap:32,alignItems:"center",flexWrap:"wrap",position:"relative"}}>
+          <div style={{flex:"1 1 300px"}}>
+            <div style={{display:"inline-flex",alignItems:"center",gap:6,padding:"4px 10px",borderRadius:20,background:"rgba(79,142,247,0.1)",border:"1px solid "+THEME.accentDim+"33",marginBottom:14}}>
+              <span style={{width:6,height:6,borderRadius:"50%",background:THEME.success,display:"inline-block",animation:"subtlepulse 2s infinite"}}/>
+              <span style={{fontSize:10,fontWeight:700,color:THEME.accent,letterSpacing:"0.08em"}}>DETECTION ENGINEERING PLATFORM</span>
             </div>
-            <div style={{fontSize:13,color:THEME.textMid,lineHeight:1.7,marginBottom:20}}>
-              {detections.length} detection{detections.length!==1?"s":""} built · {coveredCount}/14 MITRE tactics covered · {mitreCount} ATT&amp;CK techniques indexed
+            <div style={{fontSize:28,fontWeight:800,letterSpacing:"-0.025em",marginBottom:10,lineHeight:1.2,color:THEME.text,fontFamily:"'Syne',sans-serif"}}>
+              {user
+                ? <>Welcome back, <span style={{color:THEME.accent}}>{user.email.split("@")[0]}</span>.</>
+                : <>Build detections that <span style={{color:THEME.accent}}>actually work.</span></>}
             </div>
-            <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-              <button style={{...S.btn("p"),padding:"10px 22px",fontSize:13,fontWeight:700}} onClick={()=>onNav("builder")}>Build Detection</button>
-              <button style={{...S.btn(),padding:"10px 22px",fontSize:13}} onClick={()=>onNav("library")}>My Library</button>
-              <button style={{...S.btn(),padding:"10px 22px",fontSize:13}} onClick={()=>onNav("intel")}>Threat Intel</button>
+            <div style={{fontSize:13,color:THEME.textMid,lineHeight:1.8,marginBottom:22}}>
+              {total>0
+                ? <>{total} detection{total>1?"s":""} in your library · <span style={{color:coveragePct>=70?THEME.success:coveragePct>=40?THEME.warning:THEME.danger}}>{coveragePct}% MITRE coverage</span> · {mitreCount} ATT&amp;CK techniques indexed</>
+                : <>AI-powered · ADS Framework · 10 SIEM platforms · {mitreCount} MITRE ATT&amp;CK techniques indexed</>}
+            </div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <button style={{...S.btn("p"),padding:"10px 22px",fontSize:13,fontWeight:700}} onClick={()=>onNav("builder")}>+ Build Detection</button>
+              <button style={{...S.btn(),padding:"10px 20px",fontSize:13}} onClick={()=>onNav("library")}>My Library {total>0&&<span style={{marginLeft:5,background:THEME.accentGlow,color:THEME.accent,borderRadius:10,padding:"0 6px",fontSize:11}}>{total}</span>}</button>
+              <button style={{...S.btn(),padding:"10px 20px",fontSize:13}} onClick={()=>onNav("intel")}>Threat Intel</button>
             </div>
           </div>
-          <div style={{flex:"0 1 380px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          {/* ── Stat grid ─── */}
+          <div style={{flex:"0 1 420px",display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
             {[
-              {value:detections.length,label:"Detections Built",color:THEME.accent,icon:"🛡"},
-              {value:coveredCount+"/14",label:"Tactics Covered",color:THEME.success,icon:"🗺"},
-              {value:mitreCount,label:"MITRE Techniques",color:THEME.purple,icon:"📡"},
-              {value:highCount||"—",label:"High+ Severity",color:THEME.danger,icon:"🔴"},
+              {value:total||"0",label:"Detections",sub:"in library",accent:THEME.accent,icon:"🛡"},
+              {value:coveredCount+"/14",label:"Tactics",sub:"MITRE covered",accent:THEME.success,icon:"🗺"},
+              {value:coveragePct+"%",label:"Coverage",sub:coveragePct>=70?"Strong posture":coveragePct>=40?"Building up":"Needs work",accent:coveragePct>=70?THEME.success:coveragePct>=40?THEME.warning:THEME.danger,icon:"📊"},
+              {value:avgScore||"—",label:"Avg Score",sub:scoredDets.length+" scored",accent:avgScore>=7?THEME.success:avgScore>=5?THEME.warning:THEME.textDim,icon:"🏅"},
+              {value:criticalCount+highCount||"—",label:"High+ Alerts",sub:criticalCount+" critical",accent:criticalCount>0?THEME.danger:THEME.warning,icon:"🔴"},
+              {value:staleCount||"—",label:"Stale Rules",sub:"90+ days old",accent:staleCount>0?THEME.warning:THEME.success,icon:"⏳"},
             ].map(s=>(
-              <div key={s.label} style={{background:"rgba(255,255,255,0.02)",border:"1px solid "+s.color+"22",borderRadius:10,padding:"14px 16px"}}>
-                <div style={{fontSize:10,marginBottom:4}}>{s.icon}</div>
-                <div style={{fontSize:26,fontWeight:900,color:s.color,lineHeight:1,marginBottom:3}}>{s.value}</div>
-                <div style={{fontSize:10,color:THEME.textDim,fontWeight:600}}>{s.label}</div>
+              <div key={s.label} style={{background:"rgba(255,255,255,0.025)",border:"1px solid "+THEME.border,borderRadius:10,padding:"14px 14px 12px",position:"relative",overflow:"hidden",cursor:s.label==="Stale Rules"&&staleCount>0?"pointer":s.label==="Detections"&&total>0?"pointer":"default"}} onClick={()=>{if(s.label==="Detections"&&total>0)onNav("library");if(s.label==="Stale Rules"&&staleCount>0)onNav("library");}}>
+                <div style={{position:"absolute",top:10,right:10,fontSize:16,opacity:0.15}}>{s.icon}</div>
+                <div style={{fontSize:22,fontWeight:800,color:s.accent,lineHeight:1,marginBottom:3,fontFamily:"'JetBrains Mono',monospace"}}>{s.value}</div>
+                <div style={{fontSize:11,fontWeight:700,color:THEME.text,marginBottom:2}}>{s.label}</div>
+                <div style={{fontSize:10,color:THEME.textDim}}>{s.sub}</div>
+                <div style={{position:"absolute",bottom:0,left:0,right:0,height:2,background:s.accent,opacity:0.35,borderRadius:"0 0 10px 10px"}}/>
               </div>
             ))}
           </div>
         </div>
       </div>
+
+      {/* ── Onboarding checklist ──────────────────────────────────────────── */}
       <GettingStarted onNav={onNav} detections={detections}/>
+
+      {/* ── MITRE Tactic progress bar ─────────────────────────────────────── */}
+      {total>0&&(
+        <div style={{...S.card,marginBottom:16}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+            <div style={S.cardTitle}><span>🗺</span> ATT&amp;CK Coverage</div>
+            <span style={{...S.badge(coveragePct>=70?THEME.success:coveragePct>=40?THEME.warning:THEME.danger)}}>{coveragePct}% covered</span>
+            <span style={{...S.badge(maturityPct>=50?THEME.success:THEME.warning)}}>{maturityPct}% mature (3+ rules)</span>
+            <button style={{...S.btn("p"),padding:"4px 12px",fontSize:11,marginLeft:"auto"}} onClick={()=>onNav("heatmap")}>Full Heatmap →</button>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:6,marginBottom:10}}>
+            {TACTICS_LIST.map(t=>{
+              const cnt=tacticCounts[t]||0;
+              const color=cnt>=3?THEME.success:cnt>=1?THEME.warning:THEME.border;
+              const bg=cnt>=3?"rgba(34,197,94,0.08)":cnt>=1?"rgba(245,158,11,0.08)":"rgba(255,255,255,0.02)";
+              return(
+                <div key={t} title={t+": "+cnt+" rule"+(cnt===1?"":"s")} style={{padding:"8px 6px",background:bg,border:"1px solid "+color,borderRadius:7,textAlign:"center",cursor:"pointer"}} onClick={()=>onNav("heatmap")}>
+                  <div style={{fontSize:18,fontWeight:800,color,lineHeight:1,marginBottom:3}}>{cnt||"·"}</div>
+                  <div style={{fontSize:8,color:THEME.textDim,lineHeight:1.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.split(" ")[0]}</div>
+                </div>
+              );
+            })}
+          </div>
+          {gaps.length>0&&(
+            <div style={{padding:"10px 14px",background:"rgba(239,68,68,0.04)",border:"1px solid rgba(239,68,68,0.15)",borderRadius:8}}>
+              <div style={{fontSize:11,fontWeight:700,color:THEME.danger,marginBottom:6}}>⚠ {gaps.length} uncovered tactic{gaps.length>1?"s":" — "+gaps[0]}: no detections yet</div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {gaps.slice(0,6).map(t=>(
+                  <div key={t} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 10px",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:6}}>
+                    <span style={{fontSize:11,color:THEME.textMid}}>{t}</span>
+                    <button style={{fontSize:10,color:THEME.accent,background:"none",border:"none",cursor:"pointer",padding:0,fontFamily:"inherit"}} onClick={()=>onNav("builder")}>+ Build</button>
+                  </div>
+                ))}
+                {gaps.length>6&&<span style={{fontSize:11,color:THEME.textDim,padding:"4px 0"}}>+{gaps.length-6} more</span>}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Honeycomb visual ─────────────────────────────────────────────── */}
-      {detections.length>0&&<HoneycombGrid detections={detections}/>}
-      {/* ── Bottom 3 columns ──────────────────────────────────────────────── */}
+      {total>0&&<HoneycombGrid detections={detections}/>}
+
+      {/* ── Bottom section ───────────────────────────────────────────────── */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
+
         {/* Quick Launch */}
         <div style={{...S.card,marginBottom:0}}>
           <div style={{...S.cardTitle,marginBottom:14}}><span>⚡</span> Quick Launch</div>
-          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          <div style={{display:"flex",flexDirection:"column",gap:5}}>
             {[
-              {icon:"🔨",label:"Detection Builder",desc:"ADS + AI-powered",tab:"builder",color:THEME.accent},
+              {icon:"🔨",label:"Detection Builder",desc:"AI + ADS framework",tab:"builder",color:THEME.accent},
+              {icon:"🔗",label:"Detection Chain",desc:"Multi-stage correlation",tab:"chain",color:THEME.accent},
+              {icon:"🎮",label:"Log Replay",desc:"Dry-run before deploy",tab:"replay",color:THEME.purple},
+              {icon:"🛡",label:"Defend",desc:"Honeytokens + sinkhole",tab:"defend",color:THEME.orange},
               {icon:"🔄",label:"Query Translator",desc:"10 SIEM formats",tab:"translator",color:THEME.purple},
-              {icon:"🎯",label:"Attack Simulator",desc:"Realistic log gen",tab:"simulator",color:THEME.danger},
               {icon:"🔍",label:"Alert Triage",desc:"AI verdict engine",tab:"triage",color:THEME.warning},
-              {icon:"🌐",label:"Threat Intel",desc:"CISA KEV + APTs",tab:"intel",color:THEME.success},
-              {icon:"📖",label:"Use Case Library",desc:mitreCount+"+ techniques",tab:"usecases",color:THEME.orange},
+              {icon:"🌐",label:"Threat Intel",desc:"CISA KEV + live feeds",tab:"intel",color:THEME.success},
+              {icon:"📖",label:"Documentation",desc:"Every feature explained",tab:"docs",color:THEME.textMid},
             ].map(a=>(
               <div key={a.tab} onClick={()=>onNav(a.tab)}
-                style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:8,border:"1px solid "+THEME.border,cursor:"pointer",transition:"all 0.15s"}}
+                style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:7,border:"1px solid transparent",cursor:"pointer",transition:"all 0.13s"}}
                 onMouseEnter={e=>{e.currentTarget.style.borderColor=a.color+"44";e.currentTarget.style.background=a.color+"08";}}
-                onMouseLeave={e=>{e.currentTarget.style.borderColor=THEME.border;e.currentTarget.style.background="transparent";}}>
-                <div style={{width:32,height:32,borderRadius:7,background:a.color+"12",border:"1px solid "+a.color+"20",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>{a.icon}</div>
+                onMouseLeave={e=>{e.currentTarget.style.borderColor="transparent";e.currentTarget.style.background="transparent";}}>
+                <div style={{width:28,height:28,borderRadius:6,background:a.color+"12",border:"1px solid "+a.color+"20",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>{a.icon}</div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:12,fontWeight:700,color:THEME.text}}>{a.label}</div>
+                  <div style={{fontSize:12,fontWeight:600,color:THEME.text}}>{a.label}</div>
                   <div style={{fontSize:10,color:THEME.textDim}}>{a.desc}</div>
                 </div>
-                <div style={{fontSize:14,color:THEME.textDim}}>›</div>
+                <span style={{fontSize:12,color:THEME.textDim}}>›</span>
               </div>
             ))}
           </div>
         </div>
-        {/* Recent Detections */}
-        <div style={{...S.card,marginBottom:0}}>
-          <div style={{display:"flex",alignItems:"center",marginBottom:14}}>
-            <div style={S.cardTitle}><span>📋</span> Recent Detections</div>
-            <button style={{...S.btn(),padding:"4px 12px",fontSize:11,marginLeft:"auto"}} onClick={()=>onNav("library")}>View All</button>
-          </div>
-          {recentDets.length===0?(
-            <div style={{textAlign:"center",padding:"32px 20px",color:THEME.textDim}}>
-              <div style={{fontSize:32,marginBottom:10}}>🛡</div>
-              <div style={{fontSize:13,marginBottom:4,fontWeight:600,color:THEME.text}}>No detections yet</div>
-              <div style={{fontSize:11,marginBottom:16}}>Start building with the AI-powered builder</div>
-              <button style={{...S.btn("p"),padding:"8px 18px",fontSize:12}} onClick={()=>onNav("builder")}>Build Your First</button>
+
+        {/* Recent Detections + SIEM breakdown */}
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          <div style={{...S.card,marginBottom:0,flex:1}}>
+            <div style={{display:"flex",alignItems:"center",marginBottom:12}}>
+              <div style={S.cardTitle}><span>📋</span> Recent Detections</div>
+              <button style={{...S.btn(),padding:"3px 10px",fontSize:11,marginLeft:"auto"}} onClick={()=>onNav("library")}>View all {total>0&&`(${total})`}</button>
             </div>
-          ):recentDets.map(det=>(
-            <div key={det.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:"1px solid "+THEME.border+":last-child{border:none}"}}>
-              <div style={{width:8,height:8,borderRadius:"50%",background:sevColor[det.severity]||THEME.textDim,flexShrink:0}}/>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:600,color:THEME.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{det.name}</div>
-                <div style={{fontSize:10,color:THEME.textDim,marginTop:1}}>{det.tactic} · {det.tool||det.queryType}</div>
+            {recentDets.length===0?(
+              <div style={{textAlign:"center",padding:"24px 16px",color:THEME.textDim}}>
+                <div style={{fontSize:28,marginBottom:8}}>🛡</div>
+                <div style={{fontSize:12,marginBottom:4,fontWeight:600,color:THEME.text}}>No detections yet</div>
+                <div style={{fontSize:11,marginBottom:12}}>Start with the AI-powered builder</div>
+                <button style={{...S.btn("p"),padding:"7px 16px",fontSize:12}} onClick={()=>onNav("builder")}>Build Your First</button>
               </div>
-              <div style={{display:"flex",gap:4,flexShrink:0}}>
-                {det.ads&&<span style={{...S.badge(THEME.accent),fontSize:9}}>ADS</span>}
-                {det.score>0&&<span style={{...S.badge(THEME.success),fontSize:9}}>{det.score}/10</span>}
+            ):recentDets.map((det,i)=>(
+              <div key={det.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:i<recentDets.length-1?"1px solid "+THEME.border:"none"}}>
+                <div style={{width:7,height:7,borderRadius:"50%",background:sevColor[det.severity]||THEME.textDim,flexShrink:0}}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:600,color:THEME.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{det.name}</div>
+                  <div style={{fontSize:10,color:THEME.textDim,marginTop:1}}>{det.tactic||"—"} · {det.queryType||det.tool||"?"}</div>
+                </div>
+                <div style={{display:"flex",gap:3,flexShrink:0,alignItems:"center"}}>
+                  {det.ads&&<span style={{...S.badge(THEME.accent),fontSize:8}}>ADS</span>}
+                  {det.score>0&&<span style={{...S.badge(det.score>=7?THEME.success:det.score>=5?THEME.warning:THEME.textDim),fontSize:8}}>{det.score}/10</span>}
+                  {det.severity&&<span style={{...S.badge(sevColor[det.severity]||THEME.textDim),fontSize:8}}>{det.severity}</span>}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-        {/* SOC Humor */}
-        <div style={{...S.card,marginBottom:0}}>
-          <div style={{display:"flex",alignItems:"center",marginBottom:14}}>
-            <div style={S.cardTitle}><span>😄</span> SOC Humor</div>
-            <span style={{...S.badge(tip.color),fontSize:9,marginLeft:"auto"}}>{tip.cat}</span>
+            ))}
           </div>
-          <div style={{flex:1}}>
-            <div style={{borderLeft:"3px solid "+tip.color+"33",paddingLeft:12,marginBottom:14}}>
-              <div style={{fontSize:13,color:THEME.text,lineHeight:1.7,marginBottom:12}}>{tip.setup}</div>
-              <div style={{fontSize:13,color:tip.color,fontWeight:700,fontStyle:"italic",borderLeft:"3px solid "+tip.color,paddingLeft:10,lineHeight:1.6}}>{tip.punchline}</div>
-            </div>
-            <div style={{fontSize:10,color:THEME.textDim,fontFamily:"'JetBrains Mono',monospace"}}>
-              Joke #{tipIndex+1} of {TIPS.length} · refreshes daily
-            </div>
-          </div>
-          <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid "+THEME.border}}>
-            <div style={{fontSize:10,color:THEME.textDim,fontWeight:700,letterSpacing:"0.1em",marginBottom:8}}>HELPFUL LINKS</div>
-            <div style={{display:"flex",flexDirection:"column",gap:6}}>
-              {[
-                {label:"ATT&CK Coverage Heatmap",tab:"heatmap",icon:"🗺"},
-                {label:"Detection Chain Builder",tab:"chain",icon:"🔗"},
-                {label:"Team Library",tab:"team",icon:"👥"},
-                {label:"Autopilot (AI Cron)",tab:"autopilot",icon:"🤖"},
-              ].map(l=>(
-                <div key={l.tab} onClick={()=>onNav(l.tab)} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",borderRadius:6,cursor:"pointer",fontSize:12,color:THEME.textMid,transition:"all 0.15s"}}
-                  onMouseEnter={e=>{e.currentTarget.style.background=THEME.accent+"08";e.currentTarget.style.color=THEME.text;}}
-                  onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=THEME.textMid;}}>
-                  <span>{l.icon}</span><span>{l.label}</span><span style={{marginLeft:"auto",fontSize:12}}>›</span>
+
+          {/* SIEM Breakdown */}
+          {siemBreakdown.length>0&&(
+            <div style={{...S.card,marginBottom:0}}>
+              <div style={{...S.cardTitle,marginBottom:12}}><span>📡</span> Platform Breakdown</div>
+              {siemBreakdown.map(([name,count])=>(
+                <div key={name} style={{marginBottom:8}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                    <span style={{fontSize:11,color:THEME.textMid}}>{name}</span>
+                    <span style={{fontSize:11,color:THEME.text,fontWeight:600}}>{count} <span style={{color:THEME.textDim,fontWeight:400}}>({Math.round(count/total*100)}%)</span></span>
+                  </div>
+                  <div style={{height:4,background:THEME.border,borderRadius:4,overflow:"hidden"}}>
+                    <div style={{height:"100%",background:THEME.accent,borderRadius:4,width:Math.round(count/total*100)+"%",transition:"width 0.6s ease"}}/>
+                  </div>
                 </div>
               ))}
             </div>
-          </div>
+          )}
+        </div>
+
+        {/* Right column: severity dist + top gaps + links */}
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          {/* Severity distribution */}
+          {total>0&&(
+            <div style={{...S.card,marginBottom:0}}>
+              <div style={{...S.cardTitle,marginBottom:12}}><span>🎯</span> Severity Distribution</div>
+              {[
+                {label:"Critical",count:criticalCount,color:"#ff3d55"},
+                {label:"High",count:highCount,color:"#ff7700"},
+                {label:"Medium",count:medCount,color:"#ffaa00"},
+                {label:"Low",count:detections.filter(d=>d.severity==="Low").length,color:THEME.success},
+                {label:"Info",count:detections.filter(d=>d.severity==="Informational").length,color:THEME.textDim},
+              ].filter(s=>s.count>0).map(s=>(
+                <div key={s.label} style={{display:"flex",alignItems:"center",gap:8,marginBottom:7}}>
+                  <div style={{width:8,height:8,borderRadius:"50%",background:s.color,flexShrink:0}}/>
+                  <div style={{flex:1,fontSize:11,color:THEME.textMid}}>{s.label}</div>
+                  <div style={{width:80,height:4,background:THEME.border,borderRadius:4,overflow:"hidden"}}>
+                    <div style={{height:"100%",background:s.color,borderRadius:4,width:Math.round(s.count/total*100)+"%"}}/>
+                  </div>
+                  <div style={{fontSize:11,fontWeight:700,color:THEME.text,minWidth:20,textAlign:"right"}}>{s.count}</div>
+                </div>
+              ))}
+              {adsCount>0&&(
+                <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid "+THEME.border,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{fontSize:11,color:THEME.textDim}}>ADS Framework rules</span>
+                  <span style={{...S.badge(THEME.accent),fontSize:9}}>{adsCount} / {total}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Top coverage gaps or empty state CTA */}
+          {total===0?(
+            <div style={{...S.card,marginBottom:0,textAlign:"center",padding:"28px 20px"}}>
+              <div style={{fontSize:36,marginBottom:12}}>🚀</div>
+              <div style={{fontSize:14,fontWeight:700,color:THEME.text,marginBottom:6}}>Ready to get started?</div>
+              <div style={{fontSize:12,color:THEME.textDim,lineHeight:1.7,marginBottom:18}}>Build your first detection in under 2 minutes. Just describe the threat and pick your SIEM.</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <button style={{...S.btn("p"),padding:"10px 0",fontSize:13,fontWeight:600,width:"100%"}} onClick={()=>onNav("builder")}>🔨 Build a Detection</button>
+                <button style={{...S.btn(),padding:"9px 0",fontSize:12,width:"100%"}} onClick={()=>onNav("intel")}>🌐 Browse Threat Intel</button>
+                <button style={{...S.btn(),padding:"9px 0",fontSize:12,width:"100%"}} onClick={()=>onNav("docs")}>📖 Read the Docs</button>
+              </div>
+            </div>
+          ):(
+            <div style={{...S.card,marginBottom:0}}>
+              <div style={{display:"flex",alignItems:"center",marginBottom:12}}>
+                <div style={S.cardTitle}><span>🔗</span> Explore</div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                {[
+                  {label:"ATT&CK Heatmap",tab:"heatmap",icon:"🗺",desc:coveredCount+"/14 tactics covered"},
+                  {label:"Detection Health",tab:"health",icon:"❤️",desc:staleCount>0?staleCount+" stale rules to review":"All rules healthy"},
+                  {label:"Adversary SIEM",tab:"adversary",icon:"🤖",desc:"Simulate attack coverage"},
+                  {label:"Metrics Dashboard",tab:"metrics",icon:"📊",desc:"Coverage trends over time"},
+                  {label:"Community Rules",tab:"community",icon:"🌍",desc:"Clone from community library"},
+                  {label:"Autopilot",tab:"autopilot",icon:"🤖",desc:"AI auto-drafts from threat intel"},
+                ].map(l=>(
+                  <div key={l.tab} onClick={()=>onNav(l.tab)}
+                    style={{display:"flex",alignItems:"center",gap:9,padding:"7px 8px",borderRadius:7,cursor:"pointer",transition:"all 0.13s",border:"1px solid transparent"}}
+                    onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.03)";e.currentTarget.style.borderColor=THEME.border;}}
+                    onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.borderColor="transparent";}}>
+                    <span style={{fontSize:14}}>{l.icon}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:600,color:THEME.text}}>{l.label}</div>
+                      <div style={{fontSize:10,color:THEME.textDim}}>{l.desc}</div>
+                    </div>
+                    <span style={{fontSize:12,color:THEME.textDim}}>›</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -2976,6 +6865,7 @@ function DashboardHome({ detections, onNav, user }) {
 }
 
 function AutopilotTab({ user, detections, onSaveDetection, onNav }) {
+  const toast = useToast();
   const SIEM_OPTIONS = ["splunk","sentinel","crowdstrike","elastic","logscale","qradar","chronicle","tanium","panther","sumo"];
   const [enabled, setEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -2989,6 +6879,10 @@ function AutopilotTab({ user, detections, onSaveDetection, onNav }) {
   const [lastKevIds, setLastKevIds] = useState([]);
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
+  const [schedFreq, setSchedFreq] = useState(LS.get("autopilot_freq","3d"));
+  const [schedEmail, setSchedEmail] = useState(LS.get("autopilot_email_notify",true));
+  const [schedTactics, setSchedTactics] = useState(LS.get("autopilot_tactics",[]));
+  const ALL_TACTICS=["Reconnaissance","Resource Development","Initial Access","Execution","Persistence","Privilege Escalation","Defense Evasion","Credential Access","Discovery","Lateral Movement","Collection","Command and Control","Exfiltration","Impact"];
 
   useEffect(() => {
     const saved = LS.get("autopilot_settings", null);
@@ -3092,6 +6986,7 @@ function AutopilotTab({ user, detections, onSaveDetection, onNav }) {
     onSaveDetection(det);
     setSavedDrafts(p => ({ ...p, [draft.cve_id]: true }));
     setMsg("Saved to library: " + draft.detection_name);
+    toast?.("Saved to library: " + draft.detection_name, "success");
   }
 
   const visibleDrafts = drafts.filter(d => !dismissedDrafts[d.cve_id]);
@@ -3135,6 +7030,51 @@ function AutopilotTab({ user, detections, onSaveDetection, onNav }) {
 
       {err && <StatusBar msg={err} type="error"/>}
       {msg && <StatusBar msg={msg} type="success"/>}
+
+      {/* Schedule Configuration */}
+      <div style={S.card}>
+        <div style={{...S.cardTitle,marginBottom:14}}><span>🗓</span> Schedule & Filters</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+          <div>
+            <label style={S.label}>Scan Frequency</label>
+            <select style={{...S.input,cursor:"pointer"}} value={schedFreq} onChange={e=>{setSchedFreq(e.target.value);LS.set("autopilot_freq",e.target.value);}}>
+              <option value="1d">Daily</option>
+              <option value="3d">Every 3 Days</option>
+              <option value="7d">Weekly</option>
+              <option value="manual">Manual Only</option>
+            </select>
+            <div style={{fontSize:10,color:THEME.textDim,marginTop:4}}>How often Autopilot checks the CISA KEV feed in the background.</div>
+          </div>
+          <div>
+            <label style={S.label}>Email Notifications</label>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginTop:6}}>
+              <div style={{width:44,height:24,borderRadius:12,background:schedEmail?"rgba(0,212,255,0.2)":THEME.border,border:"1px solid "+(schedEmail?THEME.accent:THEME.border),cursor:"pointer",position:"relative",transition:"all 0.2s"}}
+                onClick={()=>{setSchedEmail(!schedEmail);LS.set("autopilot_email_notify",!schedEmail);}}>
+                <div style={{position:"absolute",top:3,left:schedEmail?22:3,width:16,height:16,borderRadius:"50%",background:schedEmail?THEME.accent:THEME.textDim,transition:"all 0.2s"}}/>
+              </div>
+              <span style={{fontSize:12,color:schedEmail?THEME.text:THEME.textDim}}>{schedEmail?"Email me when new drafts are ready":"Notifications off"}</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label style={S.label}>Tactic Filter <span style={{color:THEME.textDim,fontSize:10,fontWeight:400}}>(leave empty = all tactics)</span></label>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:6}}>
+            {ALL_TACTICS.map(t=>{
+              const on=schedTactics.includes(t);
+              return(
+                <span key={t} onClick={()=>{const n=on?schedTactics.filter(x=>x!==t):[...schedTactics,t];setSchedTactics(n);LS.set("autopilot_tactics",n);}}
+                  style={{padding:"3px 10px",borderRadius:5,fontSize:10,cursor:"pointer",fontWeight:600,transition:"all 0.15s",
+                    background:on?"rgba(0,212,255,0.12)":"transparent",
+                    border:"1px solid "+(on?THEME.accent:THEME.border),
+                    color:on?THEME.accent:THEME.textDim}}>
+                  {t}
+                </span>
+              );
+            })}
+          </div>
+          {schedTactics.length>0&&<div style={{fontSize:10,color:THEME.accent,marginTop:6}}>Filtering to {schedTactics.length} tactic{schedTactics.length>1?"s":""}: {schedTactics.join(", ")}</div>}
+        </div>
+      </div>
 
       {lastRun && (
         <div style={{...S.grid4,marginBottom:16}}>
@@ -3231,6 +7171,7 @@ function AutopilotTab({ user, detections, onSaveDetection, onNav }) {
 }
 
 function UserSettingsTab({ user, onSignOut }) {
+  const toast = useToast();
   const [displayName, setDisplayName] = useState("");
   const [defaultSiem, setDefaultSiem] = useState("splunk");
   const [siemKeys, setSiemKeys] = useState({});
@@ -3239,6 +7180,18 @@ function UserSettingsTab({ user, onSignOut }) {
   const [loading, setLoading] = useState(true);
   const [expandedSiem, setExpandedSiem] = useState(null);
   const [pwStatus, setPwStatus] = useState(null);
+  const [auditLog, setAuditLog] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    setAuditLoading(true);
+    fetch("/api/siem/audit?userId=" + user.id)
+      .then(r => r.json())
+      .then(d => setAuditLog(d.audit || []))
+      .catch(() => {})
+      .finally(() => setAuditLoading(false));
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user) return;
@@ -3264,8 +7217,8 @@ function UserSettingsTab({ user, onSignOut }) {
       updated_at: new Date().toISOString()
     }, { onConflict: "user_id" });
     setSaving(false);
-    if (error) setStatus({ type: "error", msg: "Save failed: " + error.message });
-    else setStatus({ type: "success", msg: "Settings saved." });
+    if (error) { setStatus({ type: "error", msg: "Save failed: " + error.message }); toast?.("Save failed: " + error.message, "error"); }
+    else { setStatus({ type: "success", msg: "Settings saved." }); toast?.("Settings saved", "success"); }
   };
 
   const sendPasswordReset = async () => {
@@ -3349,43 +7302,52 @@ function UserSettingsTab({ user, onSignOut }) {
                 <span style={{fontSize:11,color:THEME.textDim}}>{siemKeys[tool.id]?"✓ Configured":expandedSiem===tool.id?"▲":"▼"}</span>
               </div>
               {expandedSiem===tool.id&&(
-                <div style={{padding:"12px 14px",borderTop:"1px solid "+THEME.border,background:"rgba(0,0,0,0.2)"}}>
-                  <label style={S.label}>API Key / Token</label>
-                  <div style={{display:"flex",gap:8}}>
-                    <input style={{...S.input,fontFamily:"'JetBrains Mono',monospace",fontSize:11}}
-                      type="password"
-                      placeholder={"Enter "+tool.name+" API key..."}
-                      value={siemKeys[tool.id]||""}
-                      onChange={e=>setSiemKeys({...siemKeys,[tool.id]:e.target.value})}/>
-                    {siemKeys[tool.id]&&(
-                      <button style={{...S.btn("d"),padding:"9px 12px"}} onClick={()=>setSiemKeys({...siemKeys,[tool.id]:""})} title="Clear">✕</button>
-                    )}
+                <div style={{padding:"12px 14px",borderTop:"1px solid "+THEME.border,background:"rgba(0,0,0,0.2)",display:"flex",flexDirection:"column",gap:10}}>
+                  {["splunk","elastic","qradar","chronicle","sumo"].includes(tool.id)&&(
+                    <div>
+                      <label style={S.label}>Instance URL</label>
+                      <input style={{...S.input,fontFamily:"'JetBrains Mono',monospace",fontSize:11}}
+                        placeholder={tool.id==="splunk"?"https://splunk.company.com:8089":tool.id==="elastic"?"https://my-cluster.es.io":tool.id==="sumo"?"https://api.us2.sumologic.com":"https://..."}
+                        value={(siemKeys[tool.id+"_url"])||""}
+                        onChange={e=>setSiemKeys({...siemKeys,[tool.id+"_url"]:e.target.value})}/>
+                    </div>
+                  )}
+                  <div>
+                    <label style={S.label}>API Key / Token</label>
+                    <div style={{display:"flex",gap:8}}>
+                      <input style={{...S.input,fontFamily:"'JetBrains Mono',monospace",fontSize:11}}
+                        type="password"
+                        placeholder={"Enter "+tool.name+" API key or token..."}
+                        value={siemKeys[tool.id]||""}
+                        onChange={e=>setSiemKeys({...siemKeys,[tool.id]:e.target.value})}/>
+                      {siemKeys[tool.id]&&(
+                        <button style={{...S.btn("d"),padding:"9px 12px"}} onClick={()=>setSiemKeys({...siemKeys,[tool.id]:""})} title="Clear">✕</button>
+                      )}
+                    </div>
                   </div>
+                  {tool.id==="sentinel"&&(
+                    <div>
+                      <label style={S.label}>Workspace ID</label>
+                      <input style={{...S.input,fontFamily:"'JetBrains Mono',monospace",fontSize:11}}
+                        placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                        value={siemKeys["sentinel_workspace"]||""}
+                        onChange={e=>setSiemKeys({...siemKeys,sentinel_workspace:e.target.value})}/>
+                    </div>
+                  )}
+                  {tool.id==="crowdstrike"&&(
+                    <div>
+                      <label style={S.label}>Client ID</label>
+                      <input style={{...S.input,fontFamily:"'JetBrains Mono',monospace",fontSize:11}}
+                        placeholder="CrowdStrike Client ID"
+                        value={siemKeys["crowdstrike_client_id"]||""}
+                        onChange={e=>setSiemKeys({...siemKeys,crowdstrike_client_id:e.target.value})}/>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           ))}
         </div>
-      </div>
-
-      {/* GitHub Integration */}
-      <div style={S.card}>
-        <div style={S.cardTitle}>🐙 GitHub Integration</div>
-        <div style={{fontSize:11,color:THEME.textDim,marginBottom:14,lineHeight:1.6}}>
-          Store your GitHub token and repo to enable one-click detection push from the Library.
-        </div>
-        <label style={S.label}>Personal Access Token</label>
-        <input style={{...S.input,marginBottom:10,fontFamily:"'JetBrains Mono',monospace",fontSize:11}}
-          type="password"
-          placeholder="ghp_..."
-          value={LS.get("github_token","")}
-          onChange={e=>{LS.set("github_token",e.target.value);}}/>
-        <label style={S.label}>Repository (owner/repo)</label>
-        <input style={S.input}
-          placeholder="myorg/detection-rules"
-          defaultValue={LS.get("github_repo","")}
-          onChange={e=>LS.set("github_repo",e.target.value)}/>
-        <div style={{marginTop:8,fontSize:11,color:THEME.textDim}}>Token needs <code style={{fontFamily:"monospace"}}>repo</code> scope. Detections are pushed to <code style={{fontFamily:"monospace"}}>detections/{"<tactic>/<name>.ext"}</code></div>
       </div>
 
       {/* Save Button */}
@@ -3408,35 +7370,451 @@ function UserSettingsTab({ user, onSignOut }) {
         </div>
       </div>
 
+      {/* SIEM Push Audit Log */}
+      <div style={S.card}>
+        <div style={{...S.cardTitle,marginBottom:14}}><span>📋</span> SIEM Push Audit Log {auditLoading&&<Spinner/>}</div>
+        {auditLog.length===0&&!auditLoading&&<div style={{color:THEME.textDim,fontSize:13,textAlign:"center",padding:20}}>No SIEM pushes recorded yet.</div>}
+        <div style={{maxHeight:280,overflowY:"auto"}}>
+          {auditLog.map((entry,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:"1px solid "+THEME.border}}>
+              <span style={{fontSize:10,fontWeight:800,padding:"2px 8px",borderRadius:4,background:entry.status==="success"?THEME.success+"15":THEME.danger+"15",color:entry.status==="success"?THEME.success:THEME.danger,flexShrink:0}}>{entry.status.toUpperCase()}</span>
+              <span style={{fontSize:11,fontWeight:700,color:THEME.accent,minWidth:70,flexShrink:0}}>{entry.platform}</span>
+              <span style={{fontSize:12,color:THEME.textMid,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{entry.detection_name||"—"}</span>
+              <span style={{fontSize:11,color:THEME.textDim,flexShrink:0}}>{new Date(entry.created_at).toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
     </div>
   );
 }
 
-const NAV_ITEMS=[
-  {id:"home",    icon:"🏠",label:"Dashboard",   color:THEME.accent},
-  {id:"builder", icon:"🔨",label:"Builder",     color:THEME.accent},
-  {id:"simulator",icon:"🎯",label:"Simulator",  color:THEME.danger},
-  {id:"usecases",icon:"📚",label:"Use Cases",   color:THEME.purple},
-  {id:"translator",icon:"🔄",label:"Translator",color:THEME.purple},
-  {id:"explainer",icon:"🔍",label:"Explainer",  color:THEME.warning},
-  {id:"library", icon:"📦",label:"Library",     color:THEME.success},
-  {id:"heatmap", icon:"🗺", label:"ATT&CK Map", color:THEME.orange},
-  {id:"triage",  icon:"🚨",label:"Triage",      color:THEME.danger},
-  {id:"chain",   icon:"🧬",label:"Campaign",     color:THEME.danger},
-  {id:"intel",   icon:"🌐",label:"Threat Intel",color:THEME.success},
-  {id:"github",  icon:"🐙",label:"GitHub",      color:THEME.textMid},
-  {id:"team",    icon:"👥",label:"Team",        color:THEME.purple},
-  {id:"autopilot",icon:"🤖",label:"Autopilot",   color:THEME.accent},
-  {id:"settings", icon:"⚙️",  label:"Settings",   color:THEME.textMid},
+// ── Docs Page ─────────────────────────────────────────────────────────────────
+const DOCS = [
+  {
+    id:"getting-started", section:"Getting Started", icon:"🚀", title:"Getting Started with DetectIQ",
+    summary:"Build your first production-ready detection in under 5 minutes.",
+    content:[
+      {h:"What is DetectIQ?", p:"DetectIQ is an AI-powered detection engineering platform. It helps security teams write, test, improve, and deploy SIEM detection rules across Splunk, Microsoft Sentinel, Elastic, CrowdStrike, Chronicle, QRadar, and more — using plain-English threat descriptions instead of raw query syntax."},
+      {h:"Quick Start (3 steps)", p:"1. Go to Build → Detection Builder. 2. Select your SIEM, describe the threat (e.g. 'Mimikatz LSASS dump'), and click Generate. 3. Click Save to store it in your Library."},
+      {h:"The ADS Framework", p:"DetectIQ uses the Alerting and Detection Strategy (ADS) framework developed by Palantir. Every generated detection includes: Goal, Categorization (MITRE tactic/technique), Strategy Abstract, Technical Context, Blind Spots, False Positives, Validation, and Priority. This ensures production-quality output, not just a raw query."},
+      {h:"SIEM Support", p:"10 platforms supported: Splunk (SPL), Microsoft Sentinel (KQL), Elastic/EQL, CrowdStrike Falcon (CQL), Falcon LogScale (LogScale), IBM QRadar (AQL), Google Chronicle (YARA-L), Tanium (Signal), Panther (Python), Sumo Logic."},
+      {h:"Authentication", p:"Sign up with email/password. All detections are saved to your account via Supabase. Demo mode is available without an account (detections saved to browser localStorage only)."},
+    ]
+  },
+  {
+    id:"builder", section:"Build", icon:"🔨", title:"Detection Builder",
+    summary:"AI generates complete detection rules from a plain-English threat description.",
+    content:[
+      {h:"Overview", p:"The Detection Builder is the core of DetectIQ. Describe an attack scenario and it generates a complete detection rule with full ADS documentation, ready to deploy to your SIEM."},
+      {h:"Threat Scenario field", p:"Describe the attack behavior in plain English. Examples: 'PowerShell downloading payload from internet', 'WMI lateral movement to remote host', 'Kerberoasting via impacket'. The more specific, the better the query. Include process names, file paths, or known malware names if relevant."},
+      {h:"Log Sample field", p:"Paste a real log line from your SIEM. DetectIQ will ground the query in your actual field names and index/sourcetype, avoiding generic templates that need heavy post-generation tuning. Highly recommended for Splunk and QRadar users."},
+      {h:"Beginner Mode", p:"Toggle Beginner Mode (top right of builder) to see simplified explanations of every field, with examples and a step-by-step wizard. Recommended for analysts new to detection engineering."},
+      {h:"Score button 🏅", p:"Rates the active detection on 5 dimensions: Specificity, Coverage Breadth, False Positive Risk, Data Source Quality, and MITRE Alignment. Score is 1-10. Aim for 7+ before deploying. Scores below 5 include specific improvement recommendations."},
+      {h:"Enrich button 🔍", p:"Pulls threat intelligence context for the detection: related MITRE techniques, known threat actors, affected platforms, recommended data sources, and tuning tips. Runs against the current query."},
+      {h:"ML/UBA tab 🧠", p:"Generates behavioral/statistical detection logic instead of static IOC matching. Includes: ML model approach, feature engineering, baseline period, anomaly threshold, Risk Score rules, Risk Based Alerting (RBA) rules, and a User Behavior Analytics (UBA) query. Use the 'Use This Query ↑' button to apply any generated query to the active detection."},
+      {h:"Blast Radius tab 💥", p:"Estimates how many alerts per day this detection would fire across 4 org sizes (500, 1k, 5k, 10k endpoints). Helps you decide if a rule needs pre-deployment tuning to avoid alert fatigue."},
+      {h:"False Positives tab ⚠️", p:"AI predicts the top 5 legitimate activities that would trigger this rule (e.g. 'IT admin running PowerShell for patch management'). Generates ready-to-paste exclusion logic for Splunk NOT, Elastic must_not, and Sentinel where clauses."},
+      {h:"LOTL tab 🔧", p:"Living-off-the-Land coverage. For a given tactic, generates detections for every common built-in OS tool attackers abuse: PowerShell, WMI, certutil, mshta, regsvr32, etc. Each comes with a detection query and evasion notes."},
+      {h:"Workflow tab ⚡", p:"Generates a complete incident response workflow for the detection: enrichment steps, containment actions, investigation queries, notification templates, and escalation paths. Useful for building SOAR playbooks."},
+      {h:"Deploy tab 🚀", p:"Test the detection, generate Sigma format, create JIRA/ServiceNow tickets, push directly to Splunk or Elastic via API, or export to GitHub. Configure SIEM API credentials in Settings → Account."},
+    ]
+  },
+  {
+    id:"library", section:"Analyze", icon:"📚", title:"Detection Library",
+    summary:"All your saved detections — search, manage, export, and push to SIEM.",
+    content:[
+      {h:"Overview", p:"The Library stores every detection you've built or imported. Detections are saved to your Supabase account (or localStorage in demo mode). You can search, filter, edit, export, and push them to your SIEM from here."},
+      {h:"Search and Filter", p:"Use the search box to filter by name or threat description. Filter by SIEM platform (Splunk, Elastic, etc.) or by MITRE tactic using the dropdowns. All filters apply simultaneously."},
+      {h:"Staleness Badge ⚠", p:"Any detection not updated in 90+ days shows an amber '⚠ Xd old' badge. This is a reminder to review — threat landscapes change, and an old rule may have degraded field names or outdated IOCs."},
+      {h:"Version History 📜", p:"Every detection has a full version history. Click '📜 Versions' on any detection card to view past versions, see what changed, restore an older version, or save the current state as a named checkpoint with notes."},
+      {h:"Export options", p:"Per-detection: Export (raw query file), SIGMA (AI-generated Sigma format), or SIGMA with AI enrichment. Whole library: Export JSON (full detection objects) or Export CSV (spreadsheet with name, tactic, severity, score, etc.)."},
+      {h:"Import JSON", p:"Import a JSON bundle of detections (same format as Export JSON). Useful for migrating detections between accounts or importing community rule packs. Limit: 50 detections per import."},
+      {h:"Bulk Select", p:"Click 'Bulk Select' to select multiple detections for batch deletion."},
+      {h:"Score / Enrich / Explain / Translate", p:"Each detection card has one-click access to Score (quality rating), Enrich (threat intel context), Explain (plain-English breakdown), and Translate (convert to another SIEM platform)."},
+      {h:"Push to SIEM (Beta)", p:"Push directly to Splunk Enterprise or Elastic Security via their REST APIs. Requires API credentials configured in Settings → Account. Also supports SOAR webhook push and JIRA/ServiceNow ticket creation."},
+      {h:"Playbook generation 🎭", p:"Generates a full incident response playbook for any detection: detection summary, initial triage steps, investigation queries, containment actions, and escalation criteria."},
+    ]
+  },
+  {
+    id:"translator", section:"Build", icon:"🔄", title:"Query Translator",
+    summary:"Convert any detection query between 10 SIEM platforms instantly.",
+    content:[
+      {h:"Overview", p:"Paste a query in any supported language (SPL, KQL, EQL, AQL, YARA-L, CQL, LogScale, Sigma, Python, Sumo Logic) and translate it to any other platform. DetectIQ preserves the detection logic while adapting field names, operators, and syntax to the target platform."},
+      {h:"Supported platforms", p:"Splunk SPL ↔ Microsoft Sentinel KQL ↔ Elastic EQL/KQL ↔ IBM QRadar AQL ↔ Google Chronicle YARA-L ↔ CrowdStrike CQL ↔ Falcon LogScale ↔ Tanium Signal ↔ Panther Python ↔ Sumo Logic."},
+      {h:"Field mapping", p:"The AI maps common field names across platforms (e.g. Splunk's CommandLine → Elastic's process.command_line → Sentinel's ProcessCommandLine). You can override the mapping by including a log sample."},
+      {h:"Limitations", p:"Translation is AI-based, not rule-based. Always validate translated queries against your actual data before deploying. Complex aggregations and joins may need manual adjustment."},
+    ]
+  },
+  {
+    id:"explainer", section:"Build", icon:"💡", title:"Detection Explainer",
+    summary:"Paste any detection query and get a plain-English breakdown.",
+    content:[
+      {h:"Overview", p:"The Explainer accepts any query in any supported language and produces: a plain-English summary, line-by-line breakdown, what data sources are required, what attacks it detects, what it misses, and improvement suggestions."},
+      {h:"Use cases", p:"Onboarding new analysts to existing rules, auditing inherited detection libraries, understanding community-sourced rules before deploying, and generating documentation for detection reviews."},
+      {h:"Output sections", p:"Summary, Detection Logic breakdown, Data Sources required, MITRE mapping, Blind Spots, False Positive scenarios, and Recommended Improvements."},
+    ]
+  },
+  {
+    id:"heatmap", section:"Analyze", icon:"🗺", title:"ATT&CK Heatmap",
+    summary:"Visual coverage map across all 14 MITRE ATT&CK tactics.",
+    content:[
+      {h:"Overview", p:"The heatmap shows which MITRE ATT&CK tactics and techniques you have detection coverage for, color-coded by number of rules. Green = 3+ rules, Yellow = 1-2 rules, Red = no coverage."},
+      {h:"Gap analysis", p:"The Dashboard home page also shows a Coverage Gap Analysis panel summarizing which tactics are fully covered, partially covered, or completely missing — with specific recommendations for each gap."},
+      {h:"MITRE Coverage Score", p:"Shown on the Dashboard: percentage of the 14 MITRE tactics that have at least one detection. 70%+ is considered a solid baseline posture. 100% with 3+ rules per tactic is the target for mature SOC teams."},
+    ]
+  },
+  {
+    id:"chain", section:"Build", icon:"🔗", title:"Detection Chain Builder",
+    summary:"Chain two detections into one high-fidelity multi-stage correlation rule.",
+    content:[
+      {h:"Overview", p:"Detection chaining creates a correlation rule that only fires when Detection A AND Detection B both occur on the same entity within a time window. This dramatically reduces false positives while catching multi-stage attacks that single rules miss."},
+      {h:"Example", p:"Chain 'PowerShell download' (Execution) + 'New scheduled task created' (Persistence). The chain fires only if both happen on the same host within 15 minutes — high confidence of a staged attack."},
+      {h:"Detection A vs B", p:"Detection A should be the earlier-stage event (e.g. Reconnaissance, Initial Access, Execution). Detection B should be the later-stage event (e.g. Persistence, Lateral Movement, Exfiltration). The chain assumes B follows A within the time window."},
+      {h:"Correlation Field", p:"The field used to link the two events. Options: host, src_ip, user, dest_ip, process_id, session_id. Choose the field that uniquely identifies the entity moving through the kill chain. For lateral movement, dest_ip is often best. For user-centric attacks, user is best."},
+      {h:"Time Window", p:"How many minutes after Detection A fires to look for Detection B. 15 minutes is a sensible default. For slow-and-low attacks, use 60-240 minutes. For fast attacks (ransomware, wiper), use 5 minutes."},
+      {h:"Load from library", p:"Use the 'Load from library...' dropdown in each detection panel to auto-fill name and query from any saved detection. You can also type detection names and queries manually."},
+      {h:"Output formats", p:"Generates ready-to-deploy versions in: Splunk ES (correlation search), Elastic EQL (sequence query), Microsoft Sentinel (KQL with join), and Google Chronicle (YARA-L with multiple events). Use the tab selector to switch between formats."},
+    ]
+  },
+  {
+    id:"replay", section:"Build", icon:"🎮", title:"Log Replay",
+    summary:"Dry-run your detection against real log lines before deploying.",
+    content:[
+      {h:"Overview", p:"Log Replay simulates what your SIEM would do when it processes each log line through your detection query — without needing live SIEM access. The AI evaluates each line and explains why it matches or doesn't match."},
+      {h:"How to use", p:"1. Paste your detection query on the left (or load from library using the dropdown). 2. Paste log lines on the right, or click '📁 Upload' to upload a .log/.txt/.json/.csv file. 3. Click 'Run Replay'."},
+      {h:"Loading from library", p:"Use the purple 'Load from library' bar at the top to auto-fill any saved detection's query and platform. The badge shows which detection is currently loaded."},
+      {h:"Results", p:"You get: total lines evaluated, match count, unmatched count, matched lines (highlighted with reason), unmatched lines, and query analysis (what the query is actually doing vs what you think it's doing)."},
+      {h:"Tuning suggestions", p:"The AI flags over-broad or over-restrictive clauses and suggests specific changes. For example: 'CommandLine contains \\'powershell\\' would be improved by adding -enc or -encodedcommand to reduce FPs from legitimate PS usage.'"},
+      {h:"Limitations", p:"Log Replay is AI-based simulation, not actual SIEM query execution. It works well for simple field-match queries but may miss edge cases in complex aggregations (stats, timechart) or correlated searches. Always validate in your SIEM before production deployment."},
+      {h:"File upload", p:"Supports .log, .txt, .json, and .csv files. Up to 200 lines are evaluated per run. For larger files, sample representative lines."},
+    ]
+  },
+  {
+    id:"defend", section:"Build", icon:"🛡", title:"Defend — Honeytokens & DNS Sinkhole",
+    summary:"Plant traps that catch attackers with 100% confidence and zero false positives.",
+    content:[
+      {h:"Overview", p:"The Defend page generates two types of deception-based detection assets: Honeytokens/Canaries and DNS Sinkholes. Unlike behavioral detections that can have false positives, any interaction with a honeytoken or sinkhole is almost certainly malicious."},
+      {h:"Honeytokens & Canaries", p:"Fake assets planted in your environment that look real to attackers. Types include: fake Active Directory accounts, canary files (documents with embedded alerts), AWS access keys (that alert on use), DNS canary tokens, and honey SMB shares. Any access to these is immediate, high-confidence evidence of compromise."},
+      {h:"Token types generated", p:"Each generated set includes 5+ token types with: deployment instructions (PowerShell/AWS CLI/AD commands), file content or credential values, the SIEM detection query to monitor for usage, and expected alert description."},
+      {h:"DNS Sinkhole", p:"Routes known-malicious C2 domains to a controlled IP (0.0.0.0 or a monitoring server) before malware can connect. Generate blocklists and zone configs for: Pi-hole, BIND9 RPZ (Response Policy Zone), Windows DNS Server, and Unbound."},
+      {h:"Sinkhole config contents", p:"Each generated config includes: the sinkhole domain list, copy-paste config block for your DNS server, reload/restart commands, and a companion SIEM detection query to alert when any internal host queries a sinkhole domain."},
+      {h:"Auto-fill from library", p:"Use the 'Auto-fill from library' dropdown to load threat context from any saved detection. The tool will tailor the honeytokens or sinkhole config to match that specific threat — e.g. a lateral movement detection will generate honeytokens that mimic admin shares and service accounts."},
+      {h:"Loaded detection banner", p:"When you auto-fill from library, a blue banner appears showing the detection name, query type, and tactic. Click ✕ to clear and start fresh."},
+      {h:"Zero false positives", p:"Honeytokens are never used by legitimate processes. Any alert from a honeytoken is nearly 100% a true positive — no tuning needed, no investigation of FPs. This makes them ideal for 24/7 unattended monitoring."},
+    ]
+  },
+  {
+    id:"triage", section:"Analyze", icon:"🎯", title:"Alert Triage",
+    summary:"Review, prioritize, and investigate alerts with AI-assisted triage.",
+    content:[
+      {h:"Overview", p:"Alert Triage helps analysts work through incoming alerts faster by providing AI-assisted context, severity scoring, and investigation steps for each alert."},
+      {h:"How to use", p:"Paste alert data (log line, alert text, or JSON) into the triage input and click Triage. The AI evaluates severity, identifies the likely attack type, maps to MITRE, and suggests immediate investigation steps."},
+      {h:"From library", p:"Click 'Triage' on any detection in the Library to pre-populate the triage input with the detection's query for quick context-aware triage."},
+    ]
+  },
+  {
+    id:"adversary", section:"Analyze", icon:"🤖", title:"Adversary SIEM",
+    summary:"Simulate adversary behavior and map it against your existing detections.",
+    content:[
+      {h:"Overview", p:"The Adversary SIEM generates realistic attack scenarios — including actual attacker commands, payloads, and techniques — and shows which of your existing detections would catch each step."},
+      {h:"How to use", p:"Select an attack scenario or describe a threat actor/campaign. The simulator generates a full attack chain with commands, then maps each step to your saved detections. Gaps are highlighted."},
+      {h:"Coverage report", p:"The output shows which attack steps are covered, which are blind spots, and what detections you need to build to close the gaps. Use the 'Build Detection' button on any gap to jump straight to the builder."},
+    ]
+  },
+  {
+    id:"health", section:"Analyze", icon:"❤️", title:"Detection Health",
+    summary:"Monitor detection quality, staleness, and coverage gaps across your library.",
+    content:[
+      {h:"Overview", p:"Detection Health gives you a portfolio-level view of your detection library's quality and completeness. It flags stale rules, scores coverage, and identifies which detections need attention."},
+      {h:"Health metrics", p:"Each detection is scored on: Age (days since last update), Score (quality rating from 1-10), Coverage (MITRE tactic/technique), Data Source availability, and last deployment status."},
+      {h:"Staleness", p:"Detections older than 90 days are flagged as stale (also shown with ⚠ badge in the Library). Click any stale detection to review and update it."},
+    ]
+  },
+  {
+    id:"intel", section:"Intel", icon:"🌐", title:"Threat Intel",
+    summary:"Browse live CVEs, CISA KEV, and threat feeds — then build detections directly from them.",
+    content:[
+      {h:"Overview", p:"The Threat Intel page aggregates real-time threat data: CISA Known Exploited Vulnerabilities (KEV), recent CVEs, and threat actor TTPs. Every item has a 'Build Detection' button to jump straight to the builder with context pre-filled."},
+      {h:"CISA KEV feed", p:"The CISA Known Exploited Vulnerabilities catalog lists vulnerabilities actively exploited in the wild. Use these to prioritize which detections to build — if CISA says it's being exploited, you need coverage."},
+      {h:"Building from intel", p:"Click 'Build Detection' on any CVE or KEV entry. The builder opens pre-populated with the vulnerability name, affected platform, and known exploitation technique. You just need to select your SIEM and click Generate."},
+    ]
+  },
+  {
+    id:"autopilot", section:"Intel", icon:"🤖", title:"Detection Autopilot",
+    summary:"Auto-generate detections from threat intel feeds without manual intervention.",
+    content:[
+      {h:"Overview", p:"Autopilot monitors threat intel feeds and automatically drafts detections for new vulnerabilities and TTPs. Drafts appear in your queue for review before being saved to your library."},
+      {h:"How it works", p:"When a new critical CVE or KEV entry appears, Autopilot generates a detection rule for your default SIEM (configured in Settings → Account). It's saved as a draft — you review, edit if needed, and approve to save to library."},
+      {h:"Configuration", p:"Set your default SIEM in Settings → Account → Preferences. Autopilot will use this platform for all auto-generated detections."},
+    ]
+  },
+  {
+    id:"atomic", section:"Build", icon:"⚛", title:"Atomic Tests",
+    summary:"Browse Atomic Red Team tests and build detections directly from attack simulations.",
+    content:[
+      {h:"Overview", p:"The Atomic Tests library contains hundreds of real-world attack simulations from the Atomic Red Team project. Each test has the actual commands an attacker would run, making it ideal for building high-fidelity detections."},
+      {h:"How to use", p:"Browse by MITRE tactic or search for a specific technique. Click any test to see the full command, platform, and description. Click 'Build Detection' to jump to the builder with the test pre-loaded as context."},
+      {h:"Import as detection", p:"Click 'Import as Detection' to save the atomic test directly to your library as a detection skeleton, then enrich and refine it using the builder tools."},
+    ]
+  },
+  {
+    id:"team", section:"Settings", icon:"👥", title:"Team Workspace",
+    summary:"Manage team members, roles, and collaborate on detections.",
+    content:[
+      {h:"Overview", p:"The Team tab lets you invite colleagues, assign roles (Admin, Engineer, Analyst, Reviewer), and collaborate on detections. Activity logs track who built what and when."},
+      {h:"Roles", p:"Admin: full access including delete. Engineer: build and edit detections. Analyst: view and triage only. Reviewer: can comment and approve but not edit."},
+      {h:"Comments", p:"Leave comments on specific detections for collaborative review. Tag teammates using @mention in the comment box."},
+    ]
+  },
+  {
+    id:"settings", section:"Settings", icon:"⚙️", title:"Account & Settings",
+    summary:"Configure your SIEM API keys, profile, and preferences.",
+    content:[
+      {h:"Profile", p:"Set your display name. Your email (used for login) cannot be changed here — use the password reset flow to update authentication credentials."},
+      {h:"Default SIEM", p:"Set your preferred SIEM platform. This is pre-selected across the Builder, Translator, and Explainer tabs so you don't have to choose every time."},
+      {h:"SIEM API Keys", p:"Store API keys for Splunk, Elastic, Sentinel, CrowdStrike, and others to enable one-click detection push from the Library. Keys are stored securely in your account. For Splunk, provide instance URL + token (or username/password). For Elastic, provide instance URL + API key."},
+      {h:"Account Security", p:"Send a password reset email or sign out from this page."},
+      {h:"SIEM Push Audit Log", p:"Every detection push to a SIEM is logged here with timestamp, platform, detection name, and success/failure status. Useful for audit trails and compliance reporting."},
+    ]
+  },
+  {
+    id:"metrics", section:"Analyze", icon:"📊", title:"Metrics Dashboard",
+    summary:"Track detection engineering activity, coverage trends, and team output over time.",
+    content:[
+      {h:"Overview", p:"The Metrics Dashboard shows activity over time: detections built per week, coverage growth across MITRE tactics, severity distribution, and SIEM platform breakdown."},
+      {h:"Coverage trend", p:"Track how your MITRE coverage score has grown month-over-month. Use this to demonstrate detection engineering ROI to leadership."},
+    ]
+  },
+  {
+    id:"community", section:"Intel", icon:"🌍", title:"Community",
+    summary:"Share detections with the DetectIQ community and clone rules built by others.",
+    content:[
+      {h:"Overview", p:"The Community tab is a shared detection library where users can publish their detections for others to clone and use. All community detections are reviewed for quality before appearing publicly."},
+      {h:"Sharing", p:"Click 'Share' on any detection in your Library to publish it. You can choose to share anonymously or with your display name."},
+      {h:"Cloning", p:"Click 'Clone' on any community detection to copy it to your Library. You can then edit and customize it for your environment."},
+      {h:"Star ratings", p:"Star community detections you find useful. Stars help surface high-quality rules for other users."},
+    ]
+  },
 ];
 
-const NAV_GROUPS=[
-  {label:"MAIN",    items:["home"]},
-  {label:"BUILD",   items:["builder","simulator","usecases","translator","explainer"]},
-  {label:"ANALYZE", items:["library","heatmap","triage","chain"]},
-  {label:"INTEL",   items:["intel","github","team","autopilot"]},
-  {label:"ACCOUNT", items:["settings"]},
+function DocsPage({ onNav }) {
+  const [search, setSearch] = useState("");
+  const [activeDoc, setActiveDoc] = useState(null);
+  const [activeSection, setActiveSection] = useState("All");
+
+  const sections = ["All", ...Array.from(new Set(DOCS.map(d => d.section)))];
+
+  const filtered = DOCS.filter(doc => {
+    const matchSection = activeSection === "All" || doc.section === activeSection;
+    if (!search.trim()) return matchSection;
+    const q = search.toLowerCase();
+    const inTitle = doc.title.toLowerCase().includes(q);
+    const inSummary = doc.summary.toLowerCase().includes(q);
+    const inContent = doc.content.some(c => c.h.toLowerCase().includes(q) || c.p.toLowerCase().includes(q));
+    return matchSection && (inTitle || inSummary || inContent);
+  });
+
+  // highlight matching text
+  function hl(text) {
+    if (!search.trim()) return text;
+    const idx = text.toLowerCase().indexOf(search.toLowerCase());
+    if (idx === -1) return text;
+    return <>{text.slice(0, idx)}<mark style={{background:THEME.accent+"33",color:THEME.accent,borderRadius:2,padding:"0 2px"}}>{text.slice(idx, idx+search.length)}</mark>{text.slice(idx+search.length)}</>;
+  }
+
+  // Find sections matching search even if content matches
+  function sectionMatchCount(section) {
+    return DOCS.filter(d => {
+      const q = search.toLowerCase();
+      if (!q) return d.section === section || section === "All";
+      const match = d.title.toLowerCase().includes(q) || d.summary.toLowerCase().includes(q) || d.content.some(c => c.h.toLowerCase().includes(q) || c.p.toLowerCase().includes(q));
+      return match && (section === "All" || d.section === section);
+    }).length;
+  }
+
+  return (
+    <div>
+      <SectionHeader icon="📖" title="Documentation" color={THEME.accent}>
+        <span style={S.badge(THEME.accent)}>{DOCS.length} articles</span>
+      </SectionHeader>
+
+      {/* Search */}
+      <div style={{...S.card, padding:"14px 16px", marginBottom:16, display:"flex", gap:12, alignItems:"center"}}>
+        <span style={{fontSize:16, opacity:0.6}}>🔍</span>
+        <input
+          autoFocus
+          style={{...S.input, flex:1, fontSize:14, border:"none", background:"transparent", padding:"4px 0"}}
+          placeholder="Search all docs — e.g. 'false positive', 'export CSV', 'honeytoken', 'correlation field'..."
+          value={search}
+          onChange={e => { setSearch(e.target.value); setActiveDoc(null); }}
+        />
+        {search && <button style={{...S.btn(), padding:"4px 10px", fontSize:11}} onClick={() => setSearch("")}>Clear</button>}
+      </div>
+
+      <div style={{display:"grid", gridTemplateColumns:"200px 1fr", gap:16, alignItems:"start"}}>
+        {/* Sidebar */}
+        <div style={{position:"sticky", top:20}}>
+          <div style={{fontSize:10, fontWeight:800, color:THEME.textDim, letterSpacing:"0.1em", marginBottom:10, paddingLeft:4}}>SECTIONS</div>
+          {sections.map(s => {
+            const count = sectionMatchCount(s);
+            return (
+              <div key={s} onClick={() => { setActiveSection(s); setActiveDoc(null); }}
+                style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",borderRadius:7,cursor:"pointer",marginBottom:3,background:activeSection===s?"rgba(79,142,247,0.1)":"transparent",border:"1px solid "+(activeSection===s?THEME.accentDim+"44":"transparent"),transition:"all 0.15s"}}
+                onMouseEnter={e=>{ if(activeSection!==s) e.currentTarget.style.background="rgba(255,255,255,0.03)"; }}
+                onMouseLeave={e=>{ if(activeSection!==s) e.currentTarget.style.background="transparent"; }}
+              >
+                <span style={{fontSize:12, fontWeight:activeSection===s?700:400, color:activeSection===s?THEME.accent:THEME.textMid}}>{s}</span>
+                {search && <span style={{fontSize:10, color:count>0?THEME.accent:THEME.textDim, background:count>0?THEME.accentGlow:"transparent", borderRadius:10, padding:"1px 6px"}}>{count}</span>}
+              </div>
+            );
+          })}
+
+          <div style={{height:1, background:THEME.border, margin:"12px 4px"}}/>
+          <div style={{fontSize:10, fontWeight:800, color:THEME.textDim, letterSpacing:"0.1em", marginBottom:10, paddingLeft:4}}>QUICK LINKS</div>
+          {[
+            {label:"Build your first detection", tab:"builder"},
+            {label:"View your library", tab:"library"},
+            {label:"Check threat intel", tab:"intel"},
+            {label:"ATT&CK heatmap", tab:"heatmap"},
+          ].map(l => (
+            <div key={l.tab} onClick={() => onNav(l.tab)}
+              style={{padding:"7px 12px",borderRadius:7,cursor:"pointer",marginBottom:3,fontSize:12,color:THEME.accent,display:"flex",alignItems:"center",gap:6}}
+              onMouseEnter={e=>e.currentTarget.style.background="rgba(79,142,247,0.06)"}
+              onMouseLeave={e=>e.currentTarget.style.background="transparent"}
+            >
+              <span style={{fontSize:10}}>→</span>{l.label}
+            </div>
+          ))}
+        </div>
+
+        {/* Main content */}
+        <div>
+          {search && filtered.length === 0 && (
+            <div style={{...S.card, textAlign:"center", padding:48}}>
+              <div style={{fontSize:32, marginBottom:10}}>🔍</div>
+              <div style={{fontSize:14, fontWeight:600, color:THEME.text, marginBottom:6}}>No results for "{search}"</div>
+              <div style={{fontSize:12, color:THEME.textDim}}>Try a different search term or browse by section.</div>
+            </div>
+          )}
+
+          {/* Article detail view */}
+          {activeDoc && !search && (() => {
+            const doc = DOCS.find(d => d.id === activeDoc);
+            if (!doc) return null;
+            return (
+              <div>
+                <button style={{...S.btn(), padding:"6px 14px", fontSize:12, marginBottom:14}} onClick={() => setActiveDoc(null)}>← Back</button>
+                <div style={S.card}>
+                  <div style={{display:"flex", alignItems:"center", gap:10, marginBottom:6}}>
+                    <span style={{fontSize:24}}>{doc.icon}</span>
+                    <div>
+                      <div style={{fontSize:11, color:THEME.accent, fontWeight:600, marginBottom:2}}>{doc.section}</div>
+                      <div style={{fontSize:20, fontWeight:800, color:THEME.text, fontFamily:"'Syne',sans-serif"}}>{doc.title}</div>
+                    </div>
+                  </div>
+                  <div style={{fontSize:13, color:THEME.textMid, marginBottom:20, paddingBottom:16, borderBottom:"1px solid "+THEME.border, lineHeight:1.7}}>{doc.summary}</div>
+                  {doc.content.map((block, i) => (
+                    <div key={i} style={{marginBottom:20}}>
+                      <div style={{fontSize:13, fontWeight:700, color:THEME.text, marginBottom:6, display:"flex", alignItems:"center", gap:8}}>
+                        <span style={{width:3, height:16, background:THEME.accent, borderRadius:2, display:"inline-block", flexShrink:0}}/>
+                        {block.h}
+                      </div>
+                      <div style={{fontSize:12, color:THEME.textMid, lineHeight:1.8, paddingLeft:11}}>{block.p}</div>
+                    </div>
+                  ))}
+                  <div style={{marginTop:20, paddingTop:16, borderTop:"1px solid "+THEME.border, display:"flex", gap:8, flexWrap:"wrap"}}>
+                    {doc.id !== "getting-started" && (
+                      <button style={{...S.btn("p"), padding:"8px 18px", fontSize:12}} onClick={() => onNav(doc.id === "settings" || doc.id === "team" ? doc.id : doc.id)}>Open {doc.title} →</button>
+                    )}
+                    <button style={{...S.btn(), padding:"8px 18px", fontSize:12}} onClick={() => setActiveDoc(null)}>← Back to Docs</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Article list */}
+          {(!activeDoc || search) && (
+            <div style={{display:"flex", flexDirection:"column", gap:10}}>
+              {filtered.map(doc => {
+                // Find matching content blocks for search
+                const matchingBlocks = search ? doc.content.filter(c =>
+                  c.h.toLowerCase().includes(search.toLowerCase()) ||
+                  c.p.toLowerCase().includes(search.toLowerCase())
+                ) : [];
+                return (
+                  <div key={doc.id}
+                    onClick={() => { if (!search) { setActiveDoc(doc.id); } }}
+                    style={{...S.card, cursor:search?"default":"pointer", transition:"border-color 0.15s", marginBottom:0}}
+                    onMouseEnter={e=>{ if(!search) e.currentTarget.style.borderColor=THEME.accent+"44"; }}
+                    onMouseLeave={e=>{ if(!search) e.currentTarget.style.borderColor=THEME.border; }}
+                  >
+                    <div style={{display:"flex", alignItems:"flex-start", gap:12}}>
+                      <div style={{width:40,height:40,borderRadius:10,background:THEME.accentGlow,border:"1px solid "+THEME.accentDim+"33",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{doc.icon}</div>
+                      <div style={{flex:1, minWidth:0}}>
+                        <div style={{display:"flex", alignItems:"center", gap:8, marginBottom:4}}>
+                          <span style={{fontSize:10, color:THEME.accent, fontWeight:700, background:THEME.accentGlow, padding:"2px 7px", borderRadius:4}}>{doc.section}</span>
+                        </div>
+                        <div style={{fontSize:14, fontWeight:700, color:THEME.text, marginBottom:4}}>{hl(doc.title)}</div>
+                        <div style={{fontSize:12, color:THEME.textMid, lineHeight:1.6}}>{hl(doc.summary)}</div>
+                        {/* Show matching content snippets when searching */}
+                        {matchingBlocks.length > 0 && (
+                          <div style={{marginTop:10, display:"flex", flexDirection:"column", gap:8}}>
+                            {matchingBlocks.slice(0, 2).map((block, i) => (
+                              <div key={i} style={{padding:"8px 12px", background:"rgba(79,142,247,0.05)", border:"1px solid "+THEME.accentDim+"22", borderRadius:6}}>
+                                <div style={{fontSize:11, fontWeight:700, color:THEME.accent, marginBottom:4}}>{hl(block.h)}</div>
+                                <div style={{fontSize:11, color:THEME.textMid, lineHeight:1.6}}>{hl(block.p.length > 180 ? block.p.slice(0, 180) + "…" : block.p)}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {!search && <span style={{fontSize:18, color:THEME.textDim, flexShrink:0}}>→</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const NAV_STRUCTURE=[
+  {id:"home",label:"Dashboard",icon:"🏠",desc:"Overview of your detections, coverage, and activity"},
+  {groupId:"build",label:"Build",icon:"🔨",desc:"Create and manage detections",children:[
+    {id:"builder",label:"Detection Builder",desc:"AI-powered builder — generate SPL/KQL/EQL detections from a scenario or tactic"},
+    {id:"translator",label:"Translator",desc:"Convert queries between SIEM platforms (Splunk ↔ Sentinel ↔ Elastic, etc.)"},
+    {id:"usecases",label:"Atomic Tests",desc:"Browse and simulate Atomic Red Team tests to validate your detections"},
+    {id:"chain",label:"Detection Chain",desc:"Chain two detections into a multi-stage correlation rule — flags kill chain sequences"},
+    {id:"replay",label:"Log Replay",desc:"Dry-run your detection against real log lines before deploying — AI evaluates which lines match"},
+    {id:"defend",label:"Defend",desc:"Honeytokens, canary traps, and DNS sinkhole configs — catch attackers with zero false positives"},
+  ]},
+  {groupId:"analyze",label:"Analyze",icon:"📊",desc:"Analyze and improve detection coverage",children:[
+    {id:"library",label:"Library",desc:"All your saved detections — search, edit, export, or push to SIEM"},
+    {id:"heatmap",label:"ATT&CK Map",desc:"MITRE ATT&CK heatmap showing which tactics and techniques you have coverage for"},
+    {id:"triage",label:"Triage",desc:"Review and prioritize detections by severity, quality score, and gaps"},
+    {id:"adversary",label:"Adversary SIEM",desc:"Simulate adversary behavior and map it against your SIEM detections"},
+    {id:"health",label:"Detection Health",desc:"Monitor detection quality, false positive rates, and coverage gaps"},
+  ]},
+  {groupId:"intel",label:"Intel",icon:"🌐",desc:"Threat intelligence and automated detection",children:[
+    {id:"intel",label:"Threat Intel",desc:"Browse CVEs, KEV catalog, and threat feeds to inform your detections"},
+    {id:"autopilot",label:"Autopilot",desc:"Auto-generate detections from threat intel feeds and CVE advisories"},
+  ]},
+  {groupId:"config",label:"Settings",icon:"⚙️",desc:"Configure integrations and account",children:[
+    {id:"team",label:"Team",desc:"Manage team members, roles, and collaboration settings"},
+    {id:"settings",label:"Account",desc:"API keys, SIEM integrations, profile, and billing"},
+    {id:"docs",label:"Documentation",desc:"Full searchable docs — every feature explained with examples"},
+  ]},
 ];
+
+// flat map for lookups
+const NAV_ITEMS=NAV_STRUCTURE.flatMap(n=>n.children?n.children:[n]);
+const NAV_GROUPS=[];// kept for compat, unused
 
 function DetectIQLogo({size="sm",onClick,theme="dark"}){
   const sz=size==="xl"?52:size==="lg"?32:size==="md"?22:18;
@@ -3458,51 +7836,117 @@ function DetectIQLogo({size="sm",onClick,theme="dark"}){
   );
 }
 
-function Sidebar({tab,setTab,collapsed,setCollapsed,detections,user,onSignIn,onSignOut,autopilotDrafts=0,kevCount=0}){
-  const navMap=NAV_ITEMS.reduce((a,n)=>{a[n.id]=n;return a;},{});
+function NavTooltip({text,visible,y}){
+  if(!visible||!text)return null;
   return(
-    <div style={{width:collapsed?64:220,background:THEME.sidebar,borderRight:"1px solid "+THEME.sidebarBorder,display:"flex",flexDirection:"column",height:"100vh",position:"sticky",top:0,flexShrink:0,transition:"width 0.2s ease",overflow:"hidden"}}>
-      <div style={{padding:collapsed?"16px 0":"16px 18px",borderBottom:"1px solid "+THEME.sidebarBorder,display:"flex",alignItems:"center",justifyContent:collapsed?"center":"space-between",height:56,flexShrink:0}}>
+    <div style={{position:"fixed",left:228,top:y-12,zIndex:9999,pointerEvents:"none",background:"#0a0f1e",border:"1px solid "+THEME.borderBright,borderRadius:7,padding:"7px 12px",maxWidth:240,boxShadow:"0 4px 20px rgba(0,0,0,0.6)"}}>
+      <div style={{fontSize:11,color:THEME.text,lineHeight:1.5}}>{text}</div>
+      <div style={{position:"absolute",left:-5,top:14,width:8,height:8,background:"#0a0f1e",border:"1px solid "+THEME.borderBright,borderRight:"none",borderTop:"none",transform:"rotate(45deg)"}}/>
+    </div>
+  );
+}
+
+function Sidebar({tab,setTab,collapsed,setCollapsed,detections,user,onSignIn,onSignOut,autopilotDrafts=0,kevCount=0}){
+  // auto-expand group containing active tab
+  const activeGroup=NAV_STRUCTURE.find(n=>n.children&&n.children.some(c=>c.id===tab))?.groupId||null;
+  const[expanded,setExpanded]=useState(()=>new Set(activeGroup?[activeGroup]:[]));
+  const[tooltip,setTooltip]=useState({visible:false,text:"",y:0});
+  const tooltipTimer=useRef(null);
+
+  // keep group open when tab changes
+  useEffect(()=>{
+    if(activeGroup)setExpanded(p=>new Set([...p,activeGroup]));
+  },[activeGroup]);
+
+  const toggleGroup=gid=>setExpanded(p=>{const n=new Set(p);n.has(gid)?n.delete(gid):n.add(gid);return n;});
+
+  const showTip=(e,text)=>{
+    if(!text)return;
+    clearTimeout(tooltipTimer.current);
+    const rect=e.currentTarget.getBoundingClientRect();
+    tooltipTimer.current=setTimeout(()=>setTooltip({visible:true,text,y:rect.top+rect.height/2}),400);
+  };
+  const hideTip=()=>{clearTimeout(tooltipTimer.current);setTooltip({visible:false,text:"",y:0});};
+
+  const badge=(id)=>{
+    if(id==="library"&&detections.length>0)return<span style={{marginLeft:"auto",fontSize:10,background:THEME.accent+"18",color:THEME.accent,borderRadius:10,padding:"0 6px",fontWeight:600}}>{detections.length}</span>;
+    if(id==="autopilot"&&autopilotDrafts>0)return<span style={{marginLeft:"auto",fontSize:10,background:THEME.warning+"18",color:THEME.warning,borderRadius:10,padding:"0 6px",fontWeight:600}}>{autopilotDrafts}</span>;
+    if(id==="intel"&&kevCount>0)return<span style={{marginLeft:"auto",fontSize:9,background:THEME.danger+"18",color:THEME.danger,borderRadius:3,padding:"0 5px",fontWeight:600}}>NEW</span>;
+    return null;
+  };
+
+  return(
+    <div style={{width:collapsed?56:220,background:THEME.sidebar,borderRight:"1px solid "+THEME.sidebarBorder,display:"flex",flexDirection:"column",height:"100vh",position:"sticky",top:0,flexShrink:0,transition:"width 0.2s ease",overflow:"hidden"}}>
+      <NavTooltip text={tooltip.text} visible={tooltip.visible} y={tooltip.y}/>
+      {/* Logo */}
+      <div style={{height:56,display:"flex",alignItems:"center",justifyContent:collapsed?"center":"space-between",padding:collapsed?"0":"0 16px",borderBottom:"1px solid "+THEME.sidebarBorder,flexShrink:0}}>
         {!collapsed&&<DetectIQLogo size="sm" onClick={()=>setTab("home")}/>}
-        <button onClick={()=>setCollapsed(!collapsed)} style={{background:"transparent",border:"1px solid "+THEME.sidebarBorder,borderRadius:6,color:THEME.textDim,cursor:"pointer",padding:"4px 7px",fontSize:12,flexShrink:0}}>{collapsed?"›":"‹"}</button>
+        <button onClick={()=>setCollapsed(!collapsed)} style={{background:"transparent",border:"none",color:THEME.textDim,cursor:"pointer",padding:"4px 6px",fontSize:14,lineHeight:1}}>{collapsed?"›":"‹"}</button>
       </div>
-      <div style={{flex:1,overflowY:"auto",padding:"10px 0",overflowX:"hidden"}}>
-        {NAV_GROUPS.map(group=>(
-          <div key={group.label} style={{marginBottom:4}}>
-            {!collapsed&&<div style={{fontSize:9,fontWeight:800,color:THEME.textDim,letterSpacing:"0.15em",padding:"8px 18px 4px"}}>{group.label}</div>}
-            {group.items.map(id=>{
-              const n=navMap[id];if(!n)return null;
-              const active=tab===id;
-              return(
-                <div key={id} onClick={()=>setTab(id)} title={collapsed?n.label:""}
-                  style={{display:"flex",alignItems:"center",gap:10,padding:collapsed?"10px 0":"9px 18px",cursor:"pointer",background:active?"linear-gradient(90deg,"+n.color+"14,transparent)":"transparent",borderLeft:active?"2px solid "+n.color:"2px solid transparent",transition:"all 0.15s",justifyContent:collapsed?"center":"flex-start"}}
-                  onMouseEnter={e=>{if(!active)e.currentTarget.style.background=n.color+"08";}}
-                  onMouseLeave={e=>{if(!active)e.currentTarget.style.background="transparent";}}>
-                  <span style={{fontSize:16,flexShrink:0}}>{n.icon}</span>
-                  {!collapsed&&<span style={{fontSize:12,fontWeight:active?700:500,color:active?n.color:THEME.textMid,whiteSpace:"nowrap"}}>{n.label}</span>}
-                  {!collapsed&&(()=>{
-                    if(id==="library"&&detections.length>0) return <span style={{marginLeft:"auto",fontSize:10,background:THEME.success+"22",color:THEME.success,border:"1px solid "+THEME.success+"33",borderRadius:10,padding:"1px 7px",fontWeight:700}}>{detections.length}</span>;
-                    if(id==="autopilot"&&autopilotDrafts>0) return <span style={{marginLeft:"auto",fontSize:10,background:THEME.warning+"22",color:THEME.warning,border:"1px solid "+THEME.warning+"33",borderRadius:10,padding:"1px 7px",fontWeight:700}}>{autopilotDrafts}</span>;
-                    if(id==="intel"&&kevCount>0) return <span style={{marginLeft:"auto",fontSize:10,background:THEME.danger+"22",color:THEME.danger,border:"1px solid "+THEME.danger+"33",borderRadius:10,padding:"1px 7px",fontWeight:700}}>NEW</span>;
-                    if(id==="builder"&&detections.length===0) return <span style={{marginLeft:"auto",width:7,height:7,borderRadius:"50%",background:THEME.accent,display:"inline-block",animation:"livepulse 1.5s ease-in-out infinite",flexShrink:0}}/>;
-                    return null;
-                  })()}
-                </div>
-              );
-            })}
-          </div>
-        ))}
+
+      {/* Nav items */}
+      <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:"8px 0"}}>
+        {NAV_STRUCTURE.map(item=>{
+          if(!item.children){
+            // single item (Dashboard)
+            const active=tab===item.id;
+            return(
+              <div key={item.id} onClick={()=>setTab(item.id)}
+                style={{display:"flex",alignItems:"center",gap:10,padding:collapsed?"10px 0":"8px 16px",cursor:"pointer",background:active?THEME.accent+"12":"transparent",borderLeft:active?"2px solid "+THEME.accent:"2px solid transparent",transition:"all 0.12s",justifyContent:collapsed?"center":"flex-start",marginBottom:2}}
+                onMouseEnter={e=>{if(!active)e.currentTarget.style.background=THEME.accent+"07";showTip(e,item.desc);}}
+                onMouseLeave={e=>{if(!active)e.currentTarget.style.background="transparent";hideTip();}}>
+                <span style={{fontSize:14,flexShrink:0,color:active?THEME.accent:THEME.textDim}}>{item.icon}</span>
+                {!collapsed&&<span style={{fontSize:12,fontWeight:active?600:500,color:active?THEME.text:THEME.textMid}}>{item.label}</span>}
+              </div>
+            );
+          }
+          // group with children
+          const isOpen=expanded.has(item.groupId);
+          const hasActive=item.children.some(c=>c.id===tab);
+          return(
+            <div key={item.groupId} style={{marginBottom:2}}>
+              {/* Group header */}
+              <div onClick={()=>collapsed?setTab(item.children[0].id):toggleGroup(item.groupId)}
+                style={{display:"flex",alignItems:"center",gap:10,padding:collapsed?"10px 0":"7px 16px",cursor:"pointer",transition:"all 0.12s",justifyContent:collapsed?"center":"flex-start",borderLeft:hasActive?"2px solid "+THEME.accent+"55":"2px solid transparent"}}
+                onMouseEnter={e=>{e.currentTarget.style.background=THEME.accent+"06";showTip(e,item.desc);}}
+                onMouseLeave={e=>{e.currentTarget.style.background="transparent";hideTip();}}>
+                <span style={{fontSize:14,flexShrink:0,color:hasActive?THEME.accent:THEME.textDim}}>{item.icon}</span>
+                {!collapsed&&<>
+                  <span style={{fontSize:12,fontWeight:600,color:hasActive?THEME.text:THEME.textMid,flex:1}}>{item.label}</span>
+                  <span style={{fontSize:10,color:THEME.textDim,transition:"transform 0.15s",display:"inline-block",transform:isOpen?"rotate(90deg)":"rotate(0deg)"}}>›</span>
+                </>}
+              </div>
+              {/* Sub-items — hidden in collapsed mode */}
+              {isOpen&&!collapsed&&item.children.map(child=>{
+                const active=tab===child.id;
+                return(
+                  <div key={child.id} onClick={()=>setTab(child.id)}
+                    style={{display:"flex",alignItems:"center",gap:8,padding:"6px 16px 6px 34px",cursor:"pointer",background:active?THEME.accent+"10":"transparent",borderLeft:active?"2px solid "+THEME.accent:"2px solid transparent",transition:"all 0.12s"}}
+                    onMouseEnter={e=>{if(!active)e.currentTarget.style.background=THEME.accent+"07";showTip(e,child.desc);}}
+                    onMouseLeave={e=>{if(!active)e.currentTarget.style.background="transparent";hideTip();}}>
+                    <span style={{fontSize:11,color:active?THEME.text:THEME.textMid,fontWeight:active?600:400,flex:1}}>{child.label}</span>
+                    {badge(child.id)}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
-      <div style={{borderTop:"1px solid "+THEME.sidebarBorder,padding:collapsed?"12px 0":"12px 14px",flexShrink:0}}>
+
+      {/* User footer */}
+      <div style={{borderTop:"1px solid "+THEME.sidebarBorder,padding:collapsed?"10px 0":"10px 12px",flexShrink:0}}>
         {user?(
           <div style={{display:"flex",alignItems:"center",gap:8,justifyContent:collapsed?"center":"flex-start"}}>
-            <div style={{width:30,height:30,borderRadius:"50%",background:"linear-gradient(135deg,"+THEME.accent+"30,"+THEME.purple+"30)",border:"1px solid "+THEME.accentDim,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:THEME.accent,flexShrink:0,cursor:"pointer"}} title="Open Settings" onClick={()=>setTab("settings")}>{user.email.slice(0,2).toUpperCase()}</div>
+            <div style={{width:28,height:28,borderRadius:"50%",background:"linear-gradient(135deg,"+THEME.accent+"30,"+THEME.purple+"30)",border:"1px solid "+THEME.accentDim,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:THEME.accent,flexShrink:0,cursor:"pointer"}} title="Settings" onClick={()=>setTab("settings")}>{user.email.slice(0,2).toUpperCase()}</div>
             {!collapsed&&<div style={{flex:1,minWidth:0}}><div style={{fontSize:11,color:THEME.text,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user.email.split("@")[0]}</div><div style={{fontSize:10,color:THEME.textDim,cursor:"pointer"}} onClick={onSignOut}>Sign out</div></div>}
           </div>
         ):(
           <div style={{display:"flex",justifyContent:collapsed?"center":"flex-start"}}>
-            {collapsed?<div onClick={onSignIn} style={{width:30,height:30,borderRadius:"50%",background:THEME.accentGlow,border:"1px solid "+THEME.accentDim,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:13}} title="Sign In">👤</div>
-            :<button style={{...S.btn("p"),width:"100%",padding:"8px",fontSize:11,justifyContent:"center",display:"flex"}} onClick={onSignIn}>Sign In / Sign Up</button>}
+            {collapsed
+              ?<div onClick={onSignIn} style={{width:28,height:28,borderRadius:"50%",background:THEME.accentGlow,border:"1px solid "+THEME.accentDim,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:12}} title="Sign In">→</div>
+              :<button style={{...S.btn("p"),width:"100%",padding:"7px",fontSize:11,justifyContent:"center",display:"flex"}} onClick={onSignIn}>Sign In / Sign Up</button>
+            }
           </div>
         )}
       </div>
@@ -3549,7 +7993,7 @@ function LazyTab({ id, tab, children, skeleton }) {
 
 function AppInner(){
   const{user,loading,signOut}=useAuth();
-  const VALID_TABS=["home","builder","simulator","usecases","translator","explainer","library","heatmap","triage","chain","intel","github","team","autopilot","settings"];
+  const VALID_TABS=["home","builder","usecases","translator","explainer","library","heatmap","triage","adversary","health","intel","team","autopilot","metrics","community","settings","chain","replay","defend","docs"];
   const[tab,setTab]=useState(()=>{const p=window.location.pathname.replace(/^\//,"");return VALID_TABS.includes(p)?p:"home";});
   useEffect(()=>{
     const url=tab==="home"?"/":"/"+tab;
@@ -3572,12 +8016,23 @@ function AppInner(){
   },[user]);
   const[demoMode,setDemoMode]=useState(false);
   const[collapsed,setCollapsed]=useState(false);
+  const[sidebarOpen,setSidebarOpen]=useState(false);
+  const[cmdkOpen,setCmdkOpen]=useState(false);
+  const[cmdkQuery,setCmdkQuery]=useState("");
+  useEffect(()=>{
+    function onKey(e){
+      if((e.metaKey||e.ctrlKey)&&e.key==="k"){e.preventDefault();setCmdkOpen(o=>!o);setCmdkQuery("");}
+      if(e.key==="Escape")setCmdkOpen(false);
+    }
+    window.addEventListener("keydown",onKey);
+    return()=>window.removeEventListener("keydown",onKey);
+  },[]);
   const[detections,setDetections]=useState([]);
   const[dbLoading,setDbLoading]=useState(false);
   const[triagePrefill,setTriagePrefill]=useState("");
   const[explainerPrefill,setExplainerPrefill]=useState({query:"",tool:""});
   const[translatorPrefill,setTranslatorPrefill]=useState({query:"",tool:""});
-  const[builderPrefill,setBuilderPrefill]=useState(()=>{if(window.location.pathname!=="/builder")return {scenario:"",tactic:""};const p=new URLSearchParams(window.location.search);return p.get("tactic")?{tactic:decodeURIComponent(p.get("tactic")),scenario:p.get("scenario")?decodeURIComponent(p.get("scenario")):""}:{scenario:"",tactic:""};});
+  const[builderPrefill,setBuilderPrefill]=useState(()=>{if(window.location.pathname!=="/builder")return {scenario:"",tactic:""};const p=new URLSearchParams(window.location.search);return p.get("tactic")?{tactic:p.get("tactic")||"",scenario:p.get("scenario")||""}:{scenario:"",tactic:""};});
   useEffect(()=>{if(tab==="builder"&&builderPrefill.tactic){window.history.replaceState({},"","/builder?tactic="+encodeURIComponent(builderPrefill.tactic)+(builderPrefill.scenario?"&scenario="+encodeURIComponent(builderPrefill.scenario):""));}},[builderPrefill,tab]);
 
   useEffect(()=>{
@@ -3842,10 +8297,22 @@ function AppInner(){
         button:hover:not(:disabled){opacity:0.82;transform:translateY(-1px);}
         button:active:not(:disabled){transform:translateY(0);}
         button:disabled{opacity:0.4;cursor:not-allowed;}
+        @media (max-width: 768px) {
+          .detect-sidebar { display: none !important; }
+          .detect-sidebar.mobile-open { display: flex !important; position: fixed; z-index: 500; left: 0; top: 0; bottom: 0; width: 260px; }
+          .detect-main { margin-left: 0 !important; padding: 12px !important; }
+          .detect-grid2 { grid-template-columns: 1fr !important; }
+          .detect-grid3 { grid-template-columns: 1fr !important; }
+          .mobile-menu-btn { display: block !important; }
+        }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
       `}</style>
+      <button style={{display:"none",position:"fixed",top:14,left:14,zIndex:600,background:THEME.surface,border:"1px solid "+THEME.border,borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:18}} className="mobile-menu-btn" onClick={()=>setSidebarOpen(o=>!o)}>☰</button>
       <div style={{display:"flex",height:"100vh",overflow:"hidden",background:THEME.bg,fontFamily:"'Courier New',monospace",color:THEME.text}}>
-        <Sidebar tab={tab} setTab={setTab} collapsed={collapsed} setCollapsed={setCollapsed} detections={detections} user={user} onSignIn={()=>setShowLogin(true)} onSignOut={signOut} autopilotDrafts={LS.get("autopilot_drafts",[]).filter(d=>!LS.get("autopilot_dismissed",{})[d.cve_id]).length} kevCount={0}/>
-        <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        <div className={sidebarOpen?"detect-sidebar mobile-open":"detect-sidebar"} style={{display:"flex",flexDirection:"column",height:"100vh",position:"sticky",top:0,flexShrink:0}}>
+          <Sidebar tab={tab} setTab={(t)=>{setTab(t);setSidebarOpen(false);}} collapsed={collapsed} setCollapsed={setCollapsed} detections={detections} user={user} onSignIn={()=>setShowLogin(true)} onSignOut={signOut} autopilotDrafts={LS.get("autopilot_drafts",[]).filter(d=>!LS.get("autopilot_dismissed",{})[d.cve_id]).length} kevCount={0}/>
+        </div>
+        <div className="detect-main" style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
           <div style={{height:56,borderBottom:"1px solid "+THEME.sidebarBorder,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 28px",flexShrink:0,background:THEME.bg}}>
             <div style={{fontSize:13,fontWeight:700,color:THEME.textMid}}>{NAV_ITEMS.find(n=>n.id===tab)?.icon} {NAV_ITEMS.find(n=>n.id===tab)?.label}</div>
             <div style={S.flex}>
@@ -3862,11 +8329,8 @@ function AppInner(){
             <LazyTab id="builder" tab={tab} skeleton={<div style={S.card}><Skeleton width="40%" height={22} style={{marginBottom:16}}/><SkeletonGrid count={2}/></div>}>
               <DetectionBuilder onSave={saveDetection} onSendToTriage={handleSendToTriage} prefill={builderPrefill}/>
             </LazyTab>
-            <LazyTab id="simulator" tab={tab} skeleton={<SkeletonGrid count={4}/>}>
-              <AttackSimulator onSendToTriage={handleSendToTriage} onSendToBuilder={handleSendToBuilder} prefill={builderPrefill}/>
-            </LazyTab>
             <LazyTab id="usecases" tab={tab} skeleton={<SkeletonGrid count={6}/>}>
-              <UseCaseRepository onImport={saveDetection} onBuildOn={(scenario,tactic)=>{setBuilderPrefill({scenario,tactic});setTab("builder");}}/>
+              <AtomicTests onImport={saveDetection} onBuildOn={(scenario,tactic)=>{setBuilderPrefill({scenario,tactic});setTab("builder");}}/>
             </LazyTab>
             <LazyTab id="translator" tab={tab} skeleton={<SkeletonCard/>}>
               <QueryTranslator prefill={translatorPrefill}/>
@@ -3891,32 +8355,114 @@ function AppInner(){
             <LazyTab id="triage" tab={tab} skeleton={<SkeletonCard/>}>
               <AlertTriage prefillAlert={triagePrefill}/>
             </LazyTab>
-            <LazyTab id="chain" tab={tab} skeleton={<SkeletonGrid count={3}/>}>
-              <AttackChainBuilder onBuildDetection={(scenario,tactic)=>{setBuilderPrefill({scenario,tactic});setTab('builder');}}/>
+            <LazyTab id="adversary" tab={tab} skeleton={<SkeletonGrid count={4}/>}>
+              <AdversarySIEM detections={detections}/>
+            </LazyTab>
+            <LazyTab id="health" tab={tab} skeleton={<SkeletonGrid count={4}/>}>
+              <DetectionHealth detections={detections} onUpdate={updateDetection} onBuildOn={(scenario,tactic)=>{setBuilderPrefill({scenario,tactic});setTab("builder");}} onNav={setTab}/>
             </LazyTab>
             <LazyTab id="intel" tab={tab} skeleton={<div style={S.grid2}><SkeletonCard/><SkeletonCard/></div>}>
-              <ThreatIntel onBuildDetection={(scenario,tactic)=>{setBuilderPrefill({scenario,tactic});setTab("builder");}} onSimulate={(scenario,tactic)=>{setBuilderPrefill({scenario,tactic});setTab("simulator");}} onHunt={handleHunt}/>
-            </LazyTab>
-            <LazyTab id="github" tab={tab} skeleton={<SkeletonCard/>}>
-              <GitHubExport detections={detections}/>
+              <ThreatIntel onBuildDetection={(scenario,tactic)=>{setBuilderPrefill({scenario,tactic});setTab("builder");}} onSimulate={(scenario,tactic)=>{setBuilderPrefill({scenario,tactic});setTab("adversary");}} onHunt={handleHunt}/>
             </LazyTab>
             <LazyTab id="autopilot" tab={tab} skeleton={<SkeletonCard/>}>
               <AutopilotTab user={user} detections={detections} onSaveDetection={det=>{setDetections(p=>[det,...p]);saveDetection(det);}} onNav={setTab}/>
             </LazyTab>
             <LazyTab id="team" tab={tab} skeleton={<div style={S.grid2}><SkeletonCard/><SkeletonCard/></div>}>
-              <TeamWorkspace detections={detections}/>
+              <TeamWorkspace detections={detections} user={user}/>
+            </LazyTab>
+            <LazyTab id="metrics" tab={tab} skeleton={<SkeletonCard/>}>
+              <MetricsDashboard detections={detections}/>
+            </LazyTab>
+            <LazyTab id="community" tab={tab} skeleton={<div style={S.grid2}><SkeletonCard/><SkeletonCard/></div>}>
+              <CommunityTab user={user} detections={detections} onCloneDetection={det=>{const newDet={...det,id:uid(),created:new Date().toISOString()};setDetections(p=>[newDet,...p]);if(user){saveDetection(newDet);}else{const u=[newDet,...detections];setDetections(u);LS.set("detectiq_detections",u);}}}/>
             </LazyTab>
             <LazyTab id="settings" tab={tab} skeleton={<SkeletonCard/>}>
               <UserSettingsTab user={user} onSignOut={()=>supabase.auth.signOut()}/>
+            </LazyTab>
+            <LazyTab id="chain" tab={tab} skeleton={<SkeletonCard/>}>
+              <DetectionChain detections={detections}/>
+            </LazyTab>
+            <LazyTab id="replay" tab={tab} skeleton={<SkeletonCard/>}>
+              <LogReplay detections={detections}/>
+            </LazyTab>
+            <LazyTab id="defend" tab={tab} skeleton={<SkeletonCard/>}>
+              <DefendPage detections={detections}/>
+            </LazyTab>
+            <LazyTab id="docs" tab={tab} skeleton={<SkeletonCard/>}>
+              <DocsPage onNav={setTab}/>
             </LazyTab>
           </div>
         </div>
       </div>
       {showLogin&&<LoginModal onClose={()=>setShowLogin(false)} onDemo={()=>{setDemoMode(true);setShowLogin(false);}}/>}
+      {cmdkOpen&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:9999,display:"flex",alignItems:"flex-start",justifyContent:"center",paddingTop:"15vh"}} onClick={()=>setCmdkOpen(false)}>
+          <div style={{background:"#0d1825",border:"1px solid "+THEME.accent+"44",borderRadius:14,width:"100%",maxWidth:580,boxShadow:"0 24px 64px rgba(0,212,255,0.15)"}} onClick={e=>e.stopPropagation()}>
+            <div style={{padding:"16px 20px",borderBottom:"1px solid #1a2a3a",display:"flex",alignItems:"center",gap:10}}>
+              <span style={{color:THEME.textDim,fontSize:14}}>🔍</span>
+              <input autoFocus style={{...S.input,border:"none",background:"transparent",fontSize:15,flex:1,padding:0}} value={cmdkQuery} onChange={e=>setCmdkQuery(e.target.value)} placeholder="Search detections..."/>
+              <span style={{fontSize:11,color:THEME.textDim,background:"#1a2a3a",padding:"2px 6px",borderRadius:4}}>ESC</span>
+            </div>
+            <div style={{maxHeight:360,overflowY:"auto",padding:"8px 0"}}>
+              {detections.filter(d=>!cmdkQuery||d.name.toLowerCase().includes(cmdkQuery.toLowerCase())||d.tactic?.toLowerCase().includes(cmdkQuery.toLowerCase())||d.threat?.toLowerCase().includes(cmdkQuery.toLowerCase())).slice(0,12).map(d=>(
+                <div key={d.id} style={{padding:"10px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,borderRadius:8,margin:"2px 8px"}} onClick={()=>{setTab("library");setCmdkOpen(false);}} onMouseEnter={e=>e.currentTarget.style.background="#1a2a3a"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                  <span style={{fontSize:11,fontWeight:700,color:THEME.accent,minWidth:30,fontFamily:"monospace"}}>{d.queryType||d.tool||"?"}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:700,color:THEME.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
+                    <div style={{fontSize:11,color:THEME.textDim,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.tactic} · {d.severity}</div>
+                  </div>
+                  <span style={{fontSize:10,color:d.score>7?THEME.success:d.score>4?THEME.warning:THEME.textDim,fontWeight:700}}>{d.score?d.score+"/10":""}</span>
+                </div>
+              ))}
+              {detections.filter(d=>!cmdkQuery||d.name.toLowerCase().includes(cmdkQuery.toLowerCase())||d.tactic?.toLowerCase().includes(cmdkQuery.toLowerCase())||d.threat?.toLowerCase().includes(cmdkQuery.toLowerCase())).length===0&&(
+                <div style={{padding:"24px 20px",textAlign:"center",color:THEME.textDim,fontSize:13}}>No detections match "{cmdkQuery}"</div>
+              )}
+              {!cmdkQuery&&detections.length===0&&<div style={{padding:"24px 20px",textAlign:"center",color:THEME.textDim,fontSize:13}}>No detections yet. Build your first one!</div>}
+            </div>
+            <div style={{padding:"10px 20px",borderTop:"1px solid #1a2a3a",fontSize:11,color:THEME.textDim,display:"flex",gap:16}}>
+              <span>↵ Go to Library</span><span>ESC Close</span><span style={{marginLeft:"auto"}}>⌘K Toggle</span>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
 
+// ── Global Toast System ───────────────────────────────────────────────────────
+const ToastContext = createContext(null);
+export function useToast(){ return useContext(ToastContext); }
+function ToastProvider({ children }){
+  const [toasts, setToasts] = useState([]);
+  const toast = useCallback((msg, type="success", duration=3500) => {
+    const id = Date.now() + Math.random();
+    setToasts(t => [...t, { id, msg, type }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), duration);
+  }, []);
+  const COLOR = { success: THEME.success, error: THEME.danger, info: THEME.accent, warning: THEME.warning };
+  return (
+    <ToastContext.Provider value={toast}>
+      {children}
+      <div style={{position:"fixed",bottom:24,right:24,zIndex:9999,display:"flex",flexDirection:"column",gap:8,pointerEvents:"none"}}>
+        {toasts.map(t => (
+          <div key={t.id} style={{
+            padding:"12px 18px", borderRadius:10, fontSize:13, fontWeight:600,
+            background:"#0d1825", border:"1px solid "+COLOR[t.type]+"55",
+            color:COLOR[t.type], boxShadow:"0 8px 32px rgba(0,0,0,0.6)",
+            display:"flex", alignItems:"center", gap:10, minWidth:260, maxWidth:400,
+            animation:"slideInRight 0.25s ease", pointerEvents:"auto",
+            fontFamily:"'JetBrains Mono',monospace",
+          }}>
+            <span>{t.type==="success"?"✓":t.type==="error"?"✕":t.type==="warning"?"⚠":"ℹ"}</span>
+            <span style={{flex:1}}>{t.msg}</span>
+          </div>
+        ))}
+      </div>
+      <style>{`@keyframes slideInRight{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}`}</style>
+    </ToastContext.Provider>
+  );
+}
+
 export default function App(){
-  return <AuthProvider><AppInner/></AuthProvider>;
+  return <AuthProvider><ToastProvider><AppInner/></ToastProvider></AuthProvider>;
 }
