@@ -5516,6 +5516,23 @@ function ThreatIntel({ onBuildDetection, onSimulate, onHunt }){
 }
 
 // ── Detection Chain Builder ────────────────────────────────────────────────────
+const KILL_CHAIN_NEXT={
+  "Reconnaissance":["Resource Development","Initial Access"],
+  "Resource Development":["Initial Access","Execution"],
+  "Initial Access":["Execution","Persistence","Defense Evasion"],
+  "Execution":["Persistence","Privilege Escalation","Defense Evasion"],
+  "Persistence":["Privilege Escalation","Defense Evasion","Credential Access"],
+  "Privilege Escalation":["Defense Evasion","Credential Access","Discovery"],
+  "Defense Evasion":["Credential Access","Discovery","Lateral Movement"],
+  "Credential Access":["Discovery","Lateral Movement","Collection"],
+  "Discovery":["Lateral Movement","Collection","Command and Control"],
+  "Lateral Movement":["Collection","Command and Control","Exfiltration"],
+  "Collection":["Command and Control","Exfiltration","Impact"],
+  "Command and Control":["Exfiltration","Impact"],
+  "Exfiltration":["Impact"],
+  "Impact":[],
+};
+
 function DetectionChain({detections}){
   const[nameA,setNameA]=useState(""); const[queryA,setQueryA]=useState("");
   const[nameB,setNameB]=useState(""); const[queryB,setQueryB]=useState("");
@@ -5527,8 +5544,23 @@ function DetectionChain({detections}){
   const[err,setErr]=useState("");
   const[activeOut,setActiveOut]=useState("splunk");
   const[copyDet,setCopyDet]=useState(null);
+  const[detA,setDetA]=useState(null);
+  const[suggestionsB,setSuggestionsB]=useState([]);
+
   function loadDet(which,det){
-    if(which==="a"){setNameA(det.name);setQueryA(det.query||"");}
+    if(which==="a"){
+      setNameA(det.name);setQueryA(det.query||"");setDetA(det);
+      // compute suggestions for B based on kill chain progression
+      const nextTactics=KILL_CHAIN_NEXT[det.tactic]||[];
+      const suggestions=detections.filter(d=>
+        d.id!==det.id&&(
+          nextTactics.some(t=>d.tactic&&d.tactic.toLowerCase()===t.toLowerCase())||
+          (nextTactics.length===0&&d.id!==det.id)// impact: suggest any
+        )
+      ).slice(0,6);
+      // if no tactic match, fall back to all others
+      setSuggestionsB(suggestions.length>0?suggestions:detections.filter(d=>d.id!==det.id).slice(0,4));
+    }
     else{setNameB(det.name);setQueryB(det.query||"");}
   }
   async function generate(){
@@ -5555,21 +5587,67 @@ function DetectionChain({detections}){
       ]}/>
       <div style={S.card}>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
-          {["a","b"].map(w=>(
-            <div key={w} style={{padding:"14px 16px",background:"rgba(255,255,255,0.02)",border:"1px solid "+(w==="a"?THEME.accentDim+"55":THEME.purple+"55"),borderRadius:8}}>
-              <div style={{fontSize:10,fontWeight:800,color:w==="a"?THEME.accent:THEME.purple,letterSpacing:"0.12em",marginBottom:10}}>DETECTION {w.toUpperCase()} — {w==="a"?"EARLY STAGE":"LATER STAGE"}</div>
-              <input style={{...S.input,marginBottom:8}} placeholder="Detection name..." value={w==="a"?nameA:nameB} onChange={e=>w==="a"?setNameA(e.target.value):setNameB(e.target.value)}/>
-              <textarea style={{...S.textarea,minHeight:80,fontSize:11,fontFamily:"monospace"}} placeholder="Paste detection query (optional)..." value={w==="a"?queryA:queryB} onChange={e=>w==="a"?setQueryA(e.target.value):setQueryB(e.target.value)}/>
-              {detections.length>0&&(
-                <div style={{marginTop:8}}>
-                  <select style={{...S.input,fontSize:11}} onChange={e=>{const d=detections.find(x=>x.id===e.target.value);if(d)loadDet(w,d);}}>
-                    <option value="">Load from library...</option>
-                    {detections.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
+          {/* Detection A */}
+          <div style={{padding:"14px 16px",background:"rgba(255,255,255,0.02)",border:"1px solid "+THEME.accentDim+"55",borderRadius:8}}>
+            <div style={{fontSize:10,fontWeight:800,color:THEME.accent,letterSpacing:"0.12em",marginBottom:10}}>DETECTION A — EARLY STAGE</div>
+            <input style={{...S.input,marginBottom:8}} placeholder="Detection name..." value={nameA} onChange={e=>setNameA(e.target.value)}/>
+            <textarea style={{...S.textarea,minHeight:80,fontSize:11,fontFamily:"monospace"}} placeholder="Paste detection query (optional)..." value={queryA} onChange={e=>setQueryA(e.target.value)}/>
+            {detections.length>0&&(
+              <div style={{marginTop:8}}>
+                <select style={{...S.input,fontSize:11}} onChange={e=>{const d=detections.find(x=>x.id===e.target.value);if(d)loadDet("a",d);}}>
+                  <option value="">Load from library...</option>
+                  {detections.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* Detection B — with smart suggestions */}
+          <div style={{padding:"14px 16px",background:"rgba(255,255,255,0.02)",border:"1px solid "+THEME.purple+"55",borderRadius:8}}>
+            <div style={{fontSize:10,fontWeight:800,color:THEME.purple,letterSpacing:"0.12em",marginBottom:10}}>DETECTION B — LATER STAGE</div>
+
+            {/* Smart suggestions */}
+            {suggestionsB.length>0&&!nameB&&(
+              <div style={{marginBottom:10}}>
+                <div style={{fontSize:10,color:THEME.textDim,fontWeight:600,marginBottom:6,letterSpacing:"0.05em"}}>
+                  💡 SUGGESTED NEXT-STAGE DETECTIONS
+                  {detA?.tactic&&<span style={{color:THEME.purple,marginLeft:6}}>following {detA.tactic}</span>}
                 </div>
-              )}
-            </div>
-          ))}
+                <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                  {suggestionsB.map(d=>{
+                    const nextTactics=KILL_CHAIN_NEXT[detA?.tactic]||[];
+                    const isMatch=nextTactics.some(t=>d.tactic&&d.tactic.toLowerCase()===t.toLowerCase());
+                    return(
+                      <div key={d.id}
+                        onClick={()=>loadDet("b",d)}
+                        style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:7,border:"1px solid "+(isMatch?THEME.purple+"44":THEME.border),background:isMatch?"rgba(168,85,247,0.06)":"rgba(255,255,255,0.02)",cursor:"pointer",transition:"all 0.15s"}}
+                        onMouseEnter={e=>{e.currentTarget.style.borderColor=THEME.purple+"88";e.currentTarget.style.background="rgba(168,85,247,0.1)";}}
+                        onMouseLeave={e=>{e.currentTarget.style.borderColor=isMatch?THEME.purple+"44":THEME.border;e.currentTarget.style.background=isMatch?"rgba(168,85,247,0.06)":"rgba(255,255,255,0.02)";}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:11,fontWeight:600,color:THEME.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
+                          {d.tactic&&<div style={{fontSize:9,color:isMatch?THEME.purple:THEME.textDim,marginTop:1}}>{d.tactic}</div>}
+                        </div>
+                        {isMatch&&<span style={{fontSize:9,color:THEME.purple,fontWeight:700,flexShrink:0}}>CHAIN →</span>}
+                        <span style={{fontSize:11,color:THEME.textDim,flexShrink:0}}>+</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{height:1,background:THEME.border,margin:"10px 0"}}/>
+              </div>
+            )}
+
+            <input style={{...S.input,marginBottom:8}} placeholder="Detection name..." value={nameB} onChange={e=>setNameB(e.target.value)}/>
+            <textarea style={{...S.textarea,minHeight:80,fontSize:11,fontFamily:"monospace"}} placeholder="Paste detection query (optional)..." value={queryB} onChange={e=>setQueryB(e.target.value)}/>
+            {detections.length>0&&(
+              <div style={{marginTop:8}}>
+                <select style={{...S.input,fontSize:11}} onChange={e=>{const d=detections.find(x=>x.id===e.target.value);if(d)loadDet("b",d);}}>
+                  <option value="">Load from library...</option>
+                  {detections.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+              </div>
+            )}
+          </div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:16}}>
           <div>
