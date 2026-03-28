@@ -5197,8 +5197,8 @@ Make logs realistic with real hostnames, IPs, usernames, paths, commands. Vary t
     if (!logs.length) return;
     if (!detections.length) { toast?.("No detections in library to test against", "error"); return; }
     setTesting(true); setResults(null);
-    const logSample = logs.map(l => `[${l.timestamp}] ${l.raw}`).join("\n");
-    const detSample = detections.slice(0,12).map(d => `ID:${d.id} | ${d.name} | ${d.queryType} | Query: ${d.query.slice(0,200)}`).join("\n---\n");
+    const logSample = logs.map(l => `[${l.timestamp}] ${l.raw}`).join("\n").slice(0,3000);
+    const detSample = detections.slice(0,10).map(d => `ID:${d.id} | ${d.name} | ${d.queryType} | Query: ${d.query.slice(0,120)}`).join("\n---\n");
     const prompt = `You are a detection validation expert. Given these adversary logs and detection rules, determine which rules would FIRE (true positive) vs MISS.
 
 ADVERSARY LOGS:

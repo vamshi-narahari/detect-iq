@@ -149,7 +149,7 @@ app.use(cors({
   allowedHeaders: ["Content-Type"],
 }));
 
-app.use(express.json({ limit: "50kb" }));
+app.use(express.json({ limit: "500kb" }));
 
 // ── Rate limiters (Redis-backed — persists across restarts, works multi-instance) ──
 const redisStore = (prefix) => new RedisStore({
