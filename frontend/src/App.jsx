@@ -2017,13 +2017,14 @@ function safeParseJSON(str){
 
 // Global async job poller — shared across all components
 async function pollJob(jobId, maxWaitMs=90000){
-  const interval=1500, start=Date.now();
+  const interval=1000, start=Date.now();
+  // Check immediately first, then poll
   while(Date.now()-start<maxWaitMs){
-    await new Promise(r=>setTimeout(r,interval));
     const r=await fetch(`/api/jobs/${jobId}`);
     const d=await r.json();
     if(d.status==="done") return d.result;
     if(d.status==="error") throw new Error(d.error||"Job failed");
+    await new Promise(r=>setTimeout(r,interval));
   }
   throw new Error("Request timed out — please try again.");
 }
