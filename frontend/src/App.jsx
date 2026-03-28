@@ -2003,6 +2003,18 @@ function inferTacticAndSeverity(text){
   return{tactic:bestTactic,severity:bestSev};
 }
 
+// Safe JSON parser — trims to last complete object if truncated
+function safeParseJSON(str){
+  try{return JSON.parse(str);}catch(e){
+    // Try to find the last complete closing brace
+    let last=str.lastIndexOf("}");
+    while(last>0){
+      try{return JSON.parse(str.slice(0,last+1));}catch(_){last=str.lastIndexOf("}",last-1);}
+    }
+    throw e;
+  }
+}
+
 // Global async job poller — shared across all components
 async function pollJob(jobId, maxWaitMs=90000){
   const interval=1500, start=Date.now();
@@ -2995,10 +3007,13 @@ function QueryTranslator({prefill}){
     try{
       if(mode==="score"){
         const res=await fetch("/api/detection/quality-score",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:"Query Analysis",query:inputQuery,queryType:fromTool.lang,tactic:"Unknown",severity:"Medium"})});
-        const data=await res.json(); if(data.error)throw new Error(data.error); setAnalyzeData(data);
+        const text=await res.text();
+        const m=text.match(/\{[\s\S]*\}/);
+        if(!m)throw new Error("No JSON in response");
+        const data=safeParseJSON(m[0]); if(data.error)throw new Error(data.error); setAnalyzeData(data);
       } else if(mode==="enrich"){
-        const txt=await callClaude([{role:"user",content:`Enrich this ${fromTool.lang} detection query.\n\nQuery:\n${inputQuery}\n\nReturn ONLY valid JSON:\n{"attack_path_summary":"...","next_tactics":["tactic1"],"adjacent_detections":[{"name":"...","why":"..."}],"high_value_targets":"...","quick_win":"...","gap_warning":"..."}`}],"Expert detection engineer. Return ONLY valid JSON.",1200);
-        const m=txt.match(/\{[\s\S]*\}/); if(m)setAnalyzeData(JSON.parse(m[0].replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,"").replace(/\\(?!["\\/bfnrtu])/g,"\\\\")));
+        const txt=await callClaude([{role:"user",content:`Enrich this ${fromTool.lang} detection query.\n\nQuery:\n${inputQuery.slice(0,500)}\n\nReturn ONLY valid JSON:\n{"attack_path_summary":"...","next_tactics":["tactic1","tactic2"],"adjacent_detections":[{"name":"...","why":"..."}],"high_value_targets":"...","quick_win":"...","gap_warning":"..."}`}],"Expert detection engineer. Return ONLY valid JSON, no markdown.",2000);
+        const m=txt.match(/\{[\s\S]*\}/); if(m)setAnalyzeData(safeParseJSON(m[0]));
       } else if(mode==="ml"){
         const res=await fetch("/api/detection/ml-enhance",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:"Query Analysis",query:inputQuery,queryType:fromTool.lang,tactic:"Unknown",severity:"Medium",threat:""})});
         const init=await res.json(); if(init.error)throw new Error(init.error);
