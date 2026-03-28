@@ -7117,6 +7117,47 @@ function DashboardHome({ detections, onNav, user }) {
   );
 }
 
+const CURATED_TTPS=[
+  {id:"T1059.001",name:"PowerShell",tactic:"Execution",priority:"Critical"},
+  {id:"T1059.003",name:"Windows Command Shell",tactic:"Execution",priority:"Critical"},
+  {id:"T1055",name:"Process Injection",tactic:"Defense Evasion",priority:"Critical"},
+  {id:"T1003.001",name:"LSASS Memory Dump",tactic:"Credential Access",priority:"Critical"},
+  {id:"T1190",name:"Exploit Public-Facing Application",tactic:"Initial Access",priority:"Critical"},
+  {id:"T1486",name:"Data Encrypted for Impact",tactic:"Impact",priority:"Critical"},
+  {id:"T1562.001",name:"Disable Security Tools",tactic:"Defense Evasion",priority:"High"},
+  {id:"T1078",name:"Valid Accounts",tactic:"Initial Access",priority:"High"},
+  {id:"T1047",name:"WMI Execution",tactic:"Execution",priority:"High"},
+  {id:"T1053.005",name:"Scheduled Task",tactic:"Persistence",priority:"High"},
+  {id:"T1021.001",name:"Remote Desktop Protocol",tactic:"Lateral Movement",priority:"High"},
+  {id:"T1071.001",name:"Web Protocols C2",tactic:"Command and Control",priority:"High"},
+  {id:"T1566.001",name:"Spearphishing Attachment",tactic:"Initial Access",priority:"High"},
+  {id:"T1548.002",name:"Bypass UAC",tactic:"Privilege Escalation",priority:"High"},
+  {id:"T1027",name:"Obfuscated Files",tactic:"Defense Evasion",priority:"High"},
+  {id:"T1136",name:"Create Account",tactic:"Persistence",priority:"High"},
+  {id:"T1110",name:"Brute Force",tactic:"Credential Access",priority:"Medium"},
+  {id:"T1018",name:"Remote System Discovery",tactic:"Discovery",priority:"Medium"},
+  {id:"T1070.004",name:"File Deletion",tactic:"Defense Evasion",priority:"Medium"},
+  {id:"T1105",name:"Ingress Tool Transfer",tactic:"Command and Control",priority:"Medium"},
+];
+const THREAT_ACTORS=[
+  {id:"apt29",name:"APT29 — Cozy Bear",origin:"Russia",focus:"Government, think tanks",top_ttps:["T1566.001","T1059.001","T1003.001","T1071.001","T1027"]},
+  {id:"apt41",name:"APT41 — Double Dragon",origin:"China",focus:"Espionage + Financial crime",top_ttps:["T1190","T1059.003","T1055","T1047","T1053.005"]},
+  {id:"apt28",name:"APT28 — Fancy Bear",origin:"Russia",focus:"Military, government",top_ttps:["T1566.001","T1059.001","T1078","T1071.001","T1562.001"]},
+  {id:"lazarus",name:"Lazarus Group",origin:"North Korea",focus:"Financial, crypto theft",top_ttps:["T1566.001","T1059.001","T1486","T1027","T1071.001"]},
+  {id:"volt_typhoon",name:"Volt Typhoon",origin:"China",focus:"Critical infrastructure",top_ttps:["T1190","T1078","T1562.001","T1021.001","T1071.001"]},
+  {id:"scattered_spider",name:"Scattered Spider",origin:"Cybercriminal",focus:"Social engineering, cloud",top_ttps:["T1078","T1059.001","T1003.001","T1562.001","T1486"]},
+  {id:"ta505",name:"TA505",origin:"Cybercriminal",focus:"Financial, ransomware delivery",top_ttps:["T1566.001","T1059.001","T1055","T1053.005","T1486"]},
+  {id:"fin7",name:"FIN7",origin:"Cybercriminal",focus:"Retail, hospitality, finance",top_ttps:["T1566.001","T1059.001","T1055","T1027","T1003.001"]},
+];
+const RANSOMWARE_GROUPS=[
+  {id:"lockbit3",name:"LockBit 3.0",active:true,ttps:["T1190","T1078","T1486","T1562.001","T1021.001","T1003.001"]},
+  {id:"blackcat",name:"BlackCat / ALPHV",active:true,ttps:["T1190","T1078","T1486","T1003.001","T1021.001"]},
+  {id:"clop",name:"Cl0p",active:true,ttps:["T1190","T1059.001","T1486","T1027","T1070.004"]},
+  {id:"akira",name:"Akira",active:true,ttps:["T1190","T1078","T1021.001","T1486","T1562.001"]},
+  {id:"blackbasta",name:"Black Basta",active:true,ttps:["T1566.001","T1059.001","T1486","T1003.001","T1021.001"]},
+  {id:"play",name:"Play Ransomware",active:true,ttps:["T1190","T1078","T1486","T1021.001","T1562.001"]},
+];
+
 function AutopilotTab({ user, detections, onSaveDetection, onNav }) {
   const toast = useToast();
   const SIEM_OPTIONS = ["splunk","sentinel","crowdstrike","elastic","logscale","qradar","chronicle","tanium","panther","sumo"];
@@ -7136,6 +7177,14 @@ function AutopilotTab({ user, detections, onSaveDetection, onNav }) {
   const [schedEmail, setSchedEmail] = useState(LS.get("autopilot_email_notify",true));
   const [schedTactics, setSchedTactics] = useState(LS.get("autopilot_tactics",[]));
   const ALL_TACTICS=["Reconnaissance","Resource Development","Initial Access","Execution","Persistence","Privilege Escalation","Defense Evasion","Credential Access","Discovery","Lateral Movement","Collection","Command and Control","Exfiltration","Impact"];
+  // Multi-source state
+  const [activeSource, setActiveSource] = useState("cve");
+  const [selectedTtps, setSelectedTtps] = useState([]);
+  const [ttpTacticFilter, setTtpTacticFilter] = useState("All");
+  const [selectedActor, setSelectedActor] = useState(null);
+  const [selectedRansomware, setSelectedRansomware] = useState([]);
+  const [draftFilter, setDraftFilter] = useState("all");
+  const draftKey = d => d.cve_id || d.draft_id || `${d.source_type}-${d.ttp_id}`;
 
   useEffect(() => {
     const saved = LS.get("autopilot_settings", null);
@@ -7199,203 +7248,304 @@ function AutopilotTab({ user, detections, onSaveDetection, onNav }) {
     if (!user) { setErr("Sign in to use Detection Autopilot."); return; }
     setRunning(true); setErr(""); setMsg("");
     try {
-      const res = await fetch("/api/autopilot/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lastKevIds, siemTool, userId: user.id })
-      });
+      const res = await fetch("/api/autopilot/run", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({lastKevIds,siemTool,userId:user.id}) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Run failed");
-      const now = new Date().toISOString();
-      setLastRun(now);
-      setNewCount(data.newCount);
-      if (data.allIds && data.allIds.length) {
-        setLastKevIds(data.allIds);
-        LS.set("autopilot_settings", { siemTool, lastKevIds: data.allIds, lastRun: now });
-      }
-      if (data.drafts && data.drafts.length > 0) {
-        const merged = [...data.drafts, ...drafts].slice(0, 20);
-        setDrafts(merged);
-        LS.set("autopilot_drafts", merged);
-        setMsg(data.drafts.length + " detection draft" + (data.drafts.length > 1 ? "s" : "") + " generated from " + data.newCount + " new KEV " + (data.newCount === 1 ? "entry" : "entries") + ".");
-      } else {
-        setMsg("No new KEV entries since last run. Coverage is up to date.");
-      }
+      const now = new Date().toISOString(); setLastRun(now); setNewCount(data.newCount);
+      if (data.allIds?.length) { setLastKevIds(data.allIds); LS.set("autopilot_settings",{siemTool,lastKevIds:data.allIds,lastRun:now}); }
+      if (data.drafts?.length > 0) {
+        const merged=[...data.drafts,...drafts].slice(0,30); setDrafts(merged); LS.set("autopilot_drafts",merged);
+        setMsg(data.drafts.length+" draft"+(data.drafts.length>1?"s":"")+" generated from "+data.newCount+" new KEV "+(data.newCount===1?"entry":"entries")+".");
+      } else { setMsg("No new KEV entries since last run. Coverage is up to date."); }
+    } catch(e) { setErr(e.message); }
+    setRunning(false);
+  }
+
+  async function runSourceAutopilot() {
+    if (!user) { setErr("Sign in to use Autopilot."); return; }
+    let items = [];
+    if (activeSource==="ttp") {
+      const selected = selectedTtps.length>0 ? CURATED_TTPS.filter(t=>selectedTtps.includes(t.id)) : CURATED_TTPS.filter(t=>t.priority==="Critical").slice(0,5);
+      items = selected.slice(0,5);
+      if (!items.length) { setErr("Select at least one technique."); return; }
+    } else if (activeSource==="actor") {
+      if (!selectedActor) { setErr("Select a threat actor first."); return; }
+      items = selectedActor.top_ttps.slice(0,5).map(ttpId=>{
+        const t=CURATED_TTPS.find(x=>x.id===ttpId)||{id:ttpId,name:ttpId,tactic:"Execution"};
+        return {ttp_id:ttpId,technique_name:t.name,tactic:t.tactic,actor_name:selectedActor.name};
+      });
+    } else if (activeSource==="ransomware") {
+      if (!selectedRansomware.length) { setErr("Select at least one ransomware group."); return; }
+      const grp = RANSOMWARE_GROUPS.find(g=>g.id===selectedRansomware[0]);
+      items = grp.ttps.slice(0,5).map(ttpId=>{
+        const t=CURATED_TTPS.find(x=>x.id===ttpId)||{id:ttpId,name:ttpId,tactic:"Execution"};
+        return {ttp_id:ttpId,technique_name:t.name,tactic:t.tactic,actor_name:grp.name};
+      });
+    }
+    setRunning(true); setErr(""); setMsg("");
+    try {
+      const res = await fetch("/api/autopilot/run-source",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sourceType:activeSource,items,siemTool,userId:user.id})});
+      const data = await res.json(); if(!res.ok) throw new Error(data.error||"Run failed");
+      if (data.drafts?.length>0) {
+        const merged=[...data.drafts,...drafts].slice(0,30); setDrafts(merged); LS.set("autopilot_drafts",merged);
+        setMsg(data.drafts.length+" detection draft"+(data.drafts.length>1?"s":"")+" generated.");
+      } else { setMsg("No drafts generated — try different selections."); }
     } catch(e) { setErr(e.message); }
     setRunning(false);
   }
 
   function approveDraft(draft) {
-    const det = {
-      id: uid(), name: draft.detection_name,
-      query: draft.detection_query, queryType: draft.siem_tool,
-      tool: draft.siem_tool, tactic: draft.detection_tactic,
-      severity: draft.detection_severity,
-      threat: draft.detection_summary || draft.vulnerability_name,
-      description: draft.detection_summary || draft.vulnerability_name,
-      tags: [draft.cve_id, draft.detection_tactic, "autopilot"],
-      score: 0, created: new Date().toISOString()
-    };
+    const k = draftKey(draft);
+    const tags = [draft.cve_id||draft.ttp_id, draft.detection_tactic, "autopilot", draft.source_type||"cve", draft.actor_name].filter(Boolean);
+    const det = { id:uid(), name:draft.detection_name, query:draft.detection_query, queryType:draft.siem_tool, tool:draft.siem_tool, tactic:draft.detection_tactic, severity:draft.detection_severity, threat:draft.detection_summary||draft.vulnerability_name||"", description:draft.detection_summary||"", tags, score:0, created:new Date().toISOString() };
     onSaveDetection(det);
-    setSavedDrafts(p => ({ ...p, [draft.cve_id]: true }));
-    setMsg("Saved to library: " + draft.detection_name);
-    toast?.("Saved to library: " + draft.detection_name, "success");
+    setSavedDrafts(p=>({...p,[k]:true}));
+    setMsg("Saved to library: "+draft.detection_name);
+    toast?.("Saved to library: "+draft.detection_name,"success");
   }
 
-  const visibleDrafts = drafts.filter(d => !dismissedDrafts[d.cve_id]);
-  const sevColor2 = { Critical: THEME.danger, High: THEME.orange, Medium: THEME.warning, Low: THEME.success };
+  const SOURCE_LABELS = {cve:"🔴 CVEs",ttp:"🎯 ATT&CK TTPs",actor:"👥 Threat Actors",ransomware:"🦠 Ransomware"};
+  const SOURCE_COLORS = {cve:THEME.danger,ttp:THEME.accent,actor:THEME.purple,ransomware:THEME.warning};
+  const visibleDrafts = drafts.filter(d=>!dismissedDrafts[draftKey(d)] && (draftFilter==="all"||(d.source_type||"cve")===draftFilter));
+  const sevColor2 = { Critical:THEME.danger, High:THEME.orange, Medium:THEME.warning, Low:THEME.success };
 
   return (
     <div>
       <SectionHeader icon="🤖" title="Detection Autopilot" color={THEME.accent}>
-        <div style={{fontSize:12,color:THEME.textMid,marginBottom:20,lineHeight:1.7}}>
-          Autopilot watches the CISA KEV feed and automatically drafts detections for new vulnerabilities. Review and approve drafts before they go to your library.
-        </div>
+        <span style={S.badge(THEME.accent)}>Multi-source</span>
+        <span style={{fontSize:11,color:THEME.textDim}}>Auto-draft detections from CVEs, TTPs, Threat Actors & Ransomware</span>
       </SectionHeader>
       <HelpBox title="Detection Autopilot Quick Reference" color={THEME.accent} items={[
-        {icon:"🤖",title:"What it does",desc:"Monitors the CISA Known Exploited Vulnerabilities feed and automatically generates draft detection rules whenever a new CVE is added. You review and approve before anything goes live."},
-        {icon:"✅",title:"Review & approve",desc:"Drafts appear in the queue below. Each one shows the CVE, affected platforms, and the generated rule. Approve to add to your library, or edit before approving."},
-        {icon:"⚙️",title:"Platform targeting",desc:"Set your primary SIEM platform in Settings so Autopilot generates rules in the right query language for your environment."},
-        {icon:"💡",title:"Tip",desc:"Autopilot drafts are a starting point — always review the generated logic before approving, especially for complex CVEs with unusual exploitation patterns."},
+        {icon:"🔴",title:"CVEs (CISA KEV)",desc:"Watches the CISA Known Exploited Vulnerabilities feed and drafts detections for each new entry automatically."},
+        {icon:"🎯",title:"ATT&CK TTPs",desc:"Select specific MITRE ATT&CK techniques and generate ready-to-deploy detections for each one in your target SIEM."},
+        {icon:"👥",title:"Threat Actors",desc:"Pick an APT group or cybercriminal group — Autopilot drafts detections for their top 5 known TTPs."},
+        {icon:"🦠",title:"Ransomware",desc:"Select active ransomware groups (LockBit, BlackCat, etc.) and get detections for their signature attack patterns."},
       ]}/>
 
-      <div style={{...S.card,borderColor:enabled?THEME.accent+"33":THEME.border}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:16}}>
-          <div style={{display:"flex",alignItems:"center",gap:16}}>
-            <div style={{width:52,height:28,borderRadius:14,background:enabled?"rgba(0,212,255,0.2)":THEME.border,border:"1px solid "+(enabled?THEME.accent:THEME.border),cursor:saving?"not-allowed":"pointer",position:"relative",transition:"all 0.25s",flexShrink:0}} onClick={()=>!saving&&toggleEnabled(!enabled)}><div style={{position:"absolute",top:4,left:enabled?26:4,width:18,height:18,borderRadius:"50%",background:enabled?THEME.accent:THEME.textDim,transition:"all 0.25s",boxShadow:enabled?"0 0 8px rgba(0,212,255,0.6)":"none"}}/></div>
+      {/* Global settings bar */}
+      <div style={{...S.card,borderColor:enabled?THEME.accent+"33":THEME.border,marginBottom:12}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
+          <div style={{display:"flex",alignItems:"center",gap:14}}>
+            <div style={{width:48,height:26,borderRadius:13,background:enabled?"rgba(0,212,255,0.2)":THEME.border,border:"1px solid "+(enabled?THEME.accent:THEME.border),cursor:saving?"not-allowed":"pointer",position:"relative",transition:"all 0.25s",flexShrink:0}} onClick={()=>!saving&&toggleEnabled(!enabled)}>
+              <div style={{position:"absolute",top:3,left:enabled?24:3,width:18,height:18,borderRadius:"50%",background:enabled?THEME.accent:THEME.textDim,transition:"all 0.25s",boxShadow:enabled?"0 0 8px rgba(0,212,255,0.6)":"none"}}/>
+            </div>
             <div>
-              <div style={{fontSize:14,fontWeight:700,color:enabled?THEME.accent:THEME.text}}>Autopilot {enabled?"Enabled":"Disabled"} {saving&&<span style={{fontSize:11,color:THEME.textDim}}>(saving...)</span>}</div>
-              <div style={{fontSize:11,color:THEME.textDim,marginTop:2,fontFamily:"'JetBrains Mono',monospace"}}>{enabled?"Scans KEV every 3 days and auto-drafts detections":"Toggle to enable background KEV scanning"}</div>
-              <div style={{fontSize:10,color:THEME.textDim,marginTop:2,fontFamily:"'JetBrains Mono',monospace"}}>{lastRun ? "Last run: " + new Date(lastRun).toLocaleString() : "Never run"}</div>
+              <div style={{fontSize:13,fontWeight:700,color:enabled?THEME.accent:THEME.text}}>Autopilot {enabled?"Enabled":"Disabled"}{saving&&<span style={{fontSize:10,color:THEME.textDim,marginLeft:6}}>(saving...)</span>}</div>
+              <div style={{fontSize:10,color:THEME.textDim,marginTop:1}}>{lastRun?"Last run: "+new Date(lastRun).toLocaleString():"Never run"}</div>
             </div>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-            <div>
-              <label style={S.label}>Target SIEM</label>
-              <select style={{...S.input,width:140,padding:"7px 10px"}} value={siemTool}
-                onChange={e => setSiemTool(e.target.value)}>
-                {SIEM_OPTIONS.map(s => <option key={s} value={s}>{s.toUpperCase()}</option>)}
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <div><label style={S.label}>Target SIEM</label>
+              <select style={{...S.input,width:130,padding:"6px 10px"}} value={siemTool} onChange={e=>setSiemTool(e.target.value)}>
+                {SIEM_OPTIONS.map(s=><option key={s} value={s}>{s.toUpperCase()}</option>)}
               </select>
             </div>
-            <div style={{paddingTop:18}}>
-              <button style={{...S.btn("p"),padding:"9px 22px",fontSize:13,opacity:running?0.6:1}}
-                onClick={runAutopilot} disabled={running}>
-                {running ? <><Spinner/>Scanning KEV...</> : "▶ Run Now"}
-              </button>
-            </div>
           </div>
         </div>
       </div>
 
-      {err && <StatusBar msg={err} type="error"/>}
-      {msg && <StatusBar msg={msg} type="success"/>}
+      {err&&<StatusBar msg={err} type="error"/>}
+      {msg&&<StatusBar msg={msg} type="success"/>}
 
-      {/* Schedule Configuration */}
+      {/* Source selector tabs */}
+      <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
+        {Object.entries(SOURCE_LABELS).map(([src,lbl])=>{
+          const col=SOURCE_COLORS[src];
+          const on=activeSource===src;
+          return(
+            <button key={src} onClick={()=>setActiveSource(src)}
+              style={{padding:"8px 18px",borderRadius:8,border:"1px solid "+(on?col+"88":"transparent"),background:on?"rgba(0,0,0,0.2)":"rgba(255,255,255,0.02)",color:on?col:THEME.textDim,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:on?700:400,transition:"all 0.15s"}}>
+              {lbl}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Source-specific config */}
       <div style={S.card}>
-        <div style={{...S.cardTitle,marginBottom:14}}><span>🗓</span> Schedule & Filters</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+        {/* CVE source */}
+        {activeSource==="cve"&&(
           <div>
-            <label style={S.label}>Scan Frequency</label>
-            <select style={{...S.input,cursor:"pointer"}} value={schedFreq} onChange={e=>{setSchedFreq(e.target.value);LS.set("autopilot_freq",e.target.value);}}>
-              <option value="1d">Daily</option>
-              <option value="3d">Every 3 Days</option>
-              <option value="7d">Weekly</option>
-              <option value="manual">Manual Only</option>
-            </select>
-            <div style={{fontSize:10,color:THEME.textDim,marginTop:4}}>How often Autopilot checks the CISA KEV feed in the background.</div>
-          </div>
-          <div>
-            <label style={S.label}>Email Notifications</label>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginTop:6}}>
-              <div style={{width:44,height:24,borderRadius:12,background:schedEmail?"rgba(0,212,255,0.2)":THEME.border,border:"1px solid "+(schedEmail?THEME.accent:THEME.border),cursor:"pointer",position:"relative",transition:"all 0.2s"}}
-                onClick={()=>{setSchedEmail(!schedEmail);LS.set("autopilot_email_notify",!schedEmail);}}>
-                <div style={{position:"absolute",top:3,left:schedEmail?22:3,width:16,height:16,borderRadius:"50%",background:schedEmail?THEME.accent:THEME.textDim,transition:"all 0.2s"}}/>
+            <div style={{fontSize:11,fontWeight:700,color:THEME.danger,letterSpacing:"0.08em",marginBottom:12}}>🔴 CISA KNOWN EXPLOITED VULNERABILITIES</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
+              <div><label style={S.label}>Scan Frequency</label>
+                <select style={S.input} value={schedFreq} onChange={e=>{setSchedFreq(e.target.value);LS.set("autopilot_freq",e.target.value);}}>
+                  <option value="1d">Daily</option><option value="3d">Every 3 Days</option>
+                  <option value="7d">Weekly</option><option value="manual">Manual Only</option>
+                </select>
               </div>
-              <span style={{fontSize:12,color:schedEmail?THEME.text:THEME.textDim}}>{schedEmail?"Email me when new drafts are ready":"Notifications off"}</span>
+              <div><label style={S.label}>Email Notifications</label>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginTop:6}}>
+                  <div style={{width:40,height:22,borderRadius:11,background:schedEmail?"rgba(0,212,255,0.2)":THEME.border,border:"1px solid "+(schedEmail?THEME.accent:THEME.border),cursor:"pointer",position:"relative",transition:"all 0.2s"}} onClick={()=>{setSchedEmail(!schedEmail);LS.set("autopilot_email_notify",!schedEmail);}}>
+                    <div style={{position:"absolute",top:2,left:schedEmail?19:2,width:16,height:16,borderRadius:"50%",background:schedEmail?THEME.accent:THEME.textDim,transition:"all 0.2s"}}/>
+                  </div>
+                  <span style={{fontSize:11,color:schedEmail?THEME.text:THEME.textDim}}>{schedEmail?"Notify on new drafts":"Off"}</span>
+                </div>
+              </div>
             </div>
+            <div style={{marginBottom:14}}>
+              <label style={S.label}>Tactic Filter <span style={{color:THEME.textDim,fontSize:10,fontWeight:400}}>(empty = all)</span></label>
+              <div style={{display:"flex",flexWrap:"wrap",gap:5,marginTop:6}}>
+                {["Reconnaissance","Initial Access","Execution","Persistence","Privilege Escalation","Defense Evasion","Credential Access","Discovery","Lateral Movement","Collection","Command and Control","Exfiltration","Impact"].map(t=>{
+                  const on=schedTactics.includes(t);
+                  return <span key={t} onClick={()=>{const n=on?schedTactics.filter(x=>x!==t):[...schedTactics,t];setSchedTactics(n);LS.set("autopilot_tactics",n);}} style={{padding:"3px 9px",borderRadius:5,fontSize:10,cursor:"pointer",fontWeight:600,background:on?"rgba(0,212,255,0.12)":"transparent",border:"1px solid "+(on?THEME.accent:THEME.border),color:on?THEME.accent:THEME.textDim}}>{t}</span>;
+                })}
+              </div>
+            </div>
+            <button style={{...S.btn("p"),padding:"9px 24px",fontSize:13,width:"100%"}} onClick={runAutopilot} disabled={running}>
+              {running?<><Spinner/>Scanning KEV...</>:"🔴 Scan KEV Feed Now"}
+            </button>
           </div>
-        </div>
-        <div>
-          <label style={S.label}>Tactic Filter <span style={{color:THEME.textDim,fontSize:10,fontWeight:400}}>(leave empty = all tactics)</span></label>
-          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:6}}>
-            {ALL_TACTICS.map(t=>{
-              const on=schedTactics.includes(t);
-              return(
-                <span key={t} onClick={()=>{const n=on?schedTactics.filter(x=>x!==t):[...schedTactics,t];setSchedTactics(n);LS.set("autopilot_tactics",n);}}
-                  style={{padding:"3px 10px",borderRadius:5,fontSize:10,cursor:"pointer",fontWeight:600,transition:"all 0.15s",
-                    background:on?"rgba(0,212,255,0.12)":"transparent",
-                    border:"1px solid "+(on?THEME.accent:THEME.border),
-                    color:on?THEME.accent:THEME.textDim}}>
-                  {t}
-                </span>
-              );
-            })}
+        )}
+
+        {/* TTP source */}
+        {activeSource==="ttp"&&(
+          <div>
+            <div style={{fontSize:11,fontWeight:700,color:THEME.accent,letterSpacing:"0.08em",marginBottom:12}}>🎯 MITRE ATT&CK TECHNIQUES — select up to 5 to generate detections</div>
+            <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>
+              {["All","Execution","Persistence","Defense Evasion","Credential Access","Initial Access","Lateral Movement","Command and Control","Impact"].map(t=>(
+                <button key={t} onClick={()=>setTtpTacticFilter(t)} style={{padding:"3px 10px",borderRadius:5,fontSize:10,cursor:"pointer",fontFamily:"inherit",border:"1px solid "+(ttpTacticFilter===t?THEME.accent:THEME.border),background:ttpTacticFilter===t?"rgba(0,212,255,0.1)":"transparent",color:ttpTacticFilter===t?THEME.accent:THEME.textDim,fontWeight:ttpTacticFilter===t?700:400}}>{t}</button>
+              ))}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:14,maxHeight:240,overflow:"auto"}}>
+              {CURATED_TTPS.filter(t=>ttpTacticFilter==="All"||t.tactic===ttpTacticFilter).map(t=>{
+                const on=selectedTtps.includes(t.id);
+                return(
+                  <div key={t.id} onClick={()=>setSelectedTtps(p=>on?p.filter(x=>x!==t.id):p.length<5?[...p,t.id]:p)}
+                    style={{display:"flex",gap:8,alignItems:"center",padding:"8px 10px",borderRadius:7,border:"1px solid "+(on?THEME.accent+"88":THEME.border),background:on?"rgba(0,212,255,0.06)":"rgba(255,255,255,0.01)",cursor:"pointer",opacity:!on&&selectedTtps.length>=5?0.4:1}}>
+                    <div style={{width:14,height:14,borderRadius:3,border:"1px solid "+(on?THEME.accent:THEME.border),background:on?THEME.accent:"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      {on&&<span style={{fontSize:9,color:"#000",fontWeight:800}}>✓</span>}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:11,fontWeight:on?600:400,color:on?THEME.text:THEME.textMid,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.id} — {t.name}</div>
+                      <div style={{fontSize:9,color:THEME.textDim}}>{t.tactic} · <span style={{color:t.priority==="Critical"?THEME.danger:t.priority==="High"?THEME.warning:THEME.textDim}}>{t.priority}</span></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <span style={{fontSize:11,color:THEME.textDim}}>{selectedTtps.length}/5 selected{selectedTtps.length===0?" — will use top Critical techniques":""}</span>
+              {selectedTtps.length>0&&<button style={{...S.btn(),fontSize:10,padding:"3px 10px"}} onClick={()=>setSelectedTtps([])}>Clear</button>}
+            </div>
+            <button style={{...S.btn("p"),padding:"9px 24px",fontSize:13,width:"100%"}} onClick={runSourceAutopilot} disabled={running}>
+              {running?<><Spinner/>Generating...</>:`🎯 Generate Detections for ${selectedTtps.length||"Top 5 Critical"} TTP${selectedTtps.length!==1?"s":""}`}
+            </button>
           </div>
-          {schedTactics.length>0&&<div style={{fontSize:10,color:THEME.accent,marginTop:6}}>Filtering to {schedTactics.length} tactic{schedTactics.length>1?"s":""}: {schedTactics.join(", ")}</div>}
-        </div>
+        )}
+
+        {/* Threat Actor source */}
+        {activeSource==="actor"&&(
+          <div>
+            <div style={{fontSize:11,fontWeight:700,color:THEME.purple,letterSpacing:"0.08em",marginBottom:12}}>👥 THREAT ACTOR — select a group to generate detections for their top TTPs</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
+              {THREAT_ACTORS.map(actor=>{
+                const on=selectedActor?.id===actor.id;
+                return(
+                  <div key={actor.id} onClick={()=>setSelectedActor(on?null:actor)}
+                    style={{padding:"11px 14px",borderRadius:8,border:"1px solid "+(on?THEME.purple+"88":THEME.border),background:on?"rgba(124,85,255,0.08)":"rgba(255,255,255,0.01)",cursor:"pointer",transition:"all 0.15s"}}>
+                    <div style={{fontSize:12,fontWeight:700,color:on?THEME.purple:THEME.text,marginBottom:3}}>{actor.name}</div>
+                    <div style={{fontSize:10,color:THEME.textDim,marginBottom:4}}>{actor.origin} · {actor.focus}</div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
+                      {actor.top_ttps.map(t=><span key={t} style={{fontSize:9,padding:"1px 6px",borderRadius:3,background:"rgba(255,255,255,0.04)",border:"1px solid "+THEME.border,color:THEME.textDim}}>{t}</span>)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {selectedActor&&<div style={{marginBottom:12,padding:"10px 14px",background:"rgba(124,85,255,0.06)",border:"1px solid "+THEME.purple+"44",borderRadius:8,fontSize:11,color:THEME.textMid}}>Will generate detections for: {selectedActor.top_ttps.map(id=>{const t=CURATED_TTPS.find(x=>x.id===id);return t?t.name:id;}).join(", ")}</div>}
+            <button style={{...S.btn("p"),padding:"9px 24px",fontSize:13,width:"100%"}} onClick={runSourceAutopilot} disabled={running||!selectedActor}>
+              {running?<><Spinner/>Generating...</>:selectedActor?`👥 Generate Detections for ${selectedActor.name}`:"Select an actor above"}
+            </button>
+          </div>
+        )}
+
+        {/* Ransomware source */}
+        {activeSource==="ransomware"&&(
+          <div>
+            <div style={{fontSize:11,fontWeight:700,color:THEME.warning,letterSpacing:"0.08em",marginBottom:12}}>🦠 RANSOMWARE GROUP — generate detections for active ransomware TTPs</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
+              {RANSOMWARE_GROUPS.map(grp=>{
+                const on=selectedRansomware.includes(grp.id);
+                return(
+                  <div key={grp.id} onClick={()=>setSelectedRansomware(p=>on?p.filter(x=>x!==grp.id):[grp.id])}
+                    style={{padding:"11px 14px",borderRadius:8,border:"1px solid "+(on?THEME.warning+"88":THEME.border),background:on?"rgba(255,170,0,0.08)":"rgba(255,255,255,0.01)",cursor:"pointer",transition:"all 0.15s"}}>
+                    <div style={{fontSize:12,fontWeight:700,color:on?THEME.warning:THEME.text,marginBottom:3}}>{grp.name}</div>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                      <div style={{width:6,height:6,borderRadius:"50%",background:grp.active?THEME.danger:THEME.textDim}}/>
+                      <span style={{fontSize:9,color:grp.active?THEME.danger:THEME.textDim}}>{grp.active?"Active":"Inactive"}</span>
+                    </div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
+                      {grp.ttps.slice(0,4).map(t=><span key={t} style={{fontSize:9,padding:"1px 5px",borderRadius:3,background:"rgba(255,255,255,0.04)",border:"1px solid "+THEME.border,color:THEME.textDim}}>{t}</span>)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {selectedRansomware.length>0&&(()=>{const grp=RANSOMWARE_GROUPS.find(g=>g.id===selectedRansomware[0]);return grp&&<div style={{marginBottom:12,padding:"10px 14px",background:"rgba(255,170,0,0.06)",border:"1px solid "+THEME.warning+"44",borderRadius:8,fontSize:11,color:THEME.textMid}}>Will generate detections for {grp.name}: {grp.ttps.slice(0,5).map(id=>{const t=CURATED_TTPS.find(x=>x.id===id);return t?t.name:id;}).join(", ")}</div>;})()}
+            <button style={{...S.btn("p"),padding:"9px 24px",fontSize:13,width:"100%"}} onClick={runSourceAutopilot} disabled={running||!selectedRansomware.length}>
+              {running?<><Spinner/>Generating...</>:selectedRansomware.length?`🦠 Generate Detections for ${RANSOMWARE_GROUPS.find(g=>g.id===selectedRansomware[0])?.name||"Group"}`:"Select a group above"}
+            </button>
+          </div>
+        )}
       </div>
 
-      {lastRun && (
-        <div style={{...S.grid4,marginBottom:16}}>
-          {[
-            {label:"Drafts Pending", value: visibleDrafts.filter(d=>!savedDrafts[d.cve_id]).length, color:THEME.warning, icon:"📋"},
-            {label:"Approved", value: Object.keys(savedDrafts).length, color:THEME.success, icon:"✅"},
-            {label:"Dismissed", value: Object.keys(dismissedDrafts).length, color:THEME.textDim, icon:"🗑"},
-            {label:"New CVEs Found", value: newCount||0, color:THEME.danger, icon:"🔴"},
-          ].map(s => (
-            <div key={s.label} style={{...S.card,marginBottom:0,padding:"14px 18px",borderColor:s.color+"22"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                <div style={{fontSize:10,color:THEME.textDim,fontFamily:"'JetBrains Mono',monospace"}}>{s.label}</div>
-                <span>{s.icon}</span>
-              </div>
-              <div style={{fontSize:28,fontWeight:900,color:s.color}}>{s.value}</div>
-            </div>
+      {/* Draft queue */}
+      <div style={{marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+        <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+          {[["all","All"],["cve","🔴 CVEs"],["ttp","🎯 TTPs"],["actor","👥 Actors"],["ransomware","🦠 Ransomware"]].map(([f,lbl])=>(
+            <button key={f} onClick={()=>setDraftFilter(f)} style={{padding:"4px 10px",borderRadius:5,fontSize:10,cursor:"pointer",fontFamily:"inherit",border:"1px solid "+(draftFilter===f?THEME.accent:THEME.border),background:draftFilter===f?"rgba(0,212,255,0.08)":"transparent",color:draftFilter===f?THEME.accent:THEME.textDim,fontWeight:draftFilter===f?700:400}}>{lbl}</button>
           ))}
         </div>
-      )}
-
-      {visibleDrafts.length === 0 ? (
-        <div style={{...S.card,textAlign:"center",padding:"48px 20px"}}>
-          <div style={{fontSize:48,marginBottom:16}}>🤖</div>
-          <div style={{fontSize:16,fontWeight:700,color:THEME.text,marginBottom:8}}>No drafts yet</div>
-          <div style={{fontSize:13,color:THEME.textDim,marginBottom:24}}>
-            Click Run Now to scan the CISA KEV feed and auto-generate detection drafts for new vulnerabilities.
-          </div>
-          <button style={{...S.btn("p"),padding:"10px 24px",fontSize:13}} onClick={runAutopilot} disabled={running}>
-            {running ? <><Spinner/>Scanning...</> : "▶ Run First Scan"}
-          </button>
+        <div style={{display:"flex",gap:8}}>
+          {[{l:"📋 Pending",v:drafts.filter(d=>!savedDrafts[draftKey(d)]&&!dismissedDrafts[draftKey(d)]).length,c:THEME.warning},
+            {l:"✅ Approved",v:Object.keys(savedDrafts).length,c:THEME.success},
+            {l:"🗑 Dismissed",v:Object.keys(dismissedDrafts).length,c:THEME.textDim}].map(s=>(
+            <div key={s.l} style={{padding:"4px 12px",borderRadius:6,background:"rgba(255,255,255,0.02)",border:"1px solid "+THEME.border,fontSize:11,color:s.c}}><b>{s.v}</b> {s.l}</div>
+          ))}
         </div>
-      ) : (
+      </div>
+
+      {visibleDrafts.length===0?(
+        <div style={{...S.card,textAlign:"center",padding:"40px 20px"}}>
+          <div style={{fontSize:40,marginBottom:12}}>🤖</div>
+          <div style={{fontSize:15,fontWeight:700,color:THEME.text,marginBottom:6}}>No drafts yet</div>
+          <div style={{fontSize:12,color:THEME.textDim,marginBottom:16}}>Select a source above and run Autopilot to generate detection drafts.</div>
+        </div>
+      ):(
         <div>
-          <div style={{fontSize:12,fontWeight:700,color:THEME.textMid,marginBottom:12,fontFamily:"'JetBrains Mono',monospace"}}>
-            {visibleDrafts.filter(d=>!savedDrafts[d.cve_id]).length} draft{visibleDrafts.filter(d=>!savedDrafts[d.cve_id]).length!==1?"s":""} awaiting review
-          </div>
-          {visibleDrafts.map((draft,i) => {
-            const isApproved = savedDrafts[draft.cve_id];
-            return (
-              <div key={draft.cve_id+i} style={{...S.card,borderColor:isApproved?THEME.success+"33":THEME.border}}>
+          {visibleDrafts.map((draft,i)=>{
+            const k=draftKey(draft); const isApproved=savedDrafts[k];
+            const src=draft.source_type||"cve"; const srcCol=SOURCE_COLORS[src]||THEME.danger;
+            return(
+              <div key={k+i} style={{...S.card,borderColor:isApproved?THEME.success+"33":THEME.border}}>
                 <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
                   <div style={{flex:1,minWidth:200}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:8}}>
-                      <span style={{...S.badge(THEME.danger),fontSize:9}}>{draft.cve_id}</span>
+                    <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap",marginBottom:8}}>
+                      <span style={{...S.badge(srcCol),fontSize:9}}>{SOURCE_LABELS[src]||"CVE"}</span>
+                      {draft.cve_id&&<span style={{...S.badge(THEME.danger),fontSize:9}}>{draft.cve_id}</span>}
+                      {draft.ttp_id&&<span style={{...S.badge(THEME.accent),fontSize:9}}>{draft.ttp_id}</span>}
+                      {draft.actor_name&&<span style={{...S.badge(THEME.purple),fontSize:9}}>{draft.actor_name}</span>}
                       <span style={{...S.badge(sevColor2[draft.detection_severity]||THEME.textDim),fontSize:9}}>{draft.detection_severity}</span>
-                      <span style={{...S.badge(THEME.purple),fontSize:9}}>{draft.detection_tactic}</span>
+                      <span style={{...S.badge(THEME.textDim),fontSize:9}}>{draft.detection_tactic}</span>
                       <span style={{...S.badge(THEME.accent),fontSize:9}}>{(draft.siem_tool||"").toUpperCase()}</span>
-                      {isApproved && <span style={{...S.badge(THEME.success),fontSize:9}}>Saved</span>}
+                      {isApproved&&<span style={{...S.badge(THEME.success),fontSize:9}}>✓ Saved</span>}
                     </div>
                     <div style={{fontSize:14,fontWeight:700,color:THEME.text,marginBottom:4}}>{draft.detection_name}</div>
-                    <div style={{fontSize:11,color:THEME.textDim,marginBottom:6}}>{draft.vendor_project}</div>
-                    <div style={{fontSize:12,color:THEME.textMid,marginBottom:10,lineHeight:1.6}}>{draft.vulnerability_name}</div>
-                    <div style={{...S.code,fontSize:11,maxHeight:120,overflow:"auto"}}>{draft.detection_query}</div>
-                    {draft.date_added && <div style={{fontSize:10,color:THEME.textDim,marginTop:8,fontFamily:"'JetBrains Mono',monospace"}}>KEV added: {draft.date_added}</div>}
+                    {draft.vendor_project&&<div style={{fontSize:11,color:THEME.textDim,marginBottom:4}}>{draft.vendor_project}</div>}
+                    {(draft.vulnerability_name||draft.technique_name)&&<div style={{fontSize:12,color:THEME.textMid,marginBottom:8,lineHeight:1.6}}>{draft.vulnerability_name||draft.technique_name}</div>}
+                    <div style={{fontSize:11,color:THEME.textMid,marginBottom:8,lineHeight:1.6}}>{draft.detection_summary}</div>
+                    {draft.key_indicators?.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>{draft.key_indicators.map((ki,ii)=><span key={ii} style={{fontSize:9,padding:"2px 7px",borderRadius:4,background:"rgba(0,212,255,0.06)",border:"1px solid "+THEME.borderBright,color:THEME.textMid}}>{ki}</span>)}</div>}
+                    <div style={{...S.code,fontSize:11,maxHeight:110,overflow:"auto"}}>{draft.detection_query}</div>
+                    {draft.date_added&&<div style={{fontSize:10,color:THEME.textDim,marginTop:6,fontFamily:"'JetBrains Mono',monospace"}}>KEV added: {draft.date_added}</div>}
                   </div>
-                  <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0}}>
-                    {!isApproved ? (
+                  <div style={{display:"flex",flexDirection:"column",gap:7,flexShrink:0}}>
+                    {!isApproved?(
                       <>
-                        <button style={{...S.btn("s"),padding:"7px 16px",fontSize:12}} onClick={()=>approveDraft(draft)}>Approve</button>
-                        <button style={{...S.btn("d"),padding:"7px 16px",fontSize:12}} onClick={()=>setDismissedDrafts(p=>({...p,[draft.cve_id]:true}))}>Dismiss</button>
+                        <button style={{...S.btn("s"),padding:"7px 16px",fontSize:12}} onClick={()=>approveDraft(draft)}>✅ Approve</button>
+                        <button style={{...S.btn("d"),padding:"7px 16px",fontSize:12}} onClick={()=>setDismissedDrafts(p=>({...p,[k]:true}))}>Dismiss</button>
                       </>
-                    ) : (
+                    ):(
                       <button style={{...S.btn(),padding:"7px 16px",fontSize:12}} onClick={()=>onNav("library")}>View in Library</button>
                     )}
                   </div>
@@ -7405,26 +7555,6 @@ function AutopilotTab({ user, detections, onSaveDetection, onNav }) {
           })}
         </div>
       )}
-
-      <div style={{...S.card,marginTop:8,background:"rgba(0,212,255,0.03)",borderColor:THEME.accent+"18"}}>
-        <div style={{...S.cardTitle,marginBottom:12}}><span>i</span> How Autopilot Works</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-          {[
-            {n:"1",t:"Scans CISA KEV",d:"Fetches the live Known Exploited Vulnerabilities feed and finds new entries since your last run.",c:THEME.accent},
-            {n:"2",t:"Drafts Detections",d:"For each new CVE, generates a detection query tuned to your chosen SIEM platform.",c:THEME.purple},
-            {n:"3",t:"Queues for Review",d:"Drafts appear here for review. Approve, or dismiss each one before it hits your library.",c:THEME.warning},
-            {n:"4",t:"Saves to Library",d:"Approved detections go to your Detection Library tagged with the CVE ID and autopilot badge.",c:THEME.success},
-          ].map(s => (
-            <div key={s.n} style={{display:"flex",gap:12,alignItems:"flex-start"}}>
-              <div style={{width:24,height:24,borderRadius:"50%",background:s.c+"18",border:"1px solid "+s.c+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:s.c,flexShrink:0}}>{s.n}</div>
-              <div>
-                <div style={{fontSize:12,fontWeight:700,color:THEME.text,marginBottom:3}}>{s.t}</div>
-                <div style={{fontSize:11,color:THEME.textDim,lineHeight:1.6}}>{s.d}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

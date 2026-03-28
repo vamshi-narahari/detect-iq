@@ -494,6 +494,68 @@ Respond ONLY with valid JSON, no markdown, no explanation:
   }
 });
 
+// ── /api/autopilot/run-source — TTP / Actor / Ransomware ─────────────────────
+app.post("/api/autopilot/run-source", claudeLimiter, express.json(), async (req, res) => {
+  const { sourceType, items, siemTool = "splunk", userId } = req.body;
+  if (!userId) return res.status(400).json({ error: "userId required." });
+  if (!items || items.length === 0) return res.status(400).json({ error: "No items provided." });
+  const drafts = [];
+  for (const item of items.slice(0, 5)) {
+    let prompt;
+    if (sourceType === "ttp") {
+      prompt = `You are a detection engineer. Generate a ${siemTool.toUpperCase()} detection for MITRE ATT&CK.
+
+Technique: ${item.id} — ${item.name}
+Tactic: ${item.tactic}
+
+Return ONLY valid JSON:
+{
+  "detection_name": "short descriptive rule name",
+  "detection_query": "complete ${siemTool.toUpperCase()} query ready to deploy",
+  "detection_tactic": "${item.tactic}",
+  "detection_severity": "Critical|High|Medium|Low",
+  "detection_summary": "one sentence explaining what this detects",
+  "key_indicators": ["indicator1","indicator2","indicator3"]
+}`;
+    } else {
+      prompt = `You are a detection engineer. Generate a ${siemTool.toUpperCase()} detection for threat actor activity.
+
+Threat Actor / Group: ${item.actor_name}
+Technique: ${item.ttp_id} — ${item.technique_name}
+Tactic: ${item.tactic}
+Source type: ${sourceType}
+
+Return ONLY valid JSON:
+{
+  "detection_name": "short rule name referencing the actor/technique",
+  "detection_query": "complete ${siemTool.toUpperCase()} query ready to deploy",
+  "detection_tactic": "${item.tactic}",
+  "detection_severity": "Critical",
+  "detection_summary": "one sentence explaining what this detects for this specific threat actor",
+  "key_indicators": ["indicator1","indicator2","indicator3"]
+}`;
+    }
+    try {
+      const resp = await bedrock.send(new InvokeModelCommand({ modelId: SONNET, contentType:"application/json", accept:"application/json",
+        body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:1500, system:"Expert detection engineer. Return ONLY valid JSON.", messages:[{role:"user",content:prompt}] }) }));
+      const text = JSON.parse(new TextDecoder().decode(resp.body)).content[0].text;
+      let parsed;
+      try { parsed = JSON.parse(jsonrepair(text.replace(/```json|```/g,"").trim())); }
+      catch { parsed = { detection_name:`Detect ${item.id||item.ttp_id} - ${item.name||item.technique_name}`, detection_query:`// Generation failed for ${item.id||item.ttp_id}`, detection_tactic:item.tactic, detection_severity:"High", detection_summary:item.name||item.technique_name, key_indicators:[] }; }
+      drafts.push({
+        source_type: sourceType,
+        draft_id: `${sourceType}-${(item.id||item.ttp_id||"").replace(/\./g,"_")}-${(item.actor_name||"").replace(/\s/g,"_")}`,
+        ttp_id: item.id || item.ttp_id,
+        technique_name: item.name || item.technique_name,
+        actor_name: item.actor_name || null,
+        siem_tool: siemTool,
+        ...parsed
+      });
+    } catch(e) { console.error("Autopilot source draft error:", e.message); }
+  }
+  res.json({ drafts, count: drafts.length });
+});
+
 // ── /api/cache/stats ──────────────────────────────────────────────────────────
 app.get("/api/cache/stats", async (req, res) => {
   try {
