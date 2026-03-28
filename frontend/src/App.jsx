@@ -855,20 +855,6 @@ function ADSResult({ ads, threat, tactic, tool, onSave, detName, setDetName, sev
   const [soarToken, setSoarToken] = useState(LS.get("soar_token",""));
   if (!ads) return null;
 
-  // Poll async job until done or error (max 90s, polls every 1.5s)
-  async function pollJob(jobId, maxWaitMs=90000) {
-    const interval=1500, start=Date.now();
-    while(Date.now()-start<maxWaitMs){
-      await new Promise(r=>setTimeout(r,interval));
-      const r=await fetch(`/api/jobs/${jobId}`);
-      const d=await r.json();
-      if(d.status==="done") return d.result;
-      if(d.status==="error") throw new Error(d.error||"Job failed");
-      // still queued/active — keep polling
-    }
-    throw new Error("Request timed out — please try again.");
-  }
-
   // Build a det object — always uses activeQuery so improvements flow through to Deploy
   function buildDet() {
     return { id: "builder-preview", name: detName||threat.slice(0,60), threat, tactic, queryType: tool.lang, tool: tool.id, query: activeQuery, severity, ads };
@@ -2015,6 +2001,19 @@ function inferTacticAndSeverity(text){
     if(kws.some(k=>t.includes(k))){bestSev=sev;break;}
   }
   return{tactic:bestTactic,severity:bestSev};
+}
+
+// Global async job poller — shared across all components
+async function pollJob(jobId, maxWaitMs=90000){
+  const interval=1500, start=Date.now();
+  while(Date.now()-start<maxWaitMs){
+    await new Promise(r=>setTimeout(r,interval));
+    const r=await fetch(`/api/jobs/${jobId}`);
+    const d=await r.json();
+    if(d.status==="done") return d.result;
+    if(d.status==="error") throw new Error(d.error||"Job failed");
+  }
+  throw new Error("Request timed out — please try again.");
 }
 
 function DetectionBuilder({onSave, onSendToTriage, prefill}){
