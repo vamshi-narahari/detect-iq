@@ -5555,7 +5555,7 @@ const TACTIC_COLORS={
   "Exfiltration":"#dc2626","Impact":"#b91c1c",
 };
 
-function DetectionChain({detections}){
+function DetectionChain({detections, onSave, onOpenInBuilder}){
   const initSteps=()=>[{id:1,name:"",query:"",tactic:""},{id:2,name:"",query:"",tactic:""}];
   const[steps,setSteps]=useState(initSteps);
   const[correlField,setCorrelField]=useState("host");
@@ -5567,6 +5567,7 @@ function DetectionChain({detections}){
   const[activeOut,setActiveOut]=useState("splunk");
   const[view,setView]=useState("builder");
   const[expandedStep,setExpandedStep]=useState(null);
+  const[saved,setSaved]=useState(false);
 
   function addStep(){setSteps(prev=>[...prev,{id:Date.now(),name:"",query:"",tactic:""}]);}
   function removeStep(id){if(steps.length<=2)return;setSteps(prev=>prev.filter(s=>s.id!==id));}
@@ -5819,9 +5820,34 @@ function DetectionChain({detections}){
                   <div style={{...S.code,whiteSpace:"pre-wrap"}}>{result[t.key]||"Not generated for this platform."}</div>
                 </div>
               ))}
-              <div style={{marginTop:12,display:"flex",gap:8}}>
-                <button style={{...S.btn(),fontSize:11,padding:"7px 16px"}} onClick={()=>{setResult(null);setSteps(initSteps());setView("builder");}}>🔄 Start New Chain</button>
-                <button style={{...S.btn(),fontSize:11,padding:"7px 16px"}} onClick={()=>setView("builder")}>🔧 Edit Steps</button>
+              {/* Action bar */}
+              <div style={{marginTop:16,padding:"14px 16px",background:"rgba(0,212,255,0.04)",border:"1px solid "+THEME.borderBright,borderRadius:10}}>
+                <div style={{fontSize:10,fontWeight:800,color:THEME.accent,letterSpacing:"0.1em",marginBottom:10}}>NEXT STEPS</div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  <button style={{...S.btn("p"),fontSize:12,padding:"9px 18px",display:"flex",alignItems:"center",gap:6}}
+                    disabled={saved}
+                    onClick={async()=>{
+                      if(!onSave)return;
+                      const keyMap={splunk:"splunk_correlation",elastic:"elastic_query",sentinel:"sentinel_kql",chronicle:"chronicle_udm"};
+                      const query=result[keyMap[activeOut]]||result.splunk_correlation||"";
+                      const tactic=result._steps?.[result._steps.length-1]?.tactic||"Impact";
+                      await onSave({name:result.playbook_name||result.correlation_name||"Correlation Rule",query,queryType:platform==="Elastic"?"EQL":platform==="Microsoft Sentinel"?"KQL_SENTINEL":platform==="Google Chronicle"?"YARA-L":"SPL",tool:platform==="Elastic"?"elastic":platform==="Microsoft Sentinel"?"sentinel":platform==="Google Chronicle"?"chronicle":"splunk",tactic,severity:result.severity||"Critical",threat:result.attack_narrative||"",tags:[...(result.mitre_techniques||[]),"correlation","multi-stage"],score:result.risk_score||0});
+                      setSaved(true);
+                    }}>
+                    {saved?"✅ Saved to Library":"💾 Save to Library"}
+                  </button>
+                  <button style={{...S.btn("s"),fontSize:12,padding:"9px 18px",display:"flex",alignItems:"center",gap:6}}
+                    onClick={()=>{
+                      const keyMap={splunk:"splunk_correlation",elastic:"elastic_query",sentinel:"sentinel_kql",chronicle:"chronicle_udm"};
+                      const query=result[keyMap[activeOut]]||result.splunk_correlation||"";
+                      const tactic=result._steps?.[result._steps.length-1]?.tactic||"Impact";
+                      if(onOpenInBuilder)onOpenInBuilder(query,result.playbook_name||"Correlation Rule",tactic);
+                    }}>
+                    🔧 Open in Builder
+                  </button>
+                  <button style={{...S.btn(),fontSize:12,padding:"9px 18px"}} onClick={()=>setView("builder")}>✏️ Edit Steps</button>
+                  <button style={{...S.btn(),fontSize:12,padding:"9px 18px"}} onClick={()=>{setResult(null);setSteps(initSteps());setSaved(false);setView("builder");}}>🔄 New Chain</button>
+                </div>
               </div>
             </div>
           )}
@@ -8820,7 +8846,7 @@ function AppInner(){
               <UserSettingsTab user={user} onSignOut={()=>supabase.auth.signOut()}/>
             </LazyTab>
             <LazyTab id="chain" tab={tab} skeleton={<SkeletonCard/>}>
-              <DetectionChain detections={detections}/>
+              <DetectionChain detections={detections} onSave={saveDetection} onOpenInBuilder={(query,name,tactic)=>{setBuilderPrefill({scenario:name,tactic:tactic||"Impact"});setTab("builder");}}/>
             </LazyTab>
             <LazyTab id="replay" tab={tab} skeleton={<SkeletonCard/>}>
               <LogReplay detections={detections}/>
