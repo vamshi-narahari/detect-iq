@@ -2131,6 +2131,49 @@ Return ONLY valid JSON:
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Multi-Stage Detection Playbook ────────────────────────────────────────────
+app.post("/api/detection/chain-playbook", claudeLimiter, express.json(), async (req, res) => {
+  const { steps, correlField, timeWindowMin, platform } = req.body;
+  if (!steps || steps.length < 2) return res.status(400).json({ error: "At least 2 steps required" });
+  const chainArrow = steps.map(s => s.name).join(" → ");
+  const stepsText = steps.map((s, i) =>
+    `Stage ${i+1} (${s.tactic||"Unknown"}): ${s.name}\nQuery: ${(s.query||"").slice(0,200)}`
+  ).join("\n\n");
+  const prompt = `You are a SIEM correlation expert. Build a ${steps.length}-stage attack playbook correlation.
+
+Attack chain: ${chainArrow}
+Correlation entity: ${correlField||"host"}
+Time window between stages: ${timeWindowMin||15} minutes
+Primary platform: ${platform||"Splunk"}
+
+Stages:
+${stepsText}
+
+Return ONLY valid JSON:
+{
+  "playbook_name": "APT: descriptive attack chain name",
+  "attack_narrative": "3-4 sentence story of the full attack progression",
+  "risk_score": 99,
+  "severity": "Critical",
+  "mitre_techniques": ["T1xxx","T1xxx"],
+  "stage_summaries": ["1-line summary per stage, array of ${steps.length} strings"],
+  "splunk_correlation": "Splunk ES multi-stage correlation SPL using transaction or sequence",
+  "elastic_query": "Elastic EQL sequence query covering all ${steps.length} stages",
+  "sentinel_kql": "Microsoft Sentinel KQL multi-stage query",
+  "chronicle_udm": "Chronicle YARA-L 2.0 rule",
+  "response_steps": ["ordered response actions (5-7 steps)"],
+  "coverage_gap": "any detection gaps between stages",
+  "recommended_additions": ["detections to add to strengthen the chain"]
+}`;
+  try {
+    const resp = await bedrock.send(new InvokeModelCommand({ modelId: SONNET, contentType:"application/json", accept:"application/json",
+      body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:5000, system:"SIEM correlation expert. Return ONLY valid JSON.", messages:[{role:"user",content:prompt}] }) }));
+    const raw = JSON.parse(new TextDecoder().decode(resp.body)).content[0].text;
+    const m = raw.match(/\{[\s\S]*\}/); if(!m) return res.status(500).json({error:"No JSON in response"});
+    res.json(JSON.parse(jsonrepair(m[0])));
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── Log Replay / Dry Run ──────────────────────────────────────────────────────
 app.post("/api/detection/replay", claudeLimiter, express.json(), async (req, res) => {
   const { query, queryType, logs } = req.body;

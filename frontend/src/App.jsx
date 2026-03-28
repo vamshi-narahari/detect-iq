@@ -5547,10 +5547,17 @@ const KILL_CHAIN_NEXT={
   "Exfiltration":["Impact"],
   "Impact":[],
 };
+const TACTIC_COLORS={
+  "Reconnaissance":"#64748b","Resource Development":"#475569","Initial Access":"#3b82f6",
+  "Execution":"#8b5cf6","Persistence":"#a855f7","Privilege Escalation":"#f59e0b",
+  "Defense Evasion":"#f97316","Credential Access":"#ef4444","Discovery":"#f97316",
+  "Lateral Movement":"#ef4444","Collection":"#ec4899","Command and Control":"#ec4899",
+  "Exfiltration":"#dc2626","Impact":"#b91c1c",
+};
 
 function DetectionChain({detections}){
-  const[nameA,setNameA]=useState(""); const[queryA,setQueryA]=useState("");
-  const[nameB,setNameB]=useState(""); const[queryB,setQueryB]=useState("");
+  const initSteps=()=>[{id:1,name:"",query:"",tactic:""},{id:2,name:"",query:"",tactic:""}];
+  const[steps,setSteps]=useState(initSteps);
   const[correlField,setCorrelField]=useState("host");
   const[timeWindow,setTimeWindow]=useState("15");
   const[platform,setPlatform]=useState("Splunk");
@@ -5558,157 +5565,266 @@ function DetectionChain({detections}){
   const[result,setResult]=useState(null);
   const[err,setErr]=useState("");
   const[activeOut,setActiveOut]=useState("splunk");
-  const[copyDet,setCopyDet]=useState(null);
-  const[detA,setDetA]=useState(null);
-  const[suggestionsB,setSuggestionsB]=useState([]);
+  const[view,setView]=useState("builder");
+  const[expandedStep,setExpandedStep]=useState(null);
 
-  function loadDet(which,det){
-    if(which==="a"){
-      setNameA(det.name);setQueryA(det.query||"");setDetA(det);
-      // compute suggestions for B based on kill chain progression
-      const nextTactics=KILL_CHAIN_NEXT[det.tactic]||[];
-      const suggestions=detections.filter(d=>
-        d.id!==det.id&&(
-          nextTactics.some(t=>d.tactic&&d.tactic.toLowerCase()===t.toLowerCase())||
-          (nextTactics.length===0&&d.id!==det.id)// impact: suggest any
-        )
-      ).slice(0,6);
-      // if no tactic match, fall back to all others
-      setSuggestionsB(suggestions.length>0?suggestions:detections.filter(d=>d.id!==det.id).slice(0,4));
-    }
-    else{setNameB(det.name);setQueryB(det.query||"");}
+  function addStep(){setSteps(prev=>[...prev,{id:Date.now(),name:"",query:"",tactic:""}]);}
+  function removeStep(id){if(steps.length<=2)return;setSteps(prev=>prev.filter(s=>s.id!==id));}
+  function updateStep(id,field,val){setSteps(prev=>prev.map(s=>s.id===id?{...s,[field]:val}:s));}
+  function loadDet(stepId,det){setSteps(prev=>prev.map(s=>s.id===stepId?{...s,name:det.name,query:det.query||"",tactic:det.tactic||""}:s));}
+
+  function getSuggestions(stepIdx){
+    const prev=steps[stepIdx-1];
+    const usedNames=steps.map(s=>s.name).filter(Boolean);
+    if(!prev?.tactic) return detections.filter(d=>!usedNames.includes(d.name)).slice(0,5);
+    const nextTactics=KILL_CHAIN_NEXT[prev.tactic]||[];
+    const matched=detections.filter(d=>!usedNames.includes(d.name)&&nextTactics.some(t=>d.tactic&&d.tactic.toLowerCase()===t.toLowerCase())).slice(0,5);
+    return matched.length>0?matched:detections.filter(d=>!usedNames.includes(d.name)).slice(0,4);
   }
+
   async function generate(){
-    if(!nameA||!nameB){setErr("Enter both detection names.");return;}
+    const filled=steps.filter(s=>s.name.trim());
+    if(filled.length<2){setErr("Fill in at least 2 detection names.");return;}
     setLoading(true);setErr("");setResult(null);
     try{
-      const res=await fetch("/api/detection/chain",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({nameA,queryA,nameB,queryB,queryType:"SPL",correlField,timeWindowMin:parseInt(timeWindow)||15,platform})});
-      const data=await res.json(); if(data.error)throw new Error(data.error); setResult(data);
+      let data;
+      if(filled.length===2){
+        const res=await fetch("/api/detection/chain",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({nameA:filled[0].name,queryA:filled[0].query,nameB:filled[1].name,queryB:filled[1].query,queryType:"SPL",correlField,timeWindowMin:parseInt(timeWindow)||15,platform})});
+        const d=await res.json(); if(d.error)throw new Error(d.error);
+        data={...d,playbook_name:d.correlation_name,stage_summaries:[filled[0].name,filled[1].name],response_steps:d.recommended_response?[d.recommended_response]:[]};
+      }else{
+        const res=await fetch("/api/detection/chain-playbook",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({steps:filled,correlField,timeWindowMin:parseInt(timeWindow)||15,platform})});
+        const d=await res.json(); if(d.error)throw new Error(d.error); data=d;
+      }
+      setResult({...data,_steps:filled});
+      setView("playbook");
     }catch(e){setErr(e.message);}
     setLoading(false);
   }
+
   const outTabs=[{id:"splunk",label:"Splunk ES",key:"splunk_correlation"},{id:"elastic",label:"Elastic EQL",key:"elastic_query"},{id:"sentinel",label:"Sentinel KQL",key:"sentinel_kql"},{id:"chronicle",label:"Chronicle",key:"chronicle_udm"}];
+  const filledCount=steps.filter(s=>s.name.trim()).length;
+
   return(
     <div>
       <SectionHeader icon="🔗" title="Detection Chain Builder" color={THEME.accent}>
-        <span style={S.badge(THEME.accent)}>Multi-stage correlation</span>
-        <span style={{fontSize:11,color:THEME.textDim}}>Chain two detections into a Critical correlation rule</span>
-      </SectionHeader>
-      <HelpBox title="How Detection Chaining Works" color={THEME.accent} items={[
-        {icon:"🎯",title:"What it does",desc:"Combines two separate detections (e.g. Reconnaissance + Lateral Movement) into a single high-fidelity correlation rule. Only fires if both events occur on the same host/user within your time window."},
-        {icon:"⏱",title:"Time window",desc:"The correlation fires only if Detection B occurs within N minutes of Detection A on the same entity. Shorter windows = higher confidence but may miss slow-and-low attacks."},
-        {icon:"🔗",title:"Correlation field",desc:"The field used to link the two events (host, src_ip, user, etc.). Choose the field that uniquely identifies the entity moving through the kill chain."},
-        {icon:"📋",title:"Output",desc:"Get Splunk ES correlation, Elastic EQL, Microsoft Sentinel KQL, and Google Chronicle YARA-L versions of the combined rule — ready to paste into your SIEM."},
-      ]}/>
-      <div style={S.card}>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
-          {/* Detection A */}
-          <div style={{padding:"14px 16px",background:"rgba(255,255,255,0.02)",border:"1px solid "+THEME.accentDim+"55",borderRadius:8}}>
-            <div style={{fontSize:10,fontWeight:800,color:THEME.accent,letterSpacing:"0.12em",marginBottom:10}}>DETECTION A — EARLY STAGE</div>
-            <input style={{...S.input,marginBottom:8}} placeholder="Detection name..." value={nameA} onChange={e=>setNameA(e.target.value)}/>
-            <textarea style={{...S.textarea,minHeight:80,fontSize:11,fontFamily:"monospace"}} placeholder="Paste detection query (optional)..." value={queryA} onChange={e=>setQueryA(e.target.value)}/>
-            {detections.length>0&&(
-              <div style={{marginTop:8}}>
-                <select style={{...S.input,fontSize:11}} onChange={e=>{const d=detections.find(x=>x.id===e.target.value);if(d)loadDet("a",d);}}>
-                  <option value="">Load from library...</option>
-                  {detections.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
-              </div>
-            )}
-          </div>
-
-          {/* Detection B — with smart suggestions */}
-          <div style={{padding:"14px 16px",background:"rgba(255,255,255,0.02)",border:"1px solid "+THEME.purple+"55",borderRadius:8}}>
-            <div style={{fontSize:10,fontWeight:800,color:THEME.purple,letterSpacing:"0.12em",marginBottom:10}}>DETECTION B — LATER STAGE</div>
-
-            {/* Smart suggestions */}
-            {suggestionsB.length>0&&!nameB&&(
-              <div style={{marginBottom:10}}>
-                <div style={{fontSize:10,color:THEME.textDim,fontWeight:600,marginBottom:6,letterSpacing:"0.05em"}}>
-                  💡 SUGGESTED NEXT-STAGE DETECTIONS
-                  {detA?.tactic&&<span style={{color:THEME.purple,marginLeft:6}}>following {detA.tactic}</span>}
-                </div>
-                <div style={{display:"flex",flexDirection:"column",gap:5}}>
-                  {suggestionsB.map(d=>{
-                    const nextTactics=KILL_CHAIN_NEXT[detA?.tactic]||[];
-                    const isMatch=nextTactics.some(t=>d.tactic&&d.tactic.toLowerCase()===t.toLowerCase());
-                    return(
-                      <div key={d.id}
-                        onClick={()=>loadDet("b",d)}
-                        style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:7,border:"1px solid "+(isMatch?THEME.purple+"44":THEME.border),background:isMatch?"rgba(168,85,247,0.06)":"rgba(255,255,255,0.02)",cursor:"pointer",transition:"all 0.15s"}}
-                        onMouseEnter={e=>{e.currentTarget.style.borderColor=THEME.purple+"88";e.currentTarget.style.background="rgba(168,85,247,0.1)";}}
-                        onMouseLeave={e=>{e.currentTarget.style.borderColor=isMatch?THEME.purple+"44":THEME.border;e.currentTarget.style.background=isMatch?"rgba(168,85,247,0.06)":"rgba(255,255,255,0.02)";}}>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:11,fontWeight:600,color:THEME.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
-                          {d.tactic&&<div style={{fontSize:9,color:isMatch?THEME.purple:THEME.textDim,marginTop:1}}>{d.tactic}</div>}
-                        </div>
-                        {isMatch&&<span style={{fontSize:9,color:THEME.purple,fontWeight:700,flexShrink:0}}>CHAIN →</span>}
-                        <span style={{fontSize:11,color:THEME.textDim,flexShrink:0}}>+</span>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div style={{height:1,background:THEME.border,margin:"10px 0"}}/>
-              </div>
-            )}
-
-            <input style={{...S.input,marginBottom:8}} placeholder="Detection name..." value={nameB} onChange={e=>setNameB(e.target.value)}/>
-            <textarea style={{...S.textarea,minHeight:80,fontSize:11,fontFamily:"monospace"}} placeholder="Paste detection query (optional)..." value={queryB} onChange={e=>setQueryB(e.target.value)}/>
-            {detections.length>0&&(
-              <div style={{marginTop:8}}>
-                <select style={{...S.input,fontSize:11}} onChange={e=>{const d=detections.find(x=>x.id===e.target.value);if(d)loadDet("b",d);}}>
-                  <option value="">Load from library...</option>
-                  {detections.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
-              </div>
-            )}
-          </div>
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:16}}>
-          <div>
-            <label style={S.label}>Correlation Field</label>
-            <select style={S.input} value={correlField} onChange={e=>setCorrelField(e.target.value)}>
-              {["host","src_ip","user","dest_ip","process_id","session_id"].map(f=><option key={f} value={f}>{f}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={S.label}>Time Window (minutes)</label>
-            <input style={S.input} type="number" min="1" max="1440" value={timeWindow} onChange={e=>setTimeWindow(e.target.value)} placeholder="15"/>
-          </div>
-          <div>
-            <label style={S.label}>Primary Platform</label>
-            <select style={S.input} value={platform} onChange={e=>setPlatform(e.target.value)}>
-              {["Splunk","Elastic","Microsoft Sentinel","Google Chronicle"].map(p=><option key={p} value={p}>{p}</option>)}
-            </select>
-          </div>
-        </div>
-        <button style={{...S.btn("p"),padding:"10px 28px",fontSize:13,width:"100%"}} onClick={generate} disabled={loading}>{loading?<><Spinner/> Generating correlation rule...</>:"🔗 Generate Correlation Rule"}</button>
-        {err&&<div style={{color:THEME.danger,fontSize:12,marginTop:10}}>{err}</div>}
-      </div>
-      {result&&(
-        <div style={S.card}>
-          <div style={{marginBottom:14,padding:"14px 16px",background:"rgba(255,61,85,0.05)",border:"1px solid rgba(255,61,85,0.3)",borderRadius:8}}>
-            <div style={{fontSize:14,fontWeight:700,color:THEME.text,marginBottom:4}}>{result.correlation_name}</div>
-            <div style={{fontSize:12,color:THEME.textMid,marginBottom:8}}>{result.attack_narrative}</div>
-            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-              <span style={S.badge(THEME.danger)}>Risk: {result.risk_score}</span>
-              <span style={S.badge(THEME.danger)}>{result.severity}</span>
-              {(result.mitre_techniques||[]).map((t,i)=><span key={i} style={S.badge(THEME.warning)}>{t}</span>)}
-            </div>
-          </div>
-          <div style={{padding:"10px 14px",background:"rgba(0,212,255,0.04)",border:"1px solid "+THEME.borderBright,borderRadius:8,marginBottom:14}}>
-            <div style={{fontSize:10,fontWeight:800,color:THEME.warning,letterSpacing:"0.1em",marginBottom:4}}>RECOMMENDED RESPONSE</div>
-            <div style={{fontSize:12,color:THEME.textMid}}>{result.recommended_response}</div>
-          </div>
-          <div style={{display:"flex",gap:6,marginBottom:12}}>
-            {outTabs.map(t=><button key={t.id} onClick={()=>setActiveOut(t.id)} style={{padding:"6px 14px",borderRadius:6,border:"1px solid "+(activeOut===t.id?THEME.accentDim+"88":"transparent"),background:activeOut===t.id?"rgba(0,212,255,0.08)":"transparent",color:activeOut===t.id?THEME.accent:THEME.textDim,cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:activeOut===t.id?700:400}}>{t.label}</button>)}
-          </div>
-          {outTabs.map(t=>activeOut===t.id&&(
-            <div key={t.id}>
-              <div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><CopyBtn text={result[t.key]||""}/></div>
-              <div style={{...S.code,whiteSpace:"pre-wrap"}}>{result[t.key]||"Not generated for this platform."}</div>
-            </div>
+        <span style={S.badge(THEME.accent)}>{filledCount>0?`${filledCount}-stage chain`:"Multi-stage"}</span>
+        <div style={{display:"flex",gap:5,marginLeft:"auto"}}>
+          {[["builder","🔧 Builder"],["playbook","📋 Playbook"]].map(([v,lbl])=>(
+            <button key={v} onClick={()=>setView(v)} style={{padding:"5px 13px",borderRadius:6,border:"1px solid "+(view===v?THEME.accent+"88":"transparent"),background:view===v?"rgba(0,212,255,0.1)":"transparent",color:view===v?THEME.accent:THEME.textDim,cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:view===v?700:400}}>{lbl}</button>
           ))}
+        </div>
+      </SectionHeader>
+
+      <HelpBox title="How Detection Chaining Works" color={THEME.accent} items={[
+        {icon:"🎯",title:"What it does",desc:"Chains 2–10 detections into a high-fidelity multi-stage correlation rule. Fires only when all stages occur on the same entity within your time window — extremely low false-positive rate."},
+        {icon:"➕",title:"Add steps",desc:"Click '+ Add Step' to build a full kill chain. Each step shows AI-suggested next-stage detections from your library based on MITRE kill chain progression."},
+        {icon:"📋",title:"Playbook view",desc:"Switch to Playbook view after generating to see the full attack timeline, stage-by-stage narrative, response steps, and SIEM correlation rules for Splunk, Elastic, Sentinel, and Chronicle."},
+        {icon:"🔗",title:"Correlation field",desc:"The field linking all stages (host, src_ip, user). Shorter time windows = higher confidence but may miss slow-and-low attacks."},
+      ]}/>
+
+      {/* ── Builder View ── */}
+      {view==="builder"&&(
+        <div>
+          <div style={{display:"flex",flexDirection:"column",gap:0,marginBottom:14}}>
+            {steps.map((step,idx)=>{
+              const tcol=TACTIC_COLORS[step.tactic]||THEME.accent;
+              const suggestions=idx>0&&!step.name?getSuggestions(idx):[];
+              const prevTactic=steps[idx-1]?.tactic;
+              return(
+                <div key={step.id}>
+                  {idx>0&&(
+                    <div style={{display:"flex",alignItems:"center",gap:0,margin:"0 0 0 19px"}}>
+                      <div style={{width:2,height:18,background:THEME.border+"88"}}/>
+                      <div style={{fontSize:9,color:THEME.textDim,paddingLeft:8}}>↓ within {timeWindow}min on same {correlField}</div>
+                    </div>
+                  )}
+                  <div style={{padding:"13px 16px",background:"rgba(255,255,255,0.02)",border:"1px solid "+(tcol+"44"),borderRadius:9,marginBottom:0}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                      <div style={{width:24,height:24,borderRadius:"50%",background:tcol+"22",border:"1px solid "+tcol+"55",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:tcol,flexShrink:0}}>{idx+1}</div>
+                      <div style={{fontSize:10,fontWeight:800,color:tcol,letterSpacing:"0.1em",flex:1}}>
+                        STEP {idx+1}{step.tactic?" — "+step.tactic.toUpperCase():idx===0?" — EARLY STAGE":idx===steps.length-1?" — FINAL STAGE":" — MID STAGE"}
+                      </div>
+                      {steps.length>2&&<button onClick={()=>removeStep(step.id)} style={{background:"none",border:"none",color:THEME.textDim,cursor:"pointer",fontSize:16,lineHeight:1,padding:"0 2px",opacity:0.6}} title="Remove">×</button>}
+                    </div>
+                    {/* Suggestions */}
+                    {suggestions.length>0&&(
+                      <div style={{marginBottom:9}}>
+                        <div style={{fontSize:9,color:THEME.textDim,fontWeight:700,marginBottom:5,letterSpacing:"0.06em"}}>💡 SUGGESTED — follows {prevTactic}</div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}>
+                          {suggestions.map(d=>{
+                            const nextTactics=KILL_CHAIN_NEXT[prevTactic]||[];
+                            const isMatch=nextTactics.some(t=>d.tactic&&d.tactic.toLowerCase()===t.toLowerCase());
+                            return(
+                              <button key={d.id} onClick={()=>loadDet(step.id,d)}
+                                style={{padding:"5px 10px",borderRadius:6,border:"1px solid "+(isMatch?THEME.purple+"55":THEME.border),background:isMatch?"rgba(168,85,247,0.07)":"rgba(255,255,255,0.02)",color:THEME.text,cursor:"pointer",fontSize:10,fontFamily:"inherit",display:"flex",alignItems:"center",gap:4}}>
+                                {d.name.slice(0,36)}{d.name.length>36?"…":""}
+                                {isMatch&&<span style={{color:THEME.purple,fontWeight:700}}>→</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div style={{height:1,background:THEME.border+"66",marginBottom:8}}/>
+                      </div>
+                    )}
+                    <input style={{...S.input,marginBottom:7}} placeholder={`Detection name for step ${idx+1}...`} value={step.name} onChange={e=>updateStep(step.id,"name",e.target.value)}/>
+                    <textarea style={{...S.textarea,minHeight:54,fontSize:11,fontFamily:"monospace"}} placeholder="Query (optional — helps AI generate better correlation)..." value={step.query} onChange={e=>updateStep(step.id,"query",e.target.value)}/>
+                    {detections.length>0&&(
+                      <select style={{...S.input,fontSize:11,marginTop:6}} onChange={e=>{const d=detections.find(x=>x.id===e.target.value);if(d)loadDet(step.id,d);}}>
+                        <option value="">Load from library...</option>
+                        {detections.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+                      </select>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <button onClick={addStep} style={{...S.btn(),width:"100%",marginBottom:14,padding:"8px",fontSize:12,borderStyle:"dashed",opacity:0.7}}>+ Add Step</button>
+
+          <div style={{...S.card,padding:"12px 16px",marginBottom:12}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
+              <div><label style={S.label}>Correlation Field</label>
+                <select style={S.input} value={correlField} onChange={e=>setCorrelField(e.target.value)}>
+                  {["host","src_ip","user","dest_ip","process_id","session_id"].map(f=><option key={f} value={f}>{f}</option>)}
+                </select>
+              </div>
+              <div><label style={S.label}>Time Window (minutes)</label>
+                <input style={S.input} type="number" min="1" max="1440" value={timeWindow} onChange={e=>setTimeWindow(e.target.value)} placeholder="15"/>
+              </div>
+              <div><label style={S.label}>Primary Platform</label>
+                <select style={S.input} value={platform} onChange={e=>setPlatform(e.target.value)}>
+                  {["Splunk","Elastic","Microsoft Sentinel","Google Chronicle"].map(p=><option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <button style={{...S.btn("p"),padding:"11px 28px",fontSize:13,width:"100%"}} onClick={generate} disabled={loading}>
+            {loading?<><Spinner/> Generating {filledCount}-stage playbook...</>:`🔗 Generate ${filledCount}-Stage Correlation`}
+          </button>
+          {err&&<div style={{color:THEME.danger,fontSize:12,marginTop:10}}>{err}</div>}
+        </div>
+      )}
+
+      {/* ── Playbook View ── */}
+      {view==="playbook"&&(
+        <div>
+          {/* Attack timeline */}
+          {(result?._steps||steps.filter(s=>s.name)).length>0?(
+            <div style={{...S.card,marginBottom:14}}>
+              <div style={{fontSize:11,fontWeight:700,color:THEME.textDim,marginBottom:14,letterSpacing:"0.08em"}}>
+                {result?.playbook_name||"ATTACK CHAIN PREVIEW"}
+                {result&&<span style={{...S.badge(THEME.danger),marginLeft:10}}>Risk {result.risk_score}</span>}
+                {result&&<span style={{...S.badge(THEME.danger),marginLeft:6}}>{result.severity}</span>}
+              </div>
+              {(result?._steps||steps.filter(s=>s.name)).map((step,idx,arr)=>{
+                const tcol=TACTIC_COLORS[step.tactic]||THEME.accent;
+                const summary=result?.stage_summaries?.[idx];
+                const isExpanded=expandedStep===step.id||expandedStep===idx;
+                return(
+                  <div key={step.id||idx}>
+                    <div
+                      onClick={()=>setExpandedStep(isExpanded?null:(step.id||idx))}
+                      style={{display:"flex",alignItems:"flex-start",gap:12,padding:"11px 14px",borderRadius:8,border:"1px solid "+(tcol+"33"),background:"rgba(255,255,255,0.015)",cursor:"pointer",marginBottom:2,transition:"all 0.15s"}}
+                      onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.035)";}}
+                      onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.015)";}}>
+                      <div style={{width:28,height:28,borderRadius:"50%",background:tcol+"22",border:"2px solid "+tcol+"66",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:tcol,flexShrink:0}}>{idx+1}</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:12,fontWeight:700,color:THEME.text,marginBottom:2}}>{step.name}</div>
+                        {step.tactic&&<span style={{...S.badge(tcol),fontSize:9}}>{step.tactic}</span>}
+                        {summary&&<div style={{fontSize:11,color:THEME.textMid,marginTop:5,lineHeight:1.5}}>{summary}</div>}
+                      </div>
+                      <div style={{fontSize:11,color:THEME.textDim,flexShrink:0,marginTop:2}}>{isExpanded?"▲":"▼"}</div>
+                    </div>
+                    {isExpanded&&step.query&&(
+                      <div style={{marginLeft:40,marginBottom:4,padding:"8px 12px",background:"rgba(0,0,0,0.2)",borderRadius:6,border:"1px solid "+THEME.border}}>
+                        <div style={{fontSize:9,color:THEME.textDim,marginBottom:4,fontWeight:700}}>QUERY</div>
+                        <div style={{...S.code,fontSize:10,padding:"6px 10px",maxHeight:100,overflow:"auto"}}>{step.query}</div>
+                        {!result&&(
+                          <button onClick={()=>{const id=step.id;setView("builder");setTimeout(()=>document.querySelector(`[data-stepid="${id}"]`)?.scrollIntoView({behavior:"smooth"}),100);}}
+                            style={{...S.btn(),fontSize:10,padding:"4px 10px",marginTop:6}}>Edit in Builder →</button>
+                        )}
+                      </div>
+                    )}
+                    {idx<arr.length-1&&(
+                      <div style={{display:"flex",alignItems:"center",gap:8,margin:"2px 0 2px 13px"}}>
+                        <div style={{width:2,height:16,background:THEME.border}}/>
+                        <div style={{fontSize:9,color:THEME.textDim,paddingLeft:8}}>↓ {timeWindow}min · same {correlField}</div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {!result&&(
+                <div style={{marginTop:10,padding:"10px 14px",background:"rgba(0,212,255,0.04)",border:"1px solid "+THEME.borderBright,borderRadius:8,textAlign:"center"}}>
+                  <div style={{fontSize:11,color:THEME.textDim,marginBottom:8}}>Chain configured · Click generate to build the correlation rule</div>
+                  <button style={{...S.btn("p"),padding:"8px 22px",fontSize:12}} onClick={()=>{setView("builder");generate();}}>🔗 Generate Correlation</button>
+                </div>
+              )}
+            </div>
+          ):(
+            <div style={{...S.card,textAlign:"center",padding:"48px 24px"}}>
+              <div style={{fontSize:36,marginBottom:12}}>🔗</div>
+              <div style={{fontSize:14,fontWeight:600,color:THEME.text,marginBottom:6}}>No chain built yet</div>
+              <div style={{fontSize:12,color:THEME.textDim,marginBottom:16}}>Switch to Builder view to add detections to your chain.</div>
+              <button style={{...S.btn("p"),padding:"8px 22px",fontSize:12}} onClick={()=>setView("builder")}>🔧 Go to Builder</button>
+            </div>
+          )}
+
+          {/* Result output */}
+          {result&&(
+            <div style={S.card}>
+              {result.attack_narrative&&(
+                <div style={{marginBottom:14,padding:"12px 16px",background:"rgba(255,61,85,0.04)",border:"1px solid rgba(255,61,85,0.25)",borderRadius:8}}>
+                  <div style={{fontSize:10,fontWeight:800,color:THEME.danger,letterSpacing:"0.1em",marginBottom:6}}>ATTACK NARRATIVE</div>
+                  <div style={{fontSize:12,color:THEME.textMid,lineHeight:1.7}}>{result.attack_narrative}</div>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:8}}>
+                    {(result.mitre_techniques||[]).map((t,i)=><span key={i} style={S.badge(THEME.warning)}>{t}</span>)}
+                  </div>
+                </div>
+              )}
+              {(result.response_steps||[]).length>0&&(
+                <div style={{marginBottom:14,padding:"12px 16px",background:"rgba(0,212,255,0.04)",border:"1px solid "+THEME.borderBright,borderRadius:8}}>
+                  <div style={{fontSize:10,fontWeight:800,color:THEME.accent,letterSpacing:"0.1em",marginBottom:8}}>RESPONSE PLAYBOOK</div>
+                  {(result.response_steps).map((s,i)=>(
+                    <div key={i} style={{display:"flex",gap:8,marginBottom:5}}>
+                      <div style={{width:18,height:18,borderRadius:"50%",background:THEME.accent+"22",border:"1px solid "+THEME.accent+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:THEME.accent,flexShrink:0}}>{i+1}</div>
+                      <div style={{fontSize:11,color:THEME.textMid,lineHeight:1.5}}>{s}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {result.coverage_gap&&(
+                <div style={{marginBottom:14,padding:"10px 14px",background:"rgba(255,170,0,0.04)",border:"1px solid rgba(255,170,0,0.2)",borderRadius:8}}>
+                  <div style={{fontSize:10,fontWeight:800,color:THEME.warning,letterSpacing:"0.1em",marginBottom:4}}>COVERAGE GAP</div>
+                  <div style={{fontSize:11,color:THEME.textMid}}>{result.coverage_gap}</div>
+                  {(result.recommended_additions||[]).length>0&&(
+                    <div style={{marginTop:6,display:"flex",flexWrap:"wrap",gap:5}}>
+                      {result.recommended_additions.map((a,i)=><span key={i} style={{...S.badge(THEME.warning),fontSize:9}}>+ {a}</span>)}
+                    </div>
+                  )}
+                </div>
+              )}
+              <div style={{display:"flex",gap:6,marginBottom:10}}>
+                {outTabs.map(t=><button key={t.id} onClick={()=>setActiveOut(t.id)} style={{padding:"6px 14px",borderRadius:6,border:"1px solid "+(activeOut===t.id?THEME.accentDim+"88":"transparent"),background:activeOut===t.id?"rgba(0,212,255,0.08)":"transparent",color:activeOut===t.id?THEME.accent:THEME.textDim,cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:activeOut===t.id?700:400}}>{t.label}</button>)}
+              </div>
+              {outTabs.map(t=>activeOut===t.id&&(
+                <div key={t.id}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                    <span style={{fontSize:10,color:THEME.textDim}}>Ready to paste into your SIEM</span>
+                    <CopyBtn text={result[t.key]||""}/>
+                  </div>
+                  <div style={{...S.code,whiteSpace:"pre-wrap"}}>{result[t.key]||"Not generated for this platform."}</div>
+                </div>
+              ))}
+              <div style={{marginTop:12,display:"flex",gap:8}}>
+                <button style={{...S.btn(),fontSize:11,padding:"7px 16px"}} onClick={()=>{setResult(null);setSteps(initSteps());setView("builder");}}>🔄 Start New Chain</button>
+                <button style={{...S.btn(),fontSize:11,padding:"7px 16px"}} onClick={()=>setView("builder")}>🔧 Edit Steps</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
