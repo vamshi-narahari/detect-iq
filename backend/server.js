@@ -80,7 +80,7 @@ Generate concise ML/UBA/RBA enhancements. Keep all queries to 1-3 lines. Keep al
 }`;
     const resp = await bedrock.send(new InvokeModelCommand({
       modelId: SONNET,
-      body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:4000,
+      body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:6000,
         system:"Expert detection engineer. Return ONLY valid JSON, no markdown, no code fences.",
         messages:[{role:"user",content:prompt}] }),
       contentType:"application/json", accept:"application/json"
@@ -1026,7 +1026,7 @@ No explanation, no markdown fences.`;
       accept: "application/json",
       body: JSON.stringify({
         anthropic_version: "bedrock-2023-05-31",
-        max_tokens: 2000,
+        max_tokens: 4000,
         system: "You are an expert detection engineer specializing in Panther Python rules. Always return valid Python only.",
         messages: [{ role: "user", content: prompt }],
       }),
@@ -1110,7 +1110,7 @@ Return ONLY valid JSON:
       accept: "application/json",
       body: JSON.stringify({
         anthropic_version: "bedrock-2023-05-31",
-        max_tokens: 1500,
+        max_tokens: 3000,
         system: "You are an expert detection engineer. Return only valid JSON, no markdown.",
         messages: [{ role: "user", content: prompt }],
       }),
@@ -1239,7 +1239,7 @@ ${query}`;
       accept: "application/json",
       body: JSON.stringify({
         anthropic_version: "bedrock-2023-05-31",
-        max_tokens: 2000,
+        max_tokens: 4000,
         system: "You are an expert detection engineer specializing in Sigma rules. Always return valid YAML only.",
         messages: [{ role: "user", content: prompt }],
       }),
@@ -1444,7 +1444,7 @@ Generate a realistic test scenario and return ONLY this JSON:
       accept: "application/json",
       body: JSON.stringify({
         anthropic_version: "bedrock-2023-05-31",
-        max_tokens: 2000,
+        max_tokens: 4000,
         system: "You are an expert detection engineer. Return ONLY valid JSON.",
         messages: [{ role: "user", content: prompt }],
       }),
