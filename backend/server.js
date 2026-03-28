@@ -1,12 +1,17 @@
 require("dotenv").config();
 const express = require("express");
+const compression = require("compression");
+const yaml = require("js-yaml");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
+const { RedisStore } = require("rate-limit-redis");
+const { Queue, Worker, QueueEvents } = require("bullmq");
 const { BedrockRuntimeClient, InvokeModelCommand, InvokeModelWithResponseStreamCommand } = require("@aws-sdk/client-bedrock-runtime");
 const { createClient } = require("redis");
 const crypto = require("crypto");
+const { jsonrepair } = require("jsonrepair");
 const { createClient: createSupabaseClient } = require("@supabase/supabase-js");
 const supabase = createSupabaseClient(
   "https://gckbdtcguptlfulzekzx.supabase.co",
@@ -34,8 +39,97 @@ app.set("trust proxy", 1); // Trust Cloudflare proxy
 const startTime = Date.now();
 
 // ── Redis client ──────────────────────────────────────────────────────────────
-const redis = createClient({ url: process.env.REDIS_URL || "redis://127.0.0.1:6379" });
+const REDIS_URL = process.env.REDIS_URL || "redis://127.0.0.1:6379";
+const redis = createClient({ url: REDIS_URL });
 redis.connect().then(() => console.log("Redis connected")).catch(e => console.error("Redis error:", e));
+
+// ── BullMQ job queue (async processing for heavy AI calls) ─────────────────────
+const redisConnection = { url: REDIS_URL };
+const aiQueue = new Queue("ai-jobs", { connection: redisConnection });
+const queueEvents = new QueueEvents("ai-jobs", { connection: redisConnection });
+const jobResults = new Map(); // in-memory store for job results (TTL managed separately)
+
+const aiWorker = new Worker("ai-jobs", async (job) => {
+  const { type, payload } = job.data;
+
+  if (type === "ml-enhance") {
+    const { name, query, queryType, tactic, severity, threat } = payload;
+    const querySnippet = (query || "").slice(0, 600);
+    const prompt = `You are an expert detection engineer specializing in machine learning, UBA, and risk-based alerting for SIEM platforms.
+
+Detection Name: ${name}
+Query Type: ${queryType || "SPL"}
+Tactic: ${tactic || "Unknown"}
+Severity: ${severity || "Medium"}
+Threat: ${(threat || "").slice(0, 200)}
+Original Query (excerpt):
+${querySnippet}
+
+Generate concise ML/UBA/RBA enhancements. Keep all queries to 1-3 lines. Keep all text fields to 1 sentence max. Return ONLY valid JSON:
+{
+  "ml_approach": "one sentence, max 15 words",
+  "ml_query": "1-3 line ${queryType||"SPL"} query using eventstats/streamstats z-score or stdev",
+  "ml_explanation": "one sentence explaining the ML logic",
+  "uba_pattern": "one sentence describing the behavior pattern",
+  "uba_query": "1-3 line ${queryType||"SPL"} query baselining per user/host",
+  "risk_modifier_rule": "compact Splunk ES risk modifier: eval risk_score, risk_object, risk_object_type then collect into risk index",
+  "risk_score": 60,
+  "risk_factors": ["6 words max", "6 words max"],
+  "anomaly_threshold": "one line threshold, e.g. z_score >= 3",
+  "baseline_window": "e.g. 30d rolling"
+}`;
+    const resp = await bedrock.send(new InvokeModelCommand({
+      modelId: SONNET,
+      body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:4000,
+        system:"Expert detection engineer. Return ONLY valid JSON, no markdown, no code fences.",
+        messages:[{role:"user",content:prompt}] }),
+      contentType:"application/json", accept:"application/json"
+    }));
+    const raw = JSON.parse(new TextDecoder().decode(resp.body)).content[0].text;
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error("No JSON in response");
+    return JSON.parse(require("jsonrepair").jsonrepair(m[0]));
+  }
+
+  if (type === "workflow") {
+    const { name, query, queryType, tactic, severity, threat, mitre_id } = payload;
+    const prompt = `You are a SOAR engineer designing an automated response workflow for a security detection.
+
+Detection: ${name}
+MITRE ID: ${mitre_id || "unknown"}
+Tactic: ${tactic || "Unknown"}
+Severity: ${severity || "Medium"}
+Threat: ${(threat||"").slice(0,150)}
+Query Type: ${queryType}
+
+Design a complete automated response workflow. Return ONLY valid JSON with keys: workflow_name, description, steps (array), edges (array), xsoar_pseudocode, tines_description, key_integrations.`;
+    const resp = await bedrock.send(new InvokeModelCommand({
+      modelId: SONNET,
+      body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:6000,
+        system:"You are a SOAR engineer. Return ONLY valid JSON, no markdown, no code fences.",
+        messages:[{role:"user",content:prompt}] }),
+      contentType:"application/json", accept:"application/json"
+    }));
+    const raw = JSON.parse(new TextDecoder().decode(resp.body)).content[0].text;
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error("No JSON in workflow response");
+    return JSON.parse(require("jsonrepair").jsonrepair(m[0]));
+  }
+
+  throw new Error(`Unknown job type: ${type}`);
+}, { connection: redisConnection, concurrency: 3 });
+
+aiWorker.on("completed", (job, result) => {
+  jobResults.set(job.id, { status: "done", result });
+  setTimeout(() => jobResults.delete(job.id), 10 * 60 * 1000); // cleanup after 10min
+});
+aiWorker.on("failed", (job, err) => {
+  jobResults.set(job.id, { status: "error", error: err.message });
+  setTimeout(() => jobResults.delete(job.id), 5 * 60 * 1000);
+});
+
+// ── Compression (gzip ~70% bandwidth reduction) ───────────────────────────────
+app.use(compression({ threshold: 1024 }));
 
 // ── Security headers ──────────────────────────────────────────────────────────
 app.use(helmet());
@@ -57,15 +151,23 @@ app.use(cors({
 
 app.use(express.json({ limit: "50kb" }));
 
-// ── Rate limiters ─────────────────────────────────────────────────────────────
+// ── Rate limiters (Redis-backed — persists across restarts, works multi-instance) ──
+const redisStore = (prefix) => new RedisStore({
+  sendCommand: (...args) => redis.sendCommand(args),
+  prefix,
+});
+
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, max: 100,
+  windowMs: 15 * 60 * 1000, max: 200,
   standardHeaders: true, legacyHeaders: false,
+  store: redisStore("rl:global:"),
   message: { error: "Too many requests, please try again in 15 minutes." },
+  skip: (req) => req.path === "/api/health" || req.path === "/health",
 });
 const claudeLimiter = rateLimit({
-  windowMs: 60 * 1000, max: 20,
+  windowMs: 60 * 1000, max: 30,
   standardHeaders: true, legacyHeaders: false,
+  store: redisStore("rl:claude:"),
   message: { error: "AI rate limit reached. Please wait a moment." },
 });
 app.use(globalLimiter);
@@ -82,7 +184,7 @@ const bedrock = new BedrockRuntimeClient(bedrockConfig);
 
 // Model IDs
 const SONNET = process.env.BEDROCK_MODEL_ID || "us.anthropic.claude-sonnet-4-6";
-const HAIKU = "us.anthropic.claude-sonnet-4-6";
+const HAIKU = "us.anthropic.claude-haiku-4-5";
 
 // ── Startup env-var validation ────────────────────────────────────────────────
 const REQUIRED_ENV = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"];
@@ -99,7 +201,7 @@ const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "";
 
 // ── HMAC webhook signature verifier ───────────────────────────────────────────
 function verifyWebhookSignature(req, res, next) {
-  if (!WEBHOOK_SECRET) return next(); // skip if not configured
+  if (!WEBHOOK_SECRET) return next();
   const sig = req.headers["x-detectiq-signature"] || "";
   const body = JSON.stringify(req.body);
   const expected = "sha256=" + crypto.createHmac("sha256", WEBHOOK_SECRET).update(body).digest("hex");
@@ -108,7 +210,7 @@ function verifyWebhookSignature(req, res, next) {
   next();
 }
 
-// ── Safe error message helper (hides internals in prod) ───────────────────────
+// ── Safe error message helper ─────────────────────────────────────────────────
 function safeError(e, fallback = "Internal server error") {
   if (IS_PROD) return fallback;
   return e?.message || fallback;
@@ -409,6 +511,24 @@ app.get("/api/cache/stats", async (req, res) => {
   }
 });
 
+// ── /api/jobs/:id — poll async job result ────────────────────────────────────
+app.get("/api/jobs/:id", async (req, res) => {
+  const id = req.params.id;
+  const local = jobResults.get(id);
+  if (local) return res.json(local);
+  // Job may still be queued/active — check BullMQ
+  try {
+    const job = await aiQueue.getJob(id);
+    if (!job) return res.status(404).json({ error: "Job not found" });
+    const state = await job.getState();
+    if (state === "completed") return res.json({ status: "done", result: job.returnvalue });
+    if (state === "failed") return res.status(500).json({ status: "error", error: job.failedReason });
+    return res.json({ status: state }); // waiting, active, delayed
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── /api/cache/clear ──────────────────────────────────────────────────────────
 app.post("/api/cache/clear", async (req, res) => {
   try {
@@ -615,31 +735,40 @@ app.post("/api/siem/push/splunk", express.json(), async (req, res) => {
   if (authMode !== "basic" && !token) return res.status(400).json({ error: "token required" });
   try {
     const target = url.replace(/\/$/, "") + "/services/saved/searches";
-    const body = new URLSearchParams({
-      name, search: query, description: description || "",
+    const bodyStr = new URLSearchParams({
+      name, search: query || "", description: description || "",
       "alert.severity": severity === "Critical" ? "5" : severity === "High" ? "4" : severity === "Medium" ? "3" : "2",
-      "alert_type": "number", "alert.suppress": "0",
+      "alert_type": "number of events", "alert_comparator": "greater than", "alert_threshold": "0",
       "dispatch.earliest_time": "-15m", "dispatch.latest_time": "now",
       "is_scheduled": "1", "cron_schedule": "*/15 * * * *",
-    });
+    }).toString();
     const authHeader = authMode === "basic"
       ? "Basic " + Buffer.from(`${username}:${password}`).toString("base64")
       : "Bearer " + token;
-    const r = await fetch(target, {
-      method: "POST",
-      headers: { "Authorization": authHeader, "Content-Type": "application/x-www-form-urlencoded" },
-      body: body.toString(),
+    // Use https.request with rejectUnauthorized:false so on-prem self-signed certs work
+    const https = require("https");
+    const parsed = new URL(target);
+    const statusCode = await new Promise((resolve, reject) => {
+      const opts = {
+        hostname: parsed.hostname, port: parsed.port || 8089,
+        path: parsed.pathname + parsed.search, method: "POST",
+        headers: { "Authorization": authHeader, "Content-Type": "application/x-www-form-urlencoded", "Content-Length": Buffer.byteLength(bodyStr) },
+        rejectUnauthorized: false,
+      };
+      const r = https.request(opts, resp => { resolve(resp.statusCode); resp.resume(); });
+      r.on("error", reject);
+      r.write(bodyStr); r.end();
     });
-    const text = await r.text();
-    if (r.ok || r.status === 201) {
-      logSiemPush({ userId: req.body.userId, detectionName: name, platform: "splunk", status: "success", message: "Saved search created in Splunk", ipAddress: req.ip });
-      res.json({ success: true, message: "Detection '" + name + "' pushed to Splunk as a scheduled saved search (runs every 15 min)." });
+    if (statusCode === 201 || statusCode === 200 || statusCode === 409) {
+      const msg = statusCode === 409 ? "Saved search already exists in Splunk." : `Detection '${name}' pushed to Splunk as a scheduled saved search.`;
+      logSiemPush({ userId: req.body.userId, detectionName: name, platform: "splunk", status: "success", message: msg, ipAddress: req.ip });
+      res.json({ success: true, message: msg });
     } else {
-      logSiemPush({ userId: req.body.userId, detectionName: name, platform: "splunk", status: "failure", message: "Splunk returned " + r.status, ipAddress: req.ip });
-      res.status(400).json({ error: "Splunk returned " + r.status + ". Check your management URL (port 8089) and token. " + text.slice(0, 200) });
+      logSiemPush({ userId: req.body.userId, detectionName: name, platform: "splunk", status: "failure", message: "Splunk returned " + statusCode, ipAddress: req.ip });
+      res.status(400).json({ error: `Splunk returned ${statusCode}. Check URL (port 8089), credentials, and that the management port is accessible.` });
     }
   } catch (e) {
-    res.status(500).json({ error: "Could not reach Splunk: " + e.message + ". Ensure the URL is reachable from the server." });
+    res.status(500).json({ error: "Could not reach Splunk: " + e.message });
   }
 });
 
@@ -695,34 +824,39 @@ app.post("/api/siem/push/soar", express.json(), async (req, res) => {
 
 // ── /api/siem/push/sentinel ───────────────────────────────────────────────────
 app.post("/api/siem/push/sentinel", express.json(), async (req, res) => {
-  const { workspaceId, clientId, clientSecret, tenantId, name, query, severity, description, tactic } = req.body;
-  if (!workspaceId || !clientId || !clientSecret || !tenantId) return res.status(400).json({ error: "workspaceId, clientId, clientSecret, and tenantId required" });
+  const { url, token, name, query, severity, description, tactic, queryType } = req.body;
+  if (!url || !token) return res.status(400).json({ error: "url and token required" });
   try {
-    const tokenRes = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ grant_type: "client_credentials", client_id: clientId, client_secret: clientSecret, scope: "https://management.azure.com/.default" }),
-    });
-    const tokenData = await tokenRes.json();
-    if (!tokenData.access_token) return res.status(400).json({ error: "Azure auth failed. Check clientId, clientSecret, tenantId. " + (tokenData.error_description || "") });
-    const ruleId = `detectiq-${Date.now()}`;
     const sevMap = { Critical: "High", High: "High", Medium: "Medium", Low: "Low", Informational: "Informational" };
-    const body = {
+    const sentinelSev = sevMap[severity] || "Medium";
+    const ruleId = name.replace(/[^a-zA-Z0-9-]/g, "-").toLowerCase().slice(0, 60) + "-" + Date.now().toString(36);
+    const target = `${url.replace(/\/$/, "")}/providers/Microsoft.SecurityInsights/alertRules/${ruleId}?api-version=2023-02-01`;
+    const payload = {
       kind: "Scheduled",
       properties: {
-        displayName: name, description: description || name, enabled: true,
-        query, severity: sevMap[severity] || "Medium",
-        queryFrequency: "PT15M", queryPeriod: "PT1H", triggerOperator: "GreaterThan", triggerThreshold: 0,
+        displayName: name,
+        description: description || name,
+        severity: sentinelSev,
+        query: query,
+        queryFrequency: "PT1H",
+        queryPeriod: "P1D",
+        triggerOperator: "GreaterThan",
+        triggerThreshold: 0,
+        enabled: true,
+        suppressionEnabled: false,
         tactics: tactic ? [tactic.replace(/\s+/g, "")] : [],
-      }
+      },
     };
-    const url = `https://management.azure.com/subscriptions/placeholder/resourceGroups/placeholder/providers/Microsoft.OperationalInsights/workspaces/${workspaceId}/providers/Microsoft.SecurityInsights/alertRules/${ruleId}?api-version=2023-02-01`;
-    const r = await fetch(url, { method: "PUT", headers: { "Authorization": "Bearer " + tokenData.access_token, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const r = await fetch(target, {
+      method: "PUT",
+      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
     const text = await r.text();
     if (r.ok || r.status === 201) {
-      res.json({ success: true, message: "Scheduled analytics rule '" + name + "' created in Microsoft Sentinel." });
+      res.json({ success: true, message: "Scheduled Analytics Rule '" + name + "' created in Microsoft Sentinel." });
     } else {
-      res.status(400).json({ error: "Sentinel returned " + r.status + ". " + text.slice(0, 300) });
+      res.status(400).json({ error: "Sentinel returned " + r.status + ". Check workspace URL and Bearer token. " + text.slice(0, 300) });
     }
   } catch (e) {
     res.status(500).json({ error: "Could not reach Sentinel API: " + e.message });
@@ -756,13 +890,16 @@ app.post("/api/siem/push/qradar", express.json(), async (req, res) => {
 app.post("/api/siem/push/chronicle", express.json(), async (req, res) => {
   const { name, query, severity, tactic } = req.body;
   if (!name || !query) return res.status(400).json({ error: "name and query required" });
-  const ruleName = name.replace(/[^a-zA-Z0-9_]/g, "_").toLowerCase();
-  const rule = `rule ${ruleName} {
+  function generateYaraL(name, query, severity, tactic) {
+    const ruleName = name.replace(/[^a-zA-Z0-9_]/g, "_").toLowerCase();
+    const sevComment = severity ? severity.toUpperCase() : "MEDIUM";
+    const tacticComment = tactic || "Unknown";
+    return `rule ${ruleName} {
   meta:
     author = "DetectIQ"
     description = "${name}"
-    severity = "${(severity || "Medium").toUpperCase()}"
-    tactic = "${tactic || "Unknown"}"
+    severity = "${sevComment}"
+    tactic = "${tacticComment}"
     reference = "https://detect-iq.com"
 
   events:
@@ -772,6 +909,8 @@ app.post("/api/siem/push/chronicle", express.json(), async (req, res) => {
   condition:
     $e
 }`;
+  }
+  const rule = generateYaraL(name, query, severity, tactic);
   res.json({ success: true, message: "Chronicle YARA-L rule generated. Copy it into Chronicle > Detection Engine > Rules.", rule });
 });
 
@@ -779,7 +918,9 @@ app.post("/api/siem/push/chronicle", express.json(), async (req, res) => {
 app.post("/api/siem/push/crowdstrike", express.json(), async (req, res) => {
   const { name, query, severity, tactic, description } = req.body;
   if (!name || !query) return res.status(400).json({ error: "name and query required" });
-  const sevValue = { Critical: "Critical", High: "High", Medium: "Medium", Low: "Low" }[severity] || "Medium";
+  const sevMap = { Critical: "Critical", High: "High", Medium: "Medium", Low: "Low" };
+  const sevValue = sevMap[severity] || "Medium";
+  const ruleName = (name || "detection").replace(/[^a-zA-Z0-9_\-\s]/g, "").replace(/\s+/g, "_").toLowerCase();
   const ruleText = `// CrowdStrike Falcon Custom IOA Rule
 // Name: ${name}
 // Tactic: ${tactic || "Unknown"}
@@ -833,7 +974,8 @@ app.post("/api/siem/push/tanium", express.json(), async (req, res) => {
   const { name, query, severity, tactic, description } = req.body;
   if (!name || !query) return res.status(400).json({ error: "name and query required" });
   const signal = {
-    name, description: description || name,
+    name,
+    description: description || name,
     source_guid: `detectiq-${Date.now()}`,
     platforms: ["Windows"],
     mitreAttack: { technique: tactic || "Unknown", url: "" },
@@ -907,24 +1049,31 @@ app.post("/api/siem/push/sumo", express.json(), async (req, res) => {
     const target = `${url.replace(/\/$/, "")}/api/v1/savedSearchesWithSchedule`;
     const payload = {
       type: "SavedSearchWithScheduleSyncDefinition",
-      name, description: description || name,
+      name,
+      description: description || name,
       search: { queryText: query, defaultTimeRange: "-15m", queryParameters: [], parsingMode: "AutoParse" },
       searchSchedule: {
-        cronExpression: "0/15 * * * ?", displayableTimeRange: "-15m",
+        cronExpression: "0/15 * * * ?",
+        displayableTimeRange: "-15m",
         parseableTimeRange: { type: "BeginBoundedTimeRange", from: { type: "RelativeTimeRangeBoundary", relativeTime: "-15m" }, to: null },
         timeZone: "UTC",
         threshold: { thresholdType: "group", operator: "gt", count: 0 },
         notification: { taskType: "EmailSearchNotificationSyncDefinition", toList: [], subjectTemplate: `[DetectIQ] ${name} Fired`, includeQuery: true, includeResultSet: true, includeHistogram: false, includeCsvAttachment: false },
-        scheduleType: "15Minutes", muteErrorEmails: false,
+        scheduleType: "15Minutes",
+        muteErrorEmails: false,
       },
     };
     const auth = "Basic " + Buffer.from(`${accessId}:${accessKey}`).toString("base64");
-    const r = await fetch(target, { method: "POST", headers: { "Authorization": auth, "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    const r = await fetch(target, {
+      method: "POST",
+      headers: { "Authorization": auth, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
     const text = await r.text();
     if (r.ok || r.status === 200 || r.status === 201) {
       res.json({ success: true, message: `Scheduled saved search '${name}' created in Sumo Logic (runs every 15 min).` });
     } else {
-      res.status(400).json({ error: `Sumo Logic returned ${r.status}. Check your API endpoint and access keys. ${text.slice(0, 300)}` });
+      res.status(400).json({ error: `Sumo Logic returned ${r.status}. Check your API endpoint (e.g. api.us2.sumologic.com) and access keys. ${text.slice(0, 300)}` });
     }
   } catch (e) {
     res.status(500).json({ error: "Could not reach Sumo Logic: " + e.message });
@@ -935,36 +1084,36 @@ app.post("/api/siem/push/sumo", express.json(), async (req, res) => {
 app.post("/api/detection/quality-score", claudeLimiter, express.json(), async (req, res) => {
   const { name, query, queryType, tactic, severity, description } = req.body;
   if (!name || !query) return res.status(400).json({ error: "name and query required" });
-  const prompt = `You are a senior detection engineer. Analyze this detection rule and return a quality score as JSON.
+  const prompt = `Score this ${queryType||"detection"} rule. Be brief — max 8 words per note.
 
-Detection Name: ${name}
-Query Type: ${queryType || "Unknown"}
-Tactic: ${tactic || "Unknown"}
-Severity: ${severity || "Unknown"}
-Description: ${description || ""}
-Query:
-${query}
+Name: ${name} | Tactic: ${tactic||"?"} | Severity: ${severity||"?"}
+Query: ${(query||"").slice(0,300)}
 
-Return ONLY valid JSON with this exact structure:
+Return ONLY valid JSON:
 {
   "overall": 78,
   "breakdown": {
-    "query_quality": { "score": 85, "notes": "concise observation" },
-    "fp_risk": { "score": 70, "notes": "higher = lower FP risk (better)" },
-    "coverage": { "score": 80, "notes": "concise observation" },
-    "mitre_alignment": { "score": 75, "notes": "concise observation" },
-    "data_requirements": { "score": 82, "notes": "concise observation" }
+    "query_quality": { "score": 85, "notes": "8 words max" },
+    "fp_risk": { "score": 70, "notes": "8 words max" },
+    "coverage": { "score": 80, "notes": "8 words max" },
+    "mitre_alignment": { "score": 75, "notes": "8 words max" },
+    "data_requirements": { "score": 82, "notes": "8 words max" }
   },
-  "strengths": ["strength 1", "strength 2"],
-  "weaknesses": ["weakness 1"],
-  "recommendations": ["rec 1", "rec 2"]
+  "strengths": ["max 6 words", "max 6 words"],
+  "weaknesses": ["max 6 words"],
+  "recommendations": ["max 10 words", "max 10 words"]
 }`;
   try {
     const command = new InvokeModelCommand({
-      modelId: SONNET, contentType: "application/json", accept: "application/json",
-      body: JSON.stringify({ anthropic_version: "bedrock-2023-05-31", max_tokens: 1500,
+      modelId: SONNET,
+      contentType: "application/json",
+      accept: "application/json",
+      body: JSON.stringify({
+        anthropic_version: "bedrock-2023-05-31",
+        max_tokens: 1500,
         system: "You are an expert detection engineer. Return only valid JSON, no markdown.",
-        messages: [{ role: "user", content: prompt }] }),
+        messages: [{ role: "user", content: prompt }],
+      }),
     });
     const response = await bedrock.send(command);
     const result = JSON.parse(Buffer.from(response.body));
@@ -1263,7 +1412,7 @@ Platform: ${queryType || tool || "Unknown"}
 Tactic: ${tactic || "Unknown"}
 Severity: ${severity || "Medium"}
 Query:
-${query}
+${query.slice(0, 800)}
 
 Generate a realistic test scenario and return ONLY this JSON:
 {
@@ -1305,8 +1454,14 @@ Generate a realistic test scenario and return ONLY this JSON:
     const text = result.content?.[0]?.text || "";
     const m = text.match(/\{[\s\S]*\}/);
     if (!m) return res.status(500).json({ error: "Could not parse test result" });
-    res.json(JSON.parse(m[0]));
+    const parsed = JSON.parse(jsonrepair(m[0]));
+    parsed.passed = parsed.verdict === "MATCH" || parsed.verdict === "PARTIAL_MATCH";
+    parsed.summary = parsed.verdict === "MATCH" ? "Detection logic matched the simulated attack logs."
+      : parsed.verdict === "PARTIAL_MATCH" ? "Detection partially matched — review coverage gaps below."
+      : "Detection did not match simulated logs — review tuning suggestions.";
+    res.json(parsed);
   } catch (e) {
+    console.error("detection/test error:", e);
     res.status(500).json({ error: "Detection test failed: " + e.message });
   }
 });
@@ -1408,6 +1563,613 @@ app.post("/api/community/clone", express.json(), async (req, res) => {
     if (insertErr) throw insertErr;
     res.json({ success: true, detection: inserted });
   } catch(e) { res.status(500).json({ error: "Clone failed: " + e.message }); }
+});
+
+// ── Atomic Red Team ───────────────────────────────────────────────────────────
+const ATOMIC_TECHNIQUES = [
+  "T1059.001","T1059.003","T1059.005","T1059.006","T1059.007",
+  "T1547.001","T1053.005","T1136.001","T1543.003",
+  "T1055.001","T1055.012","T1548.002","T1134.001",
+  "T1070.001","T1070.004","T1036.005","T1562.001","T1027.001",
+  "T1003.001","T1003.002","T1110.001","T1110.003","T1552.001","T1558.003",
+  "T1082","T1083","T1087.001","T1087.002","T1069.001","T1057","T1018",
+  "T1021.001","T1021.002","T1021.006","T1550.002",
+  "T1005","T1056.001","T1113","T1114.001",
+  "T1071.001","T1095","T1105",
+  "T1041","T1048.003",
+  "T1486","T1490","T1489","T1529",
+  "T1566.001","T1566.002","T1190","T1078.002",
+];
+const ATOMIC_TACTIC_MAP = {
+  "T1059":"Execution","T1547":"Persistence","T1053":"Persistence","T1136":"Persistence","T1543":"Persistence",
+  "T1055":"Privilege Escalation","T1548":"Privilege Escalation","T1134":"Privilege Escalation",
+  "T1070":"Defense Evasion","T1036":"Defense Evasion","T1562":"Defense Evasion","T1027":"Defense Evasion",
+  "T1003":"Credential Access","T1110":"Credential Access","T1552":"Credential Access","T1558":"Credential Access",
+  "T1082":"Discovery","T1083":"Discovery","T1087":"Discovery","T1069":"Discovery","T1057":"Discovery","T1018":"Discovery",
+  "T1021":"Lateral Movement","T1550":"Lateral Movement",
+  "T1005":"Collection","T1056":"Collection","T1113":"Collection","T1114":"Collection",
+  "T1071":"Command and Control","T1095":"Command and Control","T1105":"Command and Control",
+  "T1041":"Exfiltration","T1048":"Exfiltration",
+  "T1486":"Impact","T1490":"Impact","T1489":"Impact","T1529":"Impact",
+  "T1566":"Initial Access","T1190":"Initial Access","T1078":"Initial Access",
+};
+let atomicCache = null;
+let atomicCacheTime = 0;
+const ATOMIC_CACHE_TTL = 24 * 60 * 60 * 1000;
+
+async function fetchAtomicTests() {
+  if (atomicCache && Date.now() - atomicCacheTime < ATOMIC_CACHE_TTL) return atomicCache;
+  const results = [];
+  await Promise.allSettled(ATOMIC_TECHNIQUES.map(async (tid) => {
+    try {
+      const url = `https://raw.githubusercontent.com/redcanaryco/atomic-red-team/master/atomics/${tid}/${tid}.yaml`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) return;
+      const text = await res.text();
+      const doc = yaml.load(text);
+      if (!doc?.atomic_tests) return;
+      const base = tid.split(".")[0];
+      const tactic = ATOMIC_TACTIC_MAP[base] || "Other";
+      doc.atomic_tests.slice(0, 3).forEach((test, i) => {
+        const cmd = test.executor?.command || test.executor?.steps || "";
+        const cleanup = test.executor?.cleanup_command || "";
+        const args = test.input_arguments || {};
+
+        // Resolve #{variable} placeholders with default values
+        function resolveCmd(str) {
+          if (typeof str !== "string") return "";
+          return str.replace(/#\{(\w+)\}/g, (_, key) => {
+            return args[key]?.default !== undefined ? String(args[key].default) : `<${key}>`;
+          });
+        }
+
+        const rawCmd = typeof cmd === "string" ? cmd.trim().slice(0, 800) : "";
+        const resolvedCmd = resolveCmd(rawCmd);
+
+        results.push({
+          id: `${tid}-${i}`,
+          technique_id: tid,
+          technique_name: doc.display_name || tid,
+          tactic,
+          test_name: test.name,
+          description: (test.description||"").trim().slice(0, 400),
+          platforms: test.supported_platforms || [],
+          executor_name: test.executor?.name || "manual",
+          command: rawCmd,
+          resolved_command: resolvedCmd !== rawCmd ? resolvedCmd.slice(0, 800) : null,
+          cleanup_command: typeof cleanup === "string" ? resolveCmd(cleanup).trim().slice(0, 400) : null,
+          input_args: Object.entries(args).slice(0, 6).map(([k,v])=>({
+            name: k,
+            description: v.description || "",
+            default: v.default !== undefined ? String(v.default).slice(0, 100) : "",
+            type: v.type || "string",
+          })),
+          elevation_required: test.executor?.elevation_required || false,
+        });
+      });
+    } catch {}
+  }));
+  atomicCache = results.sort((a, b) => a.tactic.localeCompare(b.tactic));
+  atomicCacheTime = Date.now();
+  return atomicCache;
+}
+
+app.get("/api/atomic-tests", async (req, res) => {
+  try {
+    const all = await fetchAtomicTests();
+    const { tactic, platform, search, limit = 200 } = req.query;
+    let filtered = all;
+    if (tactic && tactic !== "All") filtered = filtered.filter(t => t.tactic === tactic);
+    if (platform && platform !== "All") filtered = filtered.filter(t => t.platforms.includes(platform.toLowerCase()));
+    if (search) {
+      const q = search.toLowerCase();
+      filtered = filtered.filter(t =>
+        t.technique_id.toLowerCase().includes(q) ||
+        t.technique_name.toLowerCase().includes(q) ||
+        t.test_name.toLowerCase().includes(q) ||
+        t.description.toLowerCase().includes(q)
+      );
+    }
+    res.json({ tests: filtered.slice(0, Number(limit)), total: filtered.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Atomic: AI Simulate ───────────────────────────────────────────────────────
+app.post("/api/atomic/simulate", claudeLimiter, express.json(), async (req, res) => {
+  const { technique_id, technique_name, test_name, description, command, executor_name, platforms } = req.body;
+  if (!technique_id || !command) return res.status(400).json({ error: "Missing required fields" });
+  const prompt = `You are a cybersecurity expert simulating what happens when an attacker runs an Atomic Red Team test.
+
+Technique: ${technique_id} - ${technique_name}
+Test: ${test_name}
+Platform: ${(platforms||[]).join(", ")}
+Executor: ${executor_name}
+Command:
+${command}
+
+Simulate this test. Be concise. CRITICAL: Return ONLY raw JSON, no markdown, no backslashes in strings, use forward slashes for paths, no quotes inside string values.
+
+{
+  "what_happens": "1 sentence: what this command does",
+  "process_tree": ["parent -> child (key args only)"],
+  "event_logs": [{"event_id": "4688", "source": "Security", "description": "brief", "key_fields": {"ProcessName": "x.exe", "CommandLine": "short"}}],
+  "artifacts": ["one short artifact per item"],
+  "detection_signals": ["EventID=4688 AND CommandLine contains x"],
+  "cleanup_result": "one sentence"
+}`;
+
+  try {
+    const resp = await bedrock.send(new InvokeModelCommand({
+      modelId: SONNET,
+      body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:2000, messages:[{role:"user",content:prompt}] }),
+      contentType:"application/json", accept:"application/json"
+    }));
+    const raw = JSON.parse(new TextDecoder().decode(resp.body)).content[0].text;
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (!m) return res.status(500).json({ error: "Could not parse simulation" });
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonrepair(m[0]));
+    } catch(parseErr) {
+      console.error("[simulate] JSON repair failed:", parseErr.message, m[0].slice(0, 300));
+      return res.status(500).json({ error: "Simulation returned invalid JSON: " + parseErr.message });
+    }
+    res.json(parsed);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Atomic: Agent Job Queue ───────────────────────────────────────────────────
+const atomicJobs = new Map(); // jobId → job object
+
+app.post("/api/atomic/jobs", express.json(), async (req, res) => {
+  const { test_id, command, cleanup_command, executor_name, platform, agent_key } = req.body;
+  if (!command || !agent_key) return res.status(400).json({ error: "Missing command or agent_key" });
+  const jobId = crypto.randomUUID();
+  const job = {
+    id: jobId, test_id, command, cleanup_command: cleanup_command||null,
+    executor_name: executor_name||"powershell", platform: platform||"windows",
+    agent_key, status: "pending", created_at: Date.now(),
+    output: null, cleanup_output: null, error: null, completed_at: null
+  };
+  atomicJobs.set(jobId, job);
+  // Auto-expire jobs after 30 min
+  setTimeout(() => atomicJobs.delete(jobId), 30 * 60 * 1000);
+  res.json({ job_id: jobId, status: "pending" });
+});
+
+// Agent polls this — returns oldest pending job for this key
+app.get("/api/atomic/jobs/pending", (req, res) => {
+  const { agent_key } = req.query;
+  if (!agent_key) return res.status(400).json({ error: "Missing agent_key" });
+  const job = [...atomicJobs.values()].find(j => j.agent_key === agent_key && j.status === "pending");
+  if (!job) return res.json({ job: null });
+  job.status = "running";
+  res.json({ job });
+});
+
+// Agent posts results
+app.post("/api/atomic/jobs/:id/result", express.json(), (req, res) => {
+  const job = atomicJobs.get(req.params.id);
+  if (!job) return res.status(404).json({ error: "Job not found" });
+  job.output = req.body.output || "";
+  job.cleanup_output = req.body.cleanup_output || null;
+  job.error = req.body.error || null;
+  job.status = req.body.error ? "failed" : "completed";
+  job.completed_at = Date.now();
+  res.json({ ok: true });
+});
+
+// Frontend polls job status
+app.get("/api/atomic/jobs/:id", (req, res) => {
+  const job = atomicJobs.get(req.params.id);
+  if (!job) return res.status(404).json({ error: "Job not found" });
+  res.json({ job_id: job.id, status: job.status, output: job.output, cleanup_output: job.cleanup_output, error: job.error, completed_at: job.completed_at });
+});
+
+// ── Agent script download ─────────────────────────────────────────────────────
+app.get("/api/atomic/agent-script", (req, res) => {
+  const { platform, key } = req.query;
+  if (!key) return res.status(400).json({ error: "Missing agent key" });
+  const apiBase = `${req.protocol}://${req.get("host")}`;
+
+  if (platform === "windows") {
+    res.setHeader("Content-Type", "text/plain");
+    res.setHeader("Content-Disposition", 'attachment; filename="detectiq-agent.ps1"');
+    res.send(`# DetectIQ Agent Script - Windows PowerShell
+# Agent Key: ${key}
+# This script polls DetectIQ for pending test jobs, executes them, and posts results back.
+
+$AgentKey = "${key}"
+$ApiBase = "${apiBase}"
+$PollInterval = 10  # seconds between polls
+
+Write-Host "[DetectIQ Agent] Starting. Agent key: $AgentKey" -ForegroundColor Cyan
+
+while ($true) {
+    try {
+        $resp = Invoke-RestMethod -Uri "$ApiBase/api/atomic/jobs/pending?agent_key=$AgentKey" -Method GET -ErrorAction Stop
+
+        if ($resp.job_id) {
+            $JobId = $resp.job_id
+            $Command = $resp.command
+            $Cleanup = $resp.cleanup_command
+
+            Write-Host "[DetectIQ Agent] Got job $JobId" -ForegroundColor Yellow
+            Write-Host "[DetectIQ Agent] Command: $Command"
+
+            $Output = ""
+            $CleanupOutput = ""
+            $Error = $null
+
+            try {
+                $Output = Invoke-Expression $Command 2>&1 | Out-String
+                Write-Host "[DetectIQ Agent] Output: $Output"
+            } catch {
+                $Error = $_.Exception.Message
+                Write-Host "[DetectIQ Agent] Error: $Error" -ForegroundColor Red
+            }
+
+            if ($Cleanup) {
+                try {
+                    $CleanupOutput = Invoke-Expression $Cleanup 2>&1 | Out-String
+                    Write-Host "[DetectIQ Agent] Cleanup output: $CleanupOutput"
+                } catch {
+                    $CleanupOutput = "Cleanup error: $($_.Exception.Message)"
+                }
+            }
+
+            $Body = @{ output = $Output; cleanup_output = $CleanupOutput; error = $Error } | ConvertTo-Json
+            Invoke-RestMethod -Uri "$ApiBase/api/atomic/jobs/$JobId/result" -Method POST -Body $Body -ContentType "application/json" | Out-Null
+            Write-Host "[DetectIQ Agent] Posted result for job $JobId" -ForegroundColor Green
+        }
+    } catch {
+        # No pending jobs or network error, continue polling
+    }
+
+    Start-Sleep -Seconds $PollInterval
+}
+`);
+  } else {
+    // Linux / macOS bash
+    res.setHeader("Content-Type", "text/plain");
+    res.setHeader("Content-Disposition", 'attachment; filename="detectiq-agent.sh"');
+    res.send(`#!/bin/bash
+# DetectIQ Agent Script - Linux/macOS Bash
+# Agent Key: ${key}
+# This script polls DetectIQ for pending test jobs, executes them, and posts results back.
+
+AGENT_KEY="${key}"
+API_BASE="${apiBase}"
+POLL_INTERVAL=10
+
+echo "[DetectIQ Agent] Starting. Agent key: $AGENT_KEY"
+
+while true; do
+    RESP=$(curl -sf "$API_BASE/api/atomic/jobs/pending?agent_key=$AGENT_KEY" 2>/dev/null)
+
+    if [ -n "$RESP" ]; then
+        JOB_ID=$(echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('job_id',''))" 2>/dev/null)
+        COMMAND=$(echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('command',''))" 2>/dev/null)
+        CLEANUP=$(echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('cleanup_command',''))" 2>/dev/null)
+
+        if [ -n "$JOB_ID" ]; then
+            echo "[DetectIQ Agent] Got job: $JOB_ID"
+            echo "[DetectIQ Agent] Command: $COMMAND"
+
+            OUTPUT=$(eval "$COMMAND" 2>&1) && ERROR="" || ERROR="Exit code $?"
+            echo "[DetectIQ Agent] Output: $OUTPUT"
+
+            CLEANUP_OUTPUT=""
+            if [ -n "$CLEANUP" ]; then
+                CLEANUP_OUTPUT=$(eval "$CLEANUP" 2>&1)
+                echo "[DetectIQ Agent] Cleanup: $CLEANUP_OUTPUT"
+            fi
+
+            PAYLOAD=$(python3 -c "
+import json, sys
+print(json.dumps({'output': sys.argv[1], 'cleanup_output': sys.argv[2], 'error': sys.argv[3]}))
+" "$OUTPUT" "$CLEANUP_OUTPUT" "$ERROR")
+
+            curl -sf -X POST "$API_BASE/api/atomic/jobs/$JOB_ID/result" \
+                -H "Content-Type: application/json" \
+                -d "$PAYLOAD" > /dev/null
+
+            echo "[DetectIQ Agent] Posted result for job $JOB_ID"
+        fi
+    fi
+
+    sleep $POLL_INTERVAL
+done
+`);
+  }
+});
+
+// ── ML / UBA / Risk-Based Alerting Enhancement (async via job queue) ──────────
+app.post("/api/detection/ml-enhance", claudeLimiter, express.json(), async (req, res) => {
+  const { name, query, queryType, tactic, severity, threat } = req.body;
+  if (!name || !query) return res.status(400).json({ error: "name and query required" });
+  try {
+    const job = await aiQueue.add("ml-enhance", { type: "ml-enhance", payload: { name, query, queryType, tactic, severity, threat } });
+    res.json({ jobId: job.id });
+  } catch(e) {
+    console.error("[ml-enhance] Queue error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Automated Response Workflow Generator (async via job queue) ───────────────
+app.post("/api/detection/workflow", claudeLimiter, express.json(), async (req, res) => {
+  const { name, query, queryType, tactic, severity, threat, mitre_id } = req.body;
+  if (!name) return res.status(400).json({ error: "name required" });
+  try {
+    const job = await aiQueue.add("workflow", { type: "workflow", payload: { name, query, queryType, tactic, severity, threat, mitre_id } });
+    res.json({ jobId: job.id });
+  } catch(e) {
+    console.error("[workflow] Queue error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Blast Radius Estimator ────────────────────────────────────────────────────
+app.post("/api/detection/blast-radius", claudeLimiter, express.json(), async (req, res) => {
+  const { name, query, queryType, tactic, severity } = req.body;
+  if (!name || !query) return res.status(400).json({ error: "name and query required" });
+  const prompt = `You are a detection engineering expert. Estimate how often this detection would fire across enterprise environments of different sizes based on its query logic and MITRE tactic.
+
+Detection: ${name}
+Query Type: ${queryType || "SPL"}
+Tactic: ${tactic || "Unknown"}
+Severity: ${severity || "Medium"}
+Query (excerpt): ${(query||"").slice(0,400)}
+
+Return ONLY valid JSON:
+{
+  "estimates": [
+    {"org_size": 500, "endpoints": "~500 endpoints", "daily_alerts": 8, "fp_rate": "~25%", "noise_level": "Low", "recommendation": "Safe to deploy as-is"},
+    {"org_size": 1000, "endpoints": "~1000 endpoints", "daily_alerts": 18, "fp_rate": "~28%", "noise_level": "Medium", "recommendation": "Add 2-3 exclusions first"},
+    {"org_size": 5000, "endpoints": "~5000 endpoints", "daily_alerts": 85, "fp_rate": "~32%", "noise_level": "High", "recommendation": "Tune before deploying — risk of alert fatigue"},
+    {"org_size": 10000, "endpoints": "~10000 endpoints", "daily_alerts": 170, "fp_rate": "~35%", "noise_level": "Very High", "recommendation": "Must tune — will overwhelm SOC queue"}
+  ],
+  "top_log_sources": ["Windows Security Event Log", "Sysmon"],
+  "peak_hours": "Business hours 9am-6pm local",
+  "tuning_recommendation": "one specific exclusion to cut noise by ~40%",
+  "alert_fatigue_risk": "Medium",
+  "benchmark": "Similar ${tactic} detections typically generate 15-40 alerts/day per 1000 endpoints",
+  "cost_estimate": "At $0.003/alert for analyst triage, ~$X/month at 1000 endpoints"
+}`;
+  try {
+    const resp = await bedrock.send(new InvokeModelCommand({ modelId: SONNET, contentType:"application/json", accept:"application/json",
+      body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:2000, system:"Detection engineering expert. Return ONLY valid JSON.", messages:[{role:"user",content:prompt}] }) }));
+    const raw = JSON.parse(new TextDecoder().decode(resp.body)).content[0].text;
+    const m = raw.match(/\{[\s\S]*\}/); if(!m) return res.status(500).json({error:"No JSON in response"});
+    res.json(JSON.parse(jsonrepair(m[0])));
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── False Positive Estimator ──────────────────────────────────────────────────
+app.post("/api/detection/false-positives", claudeLimiter, express.json(), async (req, res) => {
+  const { name, query, queryType, tactic } = req.body;
+  if (!name || !query) return res.status(400).json({ error: "name and query required" });
+  const prompt = `You are a detection engineering expert. Analyze this detection query for realistic false positive scenarios in enterprise environments.
+
+Detection: ${name}
+Query Type: ${queryType || "SPL"}
+Tactic: ${tactic || "Unknown"}
+Query: ${(query||"").slice(0,500)}
+
+Return ONLY valid JSON:
+{
+  "scenarios": [
+    {
+      "title": "IT Admin Legitimate Activity",
+      "description": "System admins regularly run this for maintenance",
+      "likelihood": "High",
+      "affected_roles": "IT, SysAdmins, Helpdesk",
+      "exclusion_query": "NOT (user IN ('svcaccount','admin') AND process_name='expected.exe')"
+    }
+  ],
+  "overall_fp_rate": "~30%",
+  "exclusion_template": "full ready-to-paste exclusion block for the ${queryType||"SPL"} query",
+  "recommended_whitelist_fields": ["user", "dest", "process_name"],
+  "tuning_priority": "High",
+  "safe_to_deploy": false,
+  "deploy_recommendation": "Add exclusions for IT admin accounts before deploying"
+}`;
+  try {
+    const resp = await bedrock.send(new InvokeModelCommand({ modelId: SONNET, contentType:"application/json", accept:"application/json",
+      body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:2500, system:"Detection engineering expert. Return ONLY valid JSON.", messages:[{role:"user",content:prompt}] }) }));
+    const raw = JSON.parse(new TextDecoder().decode(resp.body)).content[0].text;
+    const m = raw.match(/\{[\s\S]*\}/); if(!m) return res.status(500).json({error:"No JSON in response"});
+    res.json(JSON.parse(jsonrepair(m[0])));
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Honeytoken / Canary Generator ─────────────────────────────────────────────
+app.post("/api/detection/honeytoken", claudeLimiter, express.json(), async (req, res) => {
+  const { name, query, queryType, tactic, threat } = req.body;
+  if (!name) return res.status(400).json({ error: "name required" });
+  const prompt = `You are a deception security expert. Design honeytoken and canary traps that pair with this detection to catch attackers with 100% confidence.
+
+Detection: ${name}
+Tactic: ${tactic || "Unknown"}
+Threat: ${(threat||"").slice(0,150)}
+Query Type: ${queryType || "SPL"}
+
+Design 3-4 honeytokens suited for this tactic. Return ONLY valid JSON:
+{
+  "tokens": [
+    {
+      "type": "Honey Credentials",
+      "name": "svc_detectiq_honey01",
+      "description": "Fake service account — any authentication attempt is malicious",
+      "deployment_cmd": "net user svc_detectiq_honey01 'P@ssw0rd!Fake' /add /domain",
+      "detection_query": "${queryType||"SPL"} query to detect access to this token",
+      "alert_confidence": "100%",
+      "platform": "Active Directory"
+    }
+  ],
+  "canarytoken_types": ["DNS token", "HTTP token", "AWS key token"],
+  "canarytoken_url": "https://canarytokens.org/generate",
+  "deployment_guide": "Step-by-step: where to place each token in a ${tactic} attack path",
+  "coverage_benefit": "Adds near-zero-FP tripwires across the ${tactic} attack chain"
+}`;
+  try {
+    const resp = await bedrock.send(new InvokeModelCommand({ modelId: SONNET, contentType:"application/json", accept:"application/json",
+      body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:2500, system:"Deception security expert. Return ONLY valid JSON.", messages:[{role:"user",content:prompt}] }) }));
+    const raw = JSON.parse(new TextDecoder().decode(resp.body)).content[0].text;
+    const m = raw.match(/\{[\s\S]*\}/); if(!m) return res.status(500).json({error:"No JSON in response"});
+    res.json(JSON.parse(jsonrepair(m[0])));
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── DNS Sinkhole Generator ────────────────────────────────────────────────────
+app.post("/api/detection/dns-sinkhole", claudeLimiter, express.json(), async (req, res) => {
+  const { name, query, threat, tactic } = req.body;
+  if (!name) return res.status(400).json({ error: "name required" });
+  const prompt = `You are a DNS security expert. Based on this detection context, infer likely C2/malicious domains and generate complete DNS sinkhole configurations.
+
+Detection: ${name}
+Tactic: ${tactic || "Unknown"}
+Threat context: ${(threat||"").slice(0,200)}
+Query context: ${(query||"").slice(0,300)}
+
+Extract or infer 3-5 example malicious domains this detection would cover, then generate configs. Return ONLY valid JSON:
+{
+  "inferred_domains": ["c2.example-malware.com", "update.evil-actor.net"],
+  "pihole_blocklist": "0.0.0.0 c2.example-malware.com\\n0.0.0.0 update.evil-actor.net",
+  "bind9_rpz": "; RPZ zone file for BIND9\\n$TTL 60\\n@ IN SOA localhost. root.localhost. 1 1h 15m 30d 2m\\n@ IN NS localhost.\\nc2.example-malware.com IN CNAME .\\nupdate.evil-actor.net IN CNAME .",
+  "windows_dns_rpz": "Add-DnsServerZone -Name 'block.local' -ReplicationScope Domain\\nAdd-DnsServerResourceRecord -ZoneName 'block.local' -Name 'c2.example-malware.com' -A -IPv4Address '0.0.0.0'",
+  "unbound_conf": "local-zone: 'c2.example-malware.com' always_nxdomain\\nlocal-zone: 'update.evil-actor.net' always_nxdomain",
+  "sinkhole_ip": "0.0.0.0",
+  "sinkhole_detection_query": "SPL/KQL query: detect DNS queries resolving to sinkhole IP 0.0.0.0 — guaranteed malicious",
+  "deployment_steps": ["1. Choose sinkhole IP (0.0.0.0 or internal honeypot)", "2. Configure your DNS server with the RPZ zone", "3. Add detection query to SIEM"],
+  "ioc_feed_sources": ["abuse.ch", "URLhaus", "Feodo Tracker"]
+}`;
+  try {
+    const resp = await bedrock.send(new InvokeModelCommand({ modelId: SONNET, contentType:"application/json", accept:"application/json",
+      body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:2500, system:"DNS security expert. Return ONLY valid JSON.", messages:[{role:"user",content:prompt}] }) }));
+    const raw = JSON.parse(new TextDecoder().decode(resp.body)).content[0].text;
+    const m = raw.match(/\{[\s\S]*\}/); if(!m) return res.status(500).json({error:"No JSON in response"});
+    res.json(JSON.parse(jsonrepair(m[0])));
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── LOTL Coverage Generator ───────────────────────────────────────────────────
+app.post("/api/detection/lotl-coverage", claudeLimiter, express.json(), async (req, res) => {
+  const { name, tactic, queryType } = req.body;
+  if (!tactic) return res.status(400).json({ error: "tactic required" });
+  const prompt = `You are a detection expert specializing in Living-off-the-Land (LOTL) attacks. List all relevant LOLBins and LOLBas tools for this MITRE tactic and generate a ${queryType||"SPL"} detection query for each.
+
+MITRE Tactic: ${tactic}
+Detection context: ${name || "General"}
+Query Type: ${queryType || "SPL"}
+
+Return 8-12 LOLBins relevant to this tactic. Return ONLY valid JSON:
+{
+  "lolbins": [
+    {
+      "name": "certutil.exe",
+      "risk": "High",
+      "abuse": "Download malware, decode base64 payloads, bypass proxy",
+      "mitre_techniques": ["T1105", "T1140"],
+      "query": "${queryType||"SPL"} detection query (1-3 lines)",
+      "prevalence": "Very Common — seen in 70% of campaigns"
+    }
+  ],
+  "coverage_gap_summary": "X of Y LOTL binaries have no detections in most environments",
+  "priority_order": ["certutil.exe", "mshta.exe", "regsvr32.exe"],
+  "quick_win": "Detecting these 3 LOLBins covers 60% of LOTL-based ${tactic} attacks",
+  "reference": "https://lolbas-project.github.io/"
+}`;
+  try {
+    const resp = await bedrock.send(new InvokeModelCommand({ modelId: SONNET, contentType:"application/json", accept:"application/json",
+      body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:3000, system:"LOTL detection expert. Return ONLY valid JSON.", messages:[{role:"user",content:prompt}] }) }));
+    const raw = JSON.parse(new TextDecoder().decode(resp.body)).content[0].text;
+    const m = raw.match(/\{[\s\S]*\}/); if(!m) return res.status(500).json({error:"No JSON in response"});
+    res.json(JSON.parse(jsonrepair(m[0])));
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Detection Chain / Correlation Generator ───────────────────────────────────
+app.post("/api/detection/chain", claudeLimiter, express.json(), async (req, res) => {
+  const { nameA, queryA, nameB, queryB, queryType, correlField, timeWindowMin, platform } = req.body;
+  if (!nameA || !nameB) return res.status(400).json({ error: "nameA and nameB required" });
+  const prompt = `You are a SIEM correlation expert. Generate a correlation rule that triggers when Detection A fires within ${timeWindowMin||15} minutes of Detection B for the same ${correlField||"host"}, indicating a multi-stage attack.
+
+Detection A (early stage): ${nameA}
+Detection A query: ${(queryA||"").slice(0,250)}
+
+Detection B (later stage): ${nameB}
+Detection B query: ${(queryB||"").slice(0,250)}
+
+Correlation field: ${correlField||"host"}
+Time window: ${timeWindowMin||15} minutes
+Primary platform: ${platform||"Splunk"}
+
+Return ONLY valid JSON:
+{
+  "correlation_name": "CHAIN: ${nameA} → ${nameB}",
+  "description": "one sentence explaining the multi-stage attack pattern",
+  "attack_narrative": "2-3 sentences explaining what the chained detections mean together",
+  "risk_score": 95,
+  "severity": "Critical",
+  "splunk_correlation": "Splunk ES correlation SPL query using transaction or join",
+  "elastic_query": "Elastic EQL sequence query",
+  "sentinel_kql": "Microsoft Sentinel KQL query using sequence",
+  "chronicle_udm": "Google Chronicle YARA-L 2.0 rule",
+  "recommended_response": "immediate action to take when this fires",
+  "mitre_techniques": ["T1xxx", "T1xxx"]
+}`;
+  try {
+    const resp = await bedrock.send(new InvokeModelCommand({ modelId: SONNET, contentType:"application/json", accept:"application/json",
+      body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:2500, system:"SIEM correlation expert. Return ONLY valid JSON.", messages:[{role:"user",content:prompt}] }) }));
+    const raw = JSON.parse(new TextDecoder().decode(resp.body)).content[0].text;
+    const m = raw.match(/\{[\s\S]*\}/); if(!m) return res.status(500).json({error:"No JSON in response"});
+    res.json(JSON.parse(jsonrepair(m[0])));
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Log Replay / Dry Run ──────────────────────────────────────────────────────
+app.post("/api/detection/replay", claudeLimiter, express.json(), async (req, res) => {
+  const { query, queryType, logs } = req.body;
+  if (!query || !logs) return res.status(400).json({ error: "query and logs required" });
+  const lines = logs.split("\n").filter(l => l.trim()).slice(0, 200); // cap at 200 lines
+  const prompt = `You are a SIEM query expert. Evaluate which of these log lines would match the given ${queryType||"SPL"} detection query. For each matching line, briefly explain why it matches.
+
+Detection Query:
+${(query||"").slice(0,600)}
+
+Log Lines (numbered):
+${lines.map((l,i)=>`${i+1}. ${l.slice(0,300)}`).join("\n")}
+
+Return ONLY valid JSON:
+{
+  "match_indices": [1, 3, 7],
+  "match_explanations": {
+    "1": "Matches because field X equals expected value Y",
+    "3": "Matches because process_name contains suspicious string"
+  },
+  "non_match_reasons": "Most lines don't match because they lack the required field Z",
+  "match_rate": "3/10 lines (30%)",
+  "query_analysis": "This query looks for X — in this log sample it would catch Y type events",
+  "tuning_suggestion": "Consider broadening/narrowing field Z to capture more/fewer events"
+}`;
+  try {
+    const resp = await bedrock.send(new InvokeModelCommand({ modelId: HAIKU, contentType:"application/json", accept:"application/json",
+      body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:2000, system:"SIEM query expert. Return ONLY valid JSON.", messages:[{role:"user",content:prompt}] }) }));
+    const raw = JSON.parse(new TextDecoder().decode(resp.body)).content[0].text;
+    const m = raw.match(/\{[\s\S]*\}/); if(!m) return res.status(500).json({error:"No JSON in response"});
+    const data = JSON.parse(jsonrepair(m[0]));
+    // Attach matched/unmatched lines
+    const matchSet = new Set((data.match_indices||[]).map(i=>i-1));
+    data.matched_lines = lines.filter((_,i)=>matchSet.has(i));
+    data.unmatched_lines = lines.filter((_,i)=>!matchSet.has(i));
+    data.total_lines = lines.length;
+    data.match_count = data.matched_lines.length;
+    res.json(data);
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.use((req, res) => res.status(404).json({ error: "Not found." }));
@@ -1617,6 +2379,18 @@ setTimeout(() => {
   setInterval(runAutopilotCron, AUTOPILOT_INTERVAL_MS);
 }, 60000);
 
+
+// ── Health check ──────────────────────────────────────────────────────────────
+app.get("/health", (req, res) => {
+  const uptime = Math.floor((Date.now() - startTime) / 1000);
+  res.json({
+    status: "ok",
+    uptime,
+    pid: process.pid,
+    memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + "MB",
+    version: process.env.npm_package_version || "5.4"
+  });
+});
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((req, res) => res.status(404).json({ error: "Not found" }));
