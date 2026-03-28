@@ -1110,7 +1110,7 @@ Return ONLY valid JSON:
       accept: "application/json",
       body: JSON.stringify({
         anthropic_version: "bedrock-2023-05-31",
-        max_tokens: 3000,
+        max_tokens: 5000,
         system: "You are an expert detection engineer. Return only valid JSON, no markdown.",
         messages: [{ role: "user", content: prompt }],
       }),
@@ -1120,7 +1120,7 @@ Return ONLY valid JSON:
     const text = result.content?.[0]?.text || "";
     const m = text.match(/\{[\s\S]*\}/);
     if (!m) return res.status(500).json({ error: "Could not parse AI response" });
-    res.json(JSON.parse(m[0]));
+    res.json(JSON.parse(require("jsonrepair").jsonrepair(m[0])));
   } catch (e) {
     res.status(500).json({ error: "Quality score failed: " + e.message });
   }
