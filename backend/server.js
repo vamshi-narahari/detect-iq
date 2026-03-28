@@ -1979,7 +1979,7 @@ Return ONLY valid JSON:
 }`;
   try {
     const resp = await bedrock.send(new InvokeModelCommand({ modelId: SONNET, contentType:"application/json", accept:"application/json",
-      body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:2500, system:"Detection engineering expert. Return ONLY valid JSON.", messages:[{role:"user",content:prompt}] }) }));
+      body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:4000, system:"Detection engineering expert. Return ONLY valid JSON.", messages:[{role:"user",content:prompt}] }) }));
     const raw = JSON.parse(new TextDecoder().decode(resp.body)).content[0].text;
     const m = raw.match(/\{[\s\S]*\}/); if(!m) return res.status(500).json({error:"No JSON in response"});
     res.json(JSON.parse(jsonrepair(m[0])));
@@ -2017,7 +2017,7 @@ Design 3-4 honeytokens suited for this tactic. Return ONLY valid JSON:
 }`;
   try {
     const resp = await bedrock.send(new InvokeModelCommand({ modelId: SONNET, contentType:"application/json", accept:"application/json",
-      body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:2500, system:"Deception security expert. Return ONLY valid JSON.", messages:[{role:"user",content:prompt}] }) }));
+      body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:4000, system:"Deception security expert. Return ONLY valid JSON.", messages:[{role:"user",content:prompt}] }) }));
     const raw = JSON.parse(new TextDecoder().decode(resp.body)).content[0].text;
     const m = raw.match(/\{[\s\S]*\}/); if(!m) return res.status(500).json({error:"No JSON in response"});
     res.json(JSON.parse(jsonrepair(m[0])));
@@ -2049,7 +2049,7 @@ Extract or infer 3-5 example malicious domains this detection would cover, then 
 }`;
   try {
     const resp = await bedrock.send(new InvokeModelCommand({ modelId: SONNET, contentType:"application/json", accept:"application/json",
-      body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:2500, system:"DNS security expert. Return ONLY valid JSON.", messages:[{role:"user",content:prompt}] }) }));
+      body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:4000, system:"DNS security expert. Return ONLY valid JSON.", messages:[{role:"user",content:prompt}] }) }));
     const raw = JSON.parse(new TextDecoder().decode(resp.body)).content[0].text;
     const m = raw.match(/\{[\s\S]*\}/); if(!m) return res.status(500).json({error:"No JSON in response"});
     res.json(JSON.parse(jsonrepair(m[0])));
@@ -2124,7 +2124,7 @@ Return ONLY valid JSON:
 }`;
   try {
     const resp = await bedrock.send(new InvokeModelCommand({ modelId: SONNET, contentType:"application/json", accept:"application/json",
-      body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:2500, system:"SIEM correlation expert. Return ONLY valid JSON.", messages:[{role:"user",content:prompt}] }) }));
+      body: JSON.stringify({ anthropic_version:"bedrock-2023-05-31", max_tokens:4000, system:"SIEM correlation expert. Return ONLY valid JSON.", messages:[{role:"user",content:prompt}] }) }));
     const raw = JSON.parse(new TextDecoder().decode(resp.body)).content[0].text;
     const m = raw.match(/\{[\s\S]*\}/); if(!m) return res.status(500).json({error:"No JSON in response"});
     res.json(JSON.parse(jsonrepair(m[0])));
