@@ -26,16 +26,65 @@ DetectIQ is an **open-source, self-hosted** SIEM detection engineering platform 
 
 ✅ **What you get:**
 - Full source code (MIT License - use, modify, distribute freely)
-- Complete control over your data (nothing sent to external services except AWS Bedrock for AI)
+- Complete control over your data
 - Run on your own servers (local, AWS EC2, Docker, Kubernetes, etc.)
 
-⚠️ **What you need:**
-- **AWS Account** with Bedrock access ([sign up here](https://aws.amazon.com/bedrock/))
-- **Your own AWS credentials** (access key + secret key) - see [setup guide](#4-aws-bedrock-setup)
-- **AI costs are yours** - AWS Bedrock pay-as-you-go (~$30-60/month for typical use)
-- **Infrastructure costs** - server to run it on (can be as low as $5/month)
+### 📋 What You Need to Run DetectIQ
 
-💡 **No vendor lock-in:** Your data stays on your infrastructure. You control everything.
+#### **Required (App won't work without these):**
+
+1. **AWS Account with Bedrock access** ([sign up](https://aws.amazon.com/bedrock/))
+   - Your own AWS credentials (access key + secret key)
+   - Claude Sonnet 4.6 model enabled in Bedrock
+   - **Cost**: Pay-as-you-go (~$5-30/month depending on usage)
+   - **What it's used for**: All AI features (detection generation, translation, etc.)
+
+2. **Redis** (open source, self-hosted)
+   - **Cost**: FREE (run on your server)
+   - Can use: Local Redis, AWS ElastiCache, Redis Cloud free tier
+   - **What it's used for**: Response caching + BullMQ job queues
+
+3. **Node.js 18+** and **npm**
+   - **Cost**: FREE
+   - **What it's used for**: Running the application
+
+4. **A server to run it on**
+   - **Cost**: $5-50/month (DigitalOcean, AWS, your laptop)
+   - Minimum: 1 vCPU, 2GB RAM
+   - Can run on: Local machine, cloud VM, Docker, Kubernetes
+
+#### **Optional (App works without, but you lose features):**
+
+5. **Supabase** (for user accounts & team collaboration)
+   - **Cost**: FREE tier available ([sign up](https://supabase.com))
+   - If you don't use Supabase:
+     - ✅ DetectIQ works fine (uses browser localStorage)
+     - ❌ Can't create user accounts
+     - ❌ Can't share detections with team
+     - ❌ No detection library sync across devices
+   - **What it's used for**: PostgreSQL database, user auth, detection storage
+
+6. **Resend** (for password reset emails)
+   - **Cost**: FREE tier: 100 emails/day ([sign up](https://resend.com))
+   - **What it's used for**: Sending password reset emails
+   - If you don't use it: Users can't reset passwords via email
+
+### 💡 **TL;DR - Minimum Setup:**
+
+**For personal use (single user, no team features):**
+- AWS Bedrock (required, ~$5-10/month)
+- Redis (free, run locally)
+- Any $5/month server or your laptop
+- **Total cost**: ~$10-15/month
+
+**For team use (5-20 users with collaboration):**
+- AWS Bedrock (required, ~$20-40/month)
+- Redis (free or $10/month managed)
+- Supabase (free tier or $25/month for more storage)
+- $10-30/month server
+- **Total cost**: ~$30-80/month
+
+**Compare to commercial tools**: Most SIEM detection platforms charge $1000-5000+ per user per year.
 
 ## Demo
 
@@ -226,10 +275,14 @@ All pushes are logged in audit trail with timestamps, user ID, and status.
 
 ### Prerequisites
 
+**Minimum (Required):**
 - Node.js 18+ and npm
-- Redis 6+
+- Redis 6+ ([install instructions](#5-redis-setup))
 - AWS account with Bedrock access ([enable Claude Sonnet 4.6](https://console.aws.amazon.com/bedrock/home#/modelaccess))
+
+**Optional (For team features):**
 - Supabase account (free tier works - [signup here](https://supabase.com/))
+- Resend account for emails (free tier - [signup here](https://resend.com/))
 
 ### 1. Clone the repository
 
@@ -250,25 +303,35 @@ cp .env.example .env
 
 Edit `.env` with your credentials:
 ```bash
-# AWS Bedrock (required)
+# ========================================
+# REQUIRED - App won't work without these
+# ========================================
+
+# AWS Bedrock (for AI features)
 AWS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=your_access_key_here
 AWS_SECRET_ACCESS_KEY=your_secret_key_here
 BEDROCK_MODEL_ID=us.anthropic.claude-sonnet-4-6
 
-# Redis (required)
+# Redis (for caching + job queues)
 REDIS_URL=redis://127.0.0.1:6379
-
-# Supabase (optional - needed for user accounts)
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-
-# Email (optional - for password reset)
-RESEND_API_KEY=your_resend_api_key
 
 # Server
 PORT=3001
+
+# ========================================
+# OPTIONAL - Skip these for personal use
+# ========================================
+
+# Supabase (for user accounts, team collaboration)
+# Leave commented out to use localStorage instead
+# SUPABASE_URL=https://your-project.supabase.co
+# SUPABASE_ANON_KEY=your_supabase_anon_key
+# SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# Email (for password reset emails)
+# Leave commented out if you don't need password reset
+# RESEND_API_KEY=your_resend_api_key
 ```
 
 Start the backend:
@@ -284,15 +347,18 @@ Backend will run on `http://localhost:3001`
 cd frontend
 npm install
 
-# Create .env file
+# Create .env file (optional - only needed for Supabase)
 cp .env.example .env
 ```
 
-Edit `.env`:
+Edit `.env` (optional - skip this if not using Supabase):
 ```bash
+# Only needed if you set up Supabase in backend .env
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
+
+**Note:** Frontend will work fine without this - detections will be stored in browser localStorage.
 
 Start the frontend:
 ```bash
@@ -352,9 +418,22 @@ redis-cli ping
 # Should return: PONG
 ```
 
-### 6. Supabase Setup (Optional)
+### 6. Supabase Setup (Optional - Skip if Not Needed)
 
-DetectIQ works without Supabase (uses local storage), but for user accounts and team collaboration:
+**You can skip this entire section if:**
+- You're the only user
+- You don't need team collaboration
+- You're okay with detections stored in browser localStorage
+
+**Set up Supabase only if you want:**
+- Multiple user accounts with login/signup
+- Detection library synced across devices
+- Team detection sharing via Community tab
+- Audit logs for SIEM push operations
+
+---
+
+**Setup steps:**
 
 1. Create a free account at [supabase.com](https://supabase.com)
 2. Create a new project
@@ -619,6 +698,19 @@ Since DetectIQ is self-hosted, you pay for the infrastructure and AI usage direc
 Currently, DetectIQ requires AWS Bedrock for AI features. **Coming soon:**
 - Anthropic API direct support (alternative to Bedrock)
 - Local LLM support (Ollama, LM Studio) - free but requires powerful hardware
+
+### Do I need Supabase?
+**No, it's optional.** DetectIQ works without Supabase:
+- **Without Supabase**: Detections stored in browser localStorage (single user only)
+- **With Supabase**: Multi-user support, detection library sync, team sharing
+
+**Get Supabase free:** https://supabase.com (50,000 rows, 500MB storage on free tier)
+
+### Do I need Resend for emails?
+**No, it's optional.** Only needed if you want password reset emails. Skip it if:
+- You're the only user
+- You don't need password reset functionality
+- You manage user accounts manually
 
 ### Is my data sent to Anthropic or other third parties?
 **Only detection text goes to AWS Bedrock** for AI processing. Everything else stays on your server:
