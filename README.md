@@ -39,9 +39,9 @@ DetectIQ is an **open-source, self-hosted** SIEM detection engineering platform 
 
 ## Demo
 
-🌐 **Live demo**: http://3.134.146.190 (hosted by us for testing)
+🎥 **Screenshots and video demo coming soon!**
 
-> Try all features instantly - no signup required for demo mode. This is our hosted instance for demo purposes only.
+> DetectIQ is self-hosted, so there's no permanent public demo. However, you can run it locally in under 5 minutes - see [Quick Start](#quick-start) below.
 
 ## Features
 
