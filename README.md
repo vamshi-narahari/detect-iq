@@ -566,91 +566,201 @@ CREATE POLICY "Users can insert their own community detections"
   WITH CHECK (auth.uid() = user_id);
 ```
 
-## 🌐 Deployment
+## 🌐 Deployment Options
 
-You can deploy DetectIQ to any server or cloud platform. Choose based on your needs:
+DetectIQ can be deployed in multiple ways depending on your needs:
 
-### Option 1: Local Development (Easiest - Start Here!)
+### Quick Comparison
 
-Perfect for testing and personal use:
+| Deployment Type | Best For | Complexity | Cost | Setup Time |
+|-----------------|----------|------------|------|------------|
+| **Local Dev** | Testing, personal use | Easy | Free (just AWS AI) | 5 mins |
+| **Company Internal** | SOC teams, secure deployment | Medium | $50-100/month | 30 mins |
+| **Docker** | Clean isolated deployment | Medium | $50-100/month | 20 mins |
+| **Cloud VM** | Public demo, production | Medium | $60-130/month | 45 mins |
 
+---
+
+## 🏢 Deploy on Your Own (Company/Enterprise)
+
+**Perfect for:** SOC teams, internal deployment, no public access needed
+
+**What you get:**
+- ✅ Run on your own infrastructure (internal network only)
+- ✅ No Supabase needed (detections in browser localStorage)
+- ✅ No email/authentication setup needed
+- ✅ Full control and data privacy
+- ✅ ~$50-100/month (just AWS Bedrock AI costs)
+
+### Prerequisites
+
+- Company server or VM (1 vCPU, 2GB RAM minimum)
+- AWS account with Bedrock access
+- Node.js 18+ and npm
+- Redis (will install in steps)
+
+### Step 1: Prepare Server
+
+**Ubuntu/Debian:**
 ```bash
-# 1. Clone repo
-git clone https://github.com/vamshi-narahari/detect-iq.git
-cd detect-iq
+# Update system
+sudo apt update && sudo apt upgrade -y
 
-# 2. Start backend
-cd backend
-cp .env.example .env
-# Edit .env with your AWS credentials
-npm install
-node server.js &
-
-# 3. Start frontend (in new terminal)
-cd frontend
-npm install
-npm run dev
-```
-
-Access at: `http://localhost:5173`
-
-### Option 2: Docker (Recommended for Production)
-
-**Coming soon!** We're working on Docker Compose setup. For now, use manual deployment below.
-
-### Option 3: Cloud VM (AWS EC2, DigitalOcean, Lightsail)
-
-Deploy to any Ubuntu/Debian server:
-
-The live demo runs on:
-- **Instance**: AWS EC2 t3.medium (2 vCPU, 4GB RAM)
-- **OS**: Ubuntu 22.04 LTS
-- **Cost**: ~$30/month
-
-**Setup steps:**
-
-1. **Install dependencies:**
-```bash
-# Node.js 18
+# Install Node.js 18
 curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
 sudo apt install -y nodejs
 
-# Redis
-sudo apt install redis-server
+# Install Redis
+sudo apt install -y redis-server
 sudo systemctl enable redis
+sudo systemctl start redis
 
-# PM2
-sudo npm install -g pm2
-
-# Nginx
-sudo apt install nginx
+# Verify installations
+node --version  # Should be v18.x or higher
+redis-cli ping  # Should return PONG
 ```
 
-2. **Deploy backend:**
+**CentOS/RHEL:**
 ```bash
-cd ~/detectiq-server
-npm install --production
-pm2 start server.js --name detectiq-api
+sudo yum update -y
+sudo yum install -y nodejs npm redis
+sudo systemctl enable redis
+sudo systemctl start redis
+```
+
+### Step 2: Clone and Configure
+
+```bash
+# Clone repository
+cd /opt  # Or your preferred location
+sudo git clone https://github.com/vamshi-narahari/detect-iq.git
+sudo chown -R $USER:$USER detect-iq
+cd detect-iq
+```
+
+### Step 3: Setup Backend
+
+```bash
+cd backend
+npm install
+
+# Create .env file (ONLY required variables)
+cat > .env << 'EOF'
+# ========================================
+# REQUIRED - AWS Bedrock Configuration
+# ========================================
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your_company_aws_key_here
+AWS_SECRET_ACCESS_KEY=your_company_aws_secret_here
+BEDROCK_MODEL_ID=us.anthropic.claude-sonnet-4-6
+
+# Redis (local installation)
+REDIS_URL=redis://127.0.0.1:6379
+
+# Server port
+PORT=3001
+
+# CORS - restrict to your internal network
+# Format: comma-separated origins
+ALLOWED_ORIGINS=http://internal-detectiq.company.local,http://10.0.0.50
+
+# ========================================
+# OPTIONAL - Skip these for internal use
+# ========================================
+# Supabase - not needed, detections stored in browser
+# Resend - not needed, no email required
+EOF
+
+# Edit with your actual AWS credentials
+nano .env  # or vim .env
+```
+
+**Get AWS Credentials:**
+1. Go to AWS Console → IAM → Users
+2. Create new user: `detectiq-service`
+3. Attach policy with Bedrock access (see Step 4)
+4. Create access key → Copy credentials to .env
+
+### Step 4: AWS IAM Permissions (Security Best Practice)
+
+Create IAM policy for DetectIQ with minimal permissions:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DetectIQBedrockAccess",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithResponseStream"
+      ],
+      "Resource": "arn:aws:bedrock:us-east-1::foundation-model/us.anthropic.claude-sonnet-4-6"
+    }
+  ]
+}
+```
+
+Enable Claude Sonnet 4.6:
+1. Go to AWS Console → Bedrock → Model access
+2. Click "Manage model access"
+3. Enable "Claude 3.5 Sonnet v2"
+4. Wait for approval (instant)
+
+### Step 5: Start Backend
+
+```bash
+# Test backend first
+node server.js
+
+# If working, stop it (Ctrl+C) and run with PM2 for production
+sudo npm install -g pm2
+pm2 start server.js --name detectiq-backend
 pm2 save
 pm2 startup  # Run the command it outputs
 ```
 
-3. **Deploy frontend:**
+Backend should now be running on `http://localhost:3001`
+
+### Step 6: Setup Frontend
+
 ```bash
-cd ~/detect-iq-repo/frontend
+cd ../frontend
+npm install
+
+# Build production version
 npm run build
-sudo cp -r dist/* /var/www/detectiq/
+
+# Frontend is now in: dist/
+# Copy to web server or serve directly
 ```
 
-4. **Configure Nginx** (`/etc/nginx/sites-available/detectiq`):
+### Step 7: Serve Frontend
+
+**Option A: Using nginx (Recommended)**
+
+```bash
+# Install nginx
+sudo apt install -y nginx
+
+# Create nginx config
+sudo nano /etc/nginx/sites-available/detectiq
+```
+
+Paste this config:
 ```nginx
 server {
     listen 80;
-    server_name your-domain.com;
+    server_name internal-detectiq.yourcompany.local;  # Change to your internal domain
+
+    # Optional: Basic authentication for security
+    # auth_basic "DetectIQ - SOC Team";
+    # auth_basic_user_file /etc/nginx/.htpasswd;
 
     # Frontend
     location / {
-        root /var/www/detectiq;
+        root /opt/detect-iq/frontend/dist;
         try_files $uri $uri/ /index.html;
     }
 
@@ -661,42 +771,426 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
         proxy_cache_bypass $http_upgrade;
     }
 }
 ```
 
+Enable and start:
 ```bash
 sudo ln -s /etc/nginx/sites-available/detectiq /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl restart nginx
 ```
 
-5. **Set up SSL** (optional but recommended):
+**Option B: Using Node.js serve (Quick & Simple)**
+
+```bash
+sudo npm install -g serve
+pm2 start "serve -s dist -l 80" --name detectiq-frontend
+pm2 save
+```
+
+### Step 8: Configure Firewall (Security)
+
+**Only allow access from company network:**
+
+```bash
+# Ubuntu/Debian with ufw
+sudo ufw allow from 10.0.0.0/8 to any port 80
+sudo ufw allow from 10.0.0.0/8 to any port 3001
+sudo ufw enable
+
+# Or restrict to specific subnet
+sudo ufw allow from 10.50.100.0/24 to any port 80
+```
+
+### Step 9: (Optional) Add Basic Authentication
+
+Protect with username/password:
+
+```bash
+# Install apache2-utils
+sudo apt install apache2-utils
+
+# Create users
+sudo htpasswd -c /etc/nginx/.htpasswd soc_analyst1
+sudo htpasswd /etc/nginx/.htpasswd soc_analyst2
+sudo htpasswd /etc/nginx/.htpasswd threat_hunter1
+
+# Uncomment auth lines in nginx config (Step 7)
+sudo systemctl restart nginx
+```
+
+### Step 10: Access DetectIQ
+
+1. **Add DNS entry** (ask IT team):
+   - Point `internal-detectiq.company.local` to your server IP
+   - Or use IP directly: `http://10.0.x.x`
+
+2. **Access from browser**:
+   - Open: `http://internal-detectiq.company.local`
+   - Or: `http://your-server-ip`
+
+3. **Start using**:
+   - No signup needed (no Supabase)
+   - Each user's detections stored in their browser
+   - Build detections, chains, use autopilot immediately
+
+### Multi-User Setup (Without Supabase)
+
+Since detections are stored in browser localStorage, here are options for team sharing:
+
+**Option 1: Export/Import via Shared Drive**
+```bash
+# Each analyst can export detections:
+Library → Export JSON → Save to: \\company-nas\soc\detectiq-detections\
+
+# Others can import:
+Library → Import JSON → Select file from shared drive
+```
+
+**Option 2: Git Repository**
+```bash
+# Create shared repo
+git clone git@internal-git.company.com:soc/detections.git
+
+# Analysts commit their detections:
+Library → Export JSON → git add → git commit → git push
+
+# Others pull latest:
+git pull → Library → Import JSON
+```
+
+**Option 3: Add PostgreSQL (Advanced)**
+
+If you need real multi-user with shared library, you can add PostgreSQL:
+
+```bash
+# Install PostgreSQL
+sudo apt install postgresql
+
+# Create database
+sudo -u postgres psql
+CREATE DATABASE detectiq;
+CREATE USER detectiq WITH PASSWORD 'secure_password';
+GRANT ALL PRIVILEGES ON DATABASE detectiq TO detectiq;
+
+# Update backend .env:
+DATABASE_URL=postgresql://detectiq:secure_password@localhost:5432/detectiq
+
+# Run migrations (you'll need to implement this)
+```
+
+---
+
+## 🐳 Docker Deployment
+
+**Perfect for:** Clean isolated deployment, easy updates, portable
+
+### Quick Start with Docker
+
+**Prerequisites:**
+- Docker and Docker Compose installed
+
+**Step 1: Create project structure**
+
+```bash
+mkdir detectiq-docker && cd detectiq-docker
+git clone https://github.com/vamshi-narahari/detect-iq.git
+cd detect-iq
+```
+
+**Step 2: Create docker-compose.yml**
+
+```yaml
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+
+  backend:
+    build: ./backend
+    ports:
+      - "3001:3001"
+    environment:
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      BEDROCK_MODEL_ID: us.anthropic.claude-sonnet-4-6
+      REDIS_URL: redis://redis:6379
+      PORT: 3001
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+```
+
+**Step 3: Create .env file**
+
+```bash
+cat > .env << 'EOF'
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your_aws_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret
+EOF
+```
+
+**Step 4: Create Dockerfiles**
+
+Backend Dockerfile (`backend/Dockerfile`):
+```dockerfile
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --production
+COPY . .
+EXPOSE 3001
+CMD ["node", "server.js"]
+```
+
+Frontend Dockerfile (`frontend/Dockerfile`):
+```dockerfile
+FROM node:18-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+Frontend nginx config (`frontend/nginx.conf`):
+```nginx
+server {
+    listen 80;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api {
+        proxy_pass http://backend:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+**Step 5: Deploy**
+
+```bash
+# Build and start
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Access at: http://localhost
+```
+
+**Step 6: Updates**
+
+```bash
+# Pull latest code
+git pull origin main
+
+# Rebuild and restart
+docker-compose down
+docker-compose build
+docker-compose up -d
+```
+
+---
+
+## ☁️ Cloud VM Deployment (Public Access)
+
+**Perfect for:** Public demo, internet-facing deployment with Supabase
+
+This setup includes full user authentication, team collaboration, and public access. Follow the "Deploy on Your Own" guide above, then add:
+
+### Additional Steps for Public Deployment:
+
+**1. Set up Supabase** (see [Supabase Setup](#6-supabase-setup-optional---skip-if-not-needed))
+
+**2. Configure domain with Cloudflare** (recommended for DDoS protection):
+- Point your domain to server IP
+- Enable Cloudflare proxy (orange cloud)
+- Set SSL/TLS mode to "Full"
+- Enable rate limiting rules
+
+**3. Set up SSL with Let's Encrypt:**
 ```bash
 sudo apt install certbot python3-certbot-nginx
 sudo certbot --nginx -d your-domain.com
 ```
 
-### Option 4: DigitalOcean / Lightsail (Cheapest Cloud Option)
+**4. Enable Supabase environment variables in backend `.env`:**
+```bash
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+```
 
-**DigitalOcean Droplet ($6/month):**
-1. Create Ubuntu 22.04 droplet (1GB RAM, 1 vCPU)
-2. Follow the same steps as AWS EC2 above
-3. Point your domain to droplet IP
+**5. Configure frontend `.env`:**
+```bash
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your_anon_key
+```
 
-**AWS Lightsail ($5-10/month):**
-1. Create Ubuntu instance
-2. Open ports: 80, 443, 3001
-3. Follow EC2 deployment steps
+Now rebuild frontend and restart:
+```bash
+cd frontend && npm run build
+sudo cp -r dist/* /var/www/detectiq/
+pm2 restart detectiq-backend
+```
 
-### Option 5: Kubernetes / Docker Swarm (Enterprise)
+---
 
-For high availability and auto-scaling:
-- Use Helm charts (coming soon)
-- Deploy Redis as StatefulSet
-- Use Horizontal Pod Autoscaler for backend
-- Use Ingress for routing
+## 📊 Deployment Comparison
+
+| Feature | Company Internal | Docker | Cloud VM (Public) |
+|---------|------------------|--------|-------------------|
+| **Access** | Internal network only | Flexible | Internet-facing |
+| **Supabase** | Not needed | Optional | Recommended |
+| **Authentication** | Optional (nginx basic auth) | Optional | Yes (Supabase) |
+| **SSL/Domain** | Optional | Optional | Required |
+| **Cost** | $50-100/month | $50-100/month | $60-130/month |
+| **Security** | Highest (firewalled) | High | Medium (use Cloudflare) |
+| **Setup Time** | 30 mins | 20 mins | 45 mins |
+| **Best For** | SOC teams | Clean isolated deploy | Public demos |
+
+---
+
+## 🔧 Maintenance & Updates
+
+### Updating DetectIQ
+
+```bash
+# Pull latest code
+cd /opt/detect-iq  # or your install path
+git pull origin main
+
+# Update backend
+cd backend
+npm install
+pm2 restart detectiq-backend
+
+# Update frontend
+cd ../frontend
+npm install
+npm run build
+sudo cp -r dist/* /var/www/detectiq/  # or your web root
+```
+
+### Monitoring
+
+**Check service status:**
+```bash
+pm2 status
+pm2 logs detectiq-backend
+redis-cli ping
+```
+
+**Check disk space:**
+```bash
+df -h
+du -sh /opt/detect-iq
+```
+
+**AWS Bedrock costs:**
+- Check AWS Console → Billing Dashboard
+- Set up budget alerts at $100/month
+
+### Backup
+
+**What to backup:**
+```bash
+# Backend .env (has AWS credentials)
+cp /opt/detect-iq/backend/.env ~/backups/
+
+# If using Supabase, database is backed up automatically
+# If not using Supabase, detections are in browser localStorage (no server backup needed)
+```
+
+---
+
+## 🆘 Troubleshooting
+
+### Backend won't start
+
+```bash
+# Check logs
+pm2 logs detectiq-backend
+
+# Common issues:
+# - AWS credentials invalid → Check .env
+# - Redis not running → sudo systemctl start redis
+# - Port 3001 in use → pm2 stop all, then pm2 start server.js
+```
+
+### Frontend shows blank page
+
+```bash
+# Check nginx logs
+sudo tail -f /var/nginx/error.log
+
+# Common issues:
+# - Build failed → cd frontend && npm run build
+# - Wrong path in nginx → Check root path in nginx config
+# - API calls failing → Check CORS in backend .env
+```
+
+### AWS Bedrock errors
+
+```bash
+# Check IAM permissions
+# User needs: bedrock:InvokeModel permission
+
+# Check model access
+# Go to AWS Console → Bedrock → Model access
+# Ensure Claude Sonnet 4.6 is enabled
+
+# Check region
+# Model must be available in your AWS_REGION (use us-east-1)
+```
+
+### High AWS costs
+
+```bash
+# Check usage in AWS Console → Bedrock → Usage
+
+# Reduce costs:
+# 1. Enable response caching (already enabled in DetectIQ)
+# 2. Reduce max_tokens in backend/server.js
+# 3. Rate limit users in nginx
+# 4. Use Haiku model for simple tasks (edit BEDROCK_MODEL_ID)
+```
 
 ## 💰 Cost Estimate (Your Expense)
 
