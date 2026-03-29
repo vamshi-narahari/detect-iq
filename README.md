@@ -92,6 +92,60 @@ DetectIQ is an **open-source, self-hosted** SIEM detection engineering platform 
 
 > Try all features with limited usage. No signup required for demo mode. For production use, deploy your own instance - see [Quick Start](#quick-start) below.
 
+### Screenshots
+
+**Dashboard - Overview & Coverage**
+![Dashboard](docs/screenshots/dashboard.jpg)
+*Track detections (82 rules), MITRE ATT&CK coverage (9/14 tactics, 64% maturity), severity distribution, and quick-launch shortcuts.*
+
+**Detection Builder - AI-Powered Rule Generation**
+![Detection Builder](docs/screenshots/detection-builder.jpg)
+*Generate detection rules from threat scenarios across 10 SIEM platforms with the ADS framework.*
+
+**Detection Chain Builder - Multi-Stage Correlation**
+![Detection Chain](docs/screenshots/detection-chain.jpg)
+*Build multi-stage detection chains that track attackers across the kill chain with visual playbooks.*
+
+**Autopilot - Auto-Generate from Threat Intel**
+![Autopilot](docs/screenshots/autopilot.jpg)
+*Auto-draft detections from 4 sources: CVEs, ATT&CK TTPs, Threat Actors, Ransomware groups.*
+
+**ATT&CK Coverage Heatmap**
+![ATT&CK Map](docs/screenshots/attack-map.jpg)
+*Visualize detection coverage across MITRE ATT&CK tactics and techniques with maturity scoring.*
+
+**Dashboard - Honeycomb View**
+![Dashboard Honeycomb](docs/screenshots/dashboard-honeycomb.jpg)
+*Interactive honeycomb visualization showing coverage intensity by tactic (strong/partial/minimal/gap).*
+
+**Detection Library - Manage & Deploy**
+![Library](docs/screenshots/library.jpg)
+*Centralized library with 82 rules - search, filter, export to Sigma, push to SIEM, version control.*
+
+**Query Translator - Cross-Platform**
+![Query Translator](docs/screenshots/query-translator.jpg)
+*Translate detection queries between 10 SIEM platforms instantly (Splunk ↔ Elastic ↔ Sentinel ↔ etc.).*
+
+**Adversary SIEM - Red Team Simulator**
+![Adversary SIEM](docs/screenshots/adversary-siem.jpg)
+*Generate realistic attack logs to test your detections before deployment.*
+
+**Atomic Tests - Real Attack Procedures**
+![Atomic Tests](docs/screenshots/atomic-tests.jpg)
+*Browse 141+ Atomic Red Team tests across all tactics with resolved commands and auto-detection generation.*
+
+**Defend Tools - Honeytokens & Sinkhole**
+![Defend](docs/screenshots/defend-honeytokens.jpg)
+*Generate honeytokens (fake credentials, canary files) and DNS sinkhole configs for zero-FP detection.*
+
+**Get Started Guide**
+![Get Started](docs/screenshots/get-started.jpg)
+*Interactive onboarding - build your first detection in under 5 minutes.*
+
+**Documentation**
+![Documentation](docs/screenshots/documentation.jpg)
+*Searchable docs with 19 articles covering every feature with examples.*
+
 ## Features
 
 ### 🔨 Build Detections
