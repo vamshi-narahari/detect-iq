@@ -158,14 +158,14 @@ const redisStore = (prefix) => new RedisStore({
 });
 
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, max: 200,
+  windowMs: 15 * 60 * 1000, max: 60,
   standardHeaders: true, legacyHeaders: false,
   store: redisStore("rl:global:"),
   message: { error: "Too many requests, please try again in 15 minutes." },
   skip: (req) => req.path === "/api/health" || req.path === "/health",
 });
 const claudeLimiter = rateLimit({
-  windowMs: 60 * 1000, max: 30,
+  windowMs: 60 * 1000, max: 5,
   standardHeaders: true, legacyHeaders: false,
   store: redisStore("rl:claude:"),
   message: { error: "AI rate limit reached. Please wait a moment." },
