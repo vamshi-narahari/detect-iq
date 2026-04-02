@@ -1,0 +1,14 @@
+{
+  "name": "detect-iq",
+  "version": "5.5.0",
+  "description": "AI-powered detection engineering platform",
+  "scripts": {
+    "install:all": "cd backend && npm install && cd ../frontend && npm install",
+    "start": "cd backend && node server.js",
+    "build": "cd frontend && npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vamshi-narahari/detect-iq"
+  }
+}
