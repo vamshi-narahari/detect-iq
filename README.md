@@ -566,6 +566,329 @@ CREATE POLICY "Users can insert their own community detections"
   WITH CHECK (auth.uid() = user_id);
 ```
 
+## 🔧 Bring Your Own Infrastructure
+
+**DetectIQ is flexible** - use your company's existing infrastructure instead of buying new services:
+
+### Flexibility Matrix
+
+| Component | Default | Alternatives | How to Swap |
+|-----------|---------|--------------|-------------|
+| **AI Model** | AWS Bedrock (Claude) | Azure OpenAI, Anthropic API, Local LLMs (Ollama) | Change API endpoint in backend |
+| **Cloud Provider** | AWS | Azure, GCP, DigitalOcean, On-Prem | Deploy anywhere with Node.js |
+| **Cache/Queue** | Redis | KeyDB, Valkey, Dragonfly, AWS ElastiCache, Azure Cache | Change REDIS_URL in .env |
+| **Email** | Resend (optional) | Office 365/Outlook, SendGrid, AWS SES, company SMTP | Change email config in backend |
+| **Database** | Browser localStorage (no DB!) | PostgreSQL, MySQL, MongoDB, SQL Server | Update backend code |
+| **Web Server** | Nginx | Apache, IIS, Caddy, Traefik | Use any reverse proxy |
+| **Process Manager** | PM2 | Systemd, Docker, Kubernetes, Supervisor | Use any process manager |
+
+### Common Enterprise Scenarios
+
+#### **Scenario 1: Microsoft Shop (Azure + Office 365)**
+```bash
+# Use Azure OpenAI instead of AWS Bedrock
+AZURE_OPENAI_API_KEY=your_key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_OPENAI_DEPLOYMENT=claude-3-5-sonnet
+
+# Use Azure Cache for Redis
+REDIS_URL=redis://your-cache.redis.cache.windows.net:6380?password=your_password
+
+# Use Office 365 for emails (via Microsoft Graph API)
+EMAIL_PROVIDER=microsoft
+MICROSOFT_TENANT_ID=your_tenant
+MICROSOFT_CLIENT_ID=your_client_id
+MICROSOFT_CLIENT_SECRET=your_secret
+```
+
+#### **Scenario 2: Google Cloud Shop (GCP + Gmail)**
+```bash
+# Use Anthropic API direct (GCP hosts it)
+ANTHROPIC_API_KEY=your_api_key
+ANTHROPIC_BASE_URL=https://api.anthropic.com
+
+# Use Google Cloud Memorystore for Redis
+REDIS_URL=redis://10.0.0.3:6379
+
+# Use Gmail API for emails
+EMAIL_PROVIDER=gmail
+GMAIL_CLIENT_ID=your_client_id
+GMAIL_CLIENT_SECRET=your_secret
+```
+
+#### **Scenario 3: On-Premises / Air-Gapped**
+```bash
+# Use local LLM (Ollama, LM Studio)
+AI_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3:70b
+
+# Use on-prem Redis cluster
+REDIS_URL=redis://redis-cluster.internal:6379
+
+# Use company SMTP server
+EMAIL_PROVIDER=smtp
+SMTP_HOST=smtp.company.local
+SMTP_PORT=587
+SMTP_USER=detectiq@company.com
+SMTP_PASSWORD=your_password
+```
+
+#### **Scenario 4: AWS Shop with Existing Services**
+```bash
+# Use AWS SES for emails (instead of Resend)
+EMAIL_PROVIDER=aws-ses
+AWS_SES_REGION=us-east-1
+AWS_SES_FROM_EMAIL=detectiq@company.com
+
+# Use AWS ElastiCache for Redis
+REDIS_URL=redis://detectiq-cache.abc123.0001.use1.cache.amazonaws.com:6379
+
+# Use AWS RDS PostgreSQL (instead of Supabase)
+DATABASE_URL=postgresql://user:pass@detectiq-db.xyz.rds.amazonaws.com:5432/detectiq
+```
+
+---
+
+### 🔌 How to Swap Infrastructure Components
+
+#### **1. Swap AI Provider (AWS Bedrock → Azure/GCP/Local)**
+
+**Current (AWS Bedrock):**
+```javascript
+// backend/server.js - line ~11
+const bedrock = new BedrockRuntimeClient({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+  }
+});
+```
+
+**Option A: Azure OpenAI**
+```javascript
+// Install: npm install @azure/openai
+const { OpenAIClient, AzureKeyCredential } = require("@azure/openai");
+const client = new OpenAIClient(
+  process.env.AZURE_OPENAI_ENDPOINT,
+  new AzureKeyCredential(process.env.AZURE_OPENAI_API_KEY)
+);
+```
+
+**Option B: Anthropic API Direct**
+```javascript
+// Install: npm install @anthropic-ai/sdk
+const Anthropic = require('@anthropic-ai/sdk');
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY
+});
+```
+
+**Option C: Local LLM (Ollama)**
+```javascript
+// Install: npm install ollama
+const ollama = require('ollama');
+// Calls go to http://localhost:11434
+```
+
+**Implementation:** Modify `backend/server.js` lines 11-50 (Bedrock initialization) and 261-370 (API calls)
+
+---
+
+#### **2. Swap Email Provider (Resend → Office 365/Gmail/SMTP)**
+
+**Current (Resend):**
+```javascript
+// backend/server.js - line ~633
+const resend = new Resend(process.env.RESEND_API_KEY);
+await resend.emails.send({ from, to, subject, html });
+```
+
+**Option A: Office 365 / Outlook (Microsoft Graph API)**
+```javascript
+// Install: npm install @microsoft/microsoft-graph-client
+const { Client } = require('@microsoft/microsoft-graph-client');
+const client = Client.init({
+  authProvider: (done) => {
+    done(null, accessToken); // Get via OAuth2
+  }
+});
+await client.api('/me/sendMail').post({
+  message: { subject, body: { contentType: 'HTML', content: html }, toRecipients }
+});
+```
+
+**Option B: Gmail API**
+```javascript
+// Install: npm install googleapis
+const { google } = require('googleapis');
+const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+await gmail.users.messages.send({
+  userId: 'me',
+  requestBody: { raw: Buffer.from(emailContent).toString('base64') }
+});
+```
+
+**Option C: Company SMTP Server**
+```javascript
+// Install: npm install nodemailer
+const nodemailer = require('nodemailer');
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
+  secure: true,
+  auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD }
+});
+await transporter.sendMail({ from, to, subject, html });
+```
+
+**Implementation:** Modify `backend/server.js` lines 633-660 (email sending)
+
+---
+
+#### **3. Swap Redis (Redis → KeyDB/Valkey/ElastiCache)**
+
+**Good news:** Redis alternatives are **drop-in compatible**! Just change the `REDIS_URL`:
+
+```bash
+# AWS ElastiCache
+REDIS_URL=redis://your-cache.abc123.0001.use1.cache.amazonaws.com:6379
+
+# Azure Cache for Redis
+REDIS_URL=redis://your-cache.redis.cache.windows.net:6380?password=your_password
+
+# Google Cloud Memorystore
+REDIS_URL=redis://10.0.0.3:6379
+
+# KeyDB (faster Redis alternative)
+REDIS_URL=redis://localhost:6379
+
+# Dragonfly (modern Redis alternative)
+REDIS_URL=redis://localhost:6379
+
+# Valkey (AWS fork of Redis)
+REDIS_URL=redis://localhost:6379
+```
+
+**No code changes needed** - BullMQ and redis client work with all Redis-compatible services.
+
+---
+
+#### **4. Add Database (PostgreSQL/MySQL instead of localStorage)**
+
+**Current:** Detections stored in browser localStorage (no database)
+
+**To add PostgreSQL:**
+
+1. **Install PostgreSQL driver:**
+```bash
+cd backend
+npm install pg
+```
+
+2. **Add connection:**
+```javascript
+// backend/server.js - add after line 19
+const { Pool } = require('pg');
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL
+});
+```
+
+3. **Create tables:**
+```sql
+CREATE TABLE detections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id VARCHAR(255),
+  name TEXT NOT NULL,
+  query TEXT NOT NULL,
+  tool VARCHAR(50) NOT NULL,
+  tactic VARCHAR(100),
+  severity VARCHAR(50),
+  description TEXT,
+  tags TEXT[],
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+4. **Update API endpoints** (lines 1395-1434):
+```javascript
+// GET /api/detections
+app.get("/api/detections", async (req, res) => {
+  const { rows } = await pool.query(
+    'SELECT * FROM detections WHERE user_id = $1 ORDER BY created_at DESC',
+    [req.user.id]
+  );
+  res.json(rows);
+});
+
+// POST detection (save)
+app.post("/api/detections", async (req, res) => {
+  const { name, query, tool, tactic, severity, description, tags } = req.body;
+  const { rows } = await pool.query(
+    'INSERT INTO detections (user_id, name, query, tool, tactic, severity, description, tags) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+    [req.user.id, name, query, tool, tactic, severity, description, tags]
+  );
+  res.json(rows[0]);
+});
+```
+
+**For MySQL:** Use `mysql2` package, same approach
+**For MongoDB:** Use `mongodb` package, store as JSON documents
+**For SQL Server:** Use `mssql` package, same SQL queries
+
+---
+
+#### **5. Deploy on Different Clouds**
+
+**Azure:**
+```bash
+# Use Azure VM, Azure Redis Cache, Azure OpenAI
+# Follow "Deploy on Your Own" guide, but:
+az vm create --resource-group detectiq --name detectiq-vm --image Ubuntu2204
+az redis create --resource-group detectiq --name detectiq-cache --sku Basic --vm-size C0
+```
+
+**GCP (Google Cloud):**
+```bash
+# Use Compute Engine, Memorystore, Anthropic API
+gcloud compute instances create detectiq-vm --machine-type=e2-medium --image-family=ubuntu-2204-lts
+gcloud redis instances create detectiq-cache --size=1 --region=us-central1
+```
+
+**On-Premises:**
+```bash
+# Install on any Ubuntu/CentOS server
+# Use local Redis, local LLM (Ollama), no internet needed
+# Follow "Deploy on Your Own" guide as-is
+```
+
+**All clouds work the same way** - DetectIQ is just Node.js + Redis + AI API, runs anywhere!
+
+---
+
+### 💡 **Why This Matters**
+
+**No Vendor Lock-In:**
+- ✅ Use your company's existing Microsoft 365 → don't buy Resend
+- ✅ Deploy on Azure/GCP → don't need AWS
+- ✅ Use your Redis cluster → don't need new cache
+- ✅ Use company SMTP → don't need email service
+- ✅ Add your own database → don't need Supabase
+
+**Cost Savings:**
+- Use enterprise agreements you already have
+- Leverage existing infrastructure
+- No redundant services
+
+**Compliance:**
+- Stay within approved vendor list
+- Use company-managed services
+- Data stays in your approved regions
+
+---
+
 ## 🌐 Deployment Options
 
 DetectIQ can be deployed in multiple ways depending on your needs:
@@ -574,9 +897,9 @@ DetectIQ can be deployed in multiple ways depending on your needs:
 
 | Deployment Type | Best For | Complexity | Cost | Setup Time |
 |-----------------|----------|------------|------|------------|
-| **Local Dev** | Testing, personal use | Easy | Free (just AWS AI) | 5 mins |
-| **Company Internal** | SOC teams, secure deployment | Medium | $50-100/month | 30 mins |
-| **Docker** | Clean isolated deployment | Medium | $50-100/month | 20 mins |
+| **Local Dev** | Testing, personal use | Easy | Free (just AI) | 5 mins |
+| **Company Internal** | SOC teams, secure deployment | Medium | Varies by infra | 30 mins |
+| **Docker** | Clean isolated deployment | Medium | Varies by infra | 20 mins |
 | **Cloud VM** | Public demo, production | Medium | $60-130/month | 45 mins |
 
 ---
@@ -1243,9 +1566,13 @@ Since DetectIQ is self-hosted, you pay for the infrastructure and AI usage direc
 - Your own server/hosting (~$5-30/month depending on size)
 
 ### Can I use it without AWS?
-Currently, DetectIQ requires AWS Bedrock for AI features. **Coming soon:**
-- Anthropic API direct support (alternative to Bedrock)
-- Local LLM support (Ollama, LM Studio) - free but requires powerful hardware
+**Yes!** DetectIQ works with multiple AI providers. Just modify the backend code:
+- ✅ **Azure OpenAI** - Use if you're on Microsoft Azure
+- ✅ **Anthropic API Direct** - Use if you have Anthropic account
+- ✅ **Google Cloud AI** - Use if you're on GCP
+- ✅ **Local LLM (Ollama)** - Free, run on your hardware
+
+See [How to Swap Infrastructure](#-how-to-swap-infrastructure-components) for code examples.
 
 ### Do I need Supabase?
 **No, it's optional.** DetectIQ works without Supabase:
@@ -1255,10 +1582,14 @@ Currently, DetectIQ requires AWS Bedrock for AI features. **Coming soon:**
 **Get Supabase free:** https://supabase.com (50,000 rows, 500MB storage on free tier)
 
 ### Do I need Resend for emails?
-**No, it's optional.** Only needed if you want password reset emails. Skip it if:
-- You're the only user
-- You don't need password reset functionality
-- You manage user accounts manually
+**No, it's optional.** Only needed if you want password reset emails. You can also use:
+- ✅ **Office 365 / Outlook** - If you use Microsoft email
+- ✅ **Gmail API** - If you use Google Workspace
+- ✅ **Company SMTP** - Your internal mail server
+- ✅ **AWS SES** - If you're on AWS
+- ❌ **Skip email entirely** - Most companies do this for internal tools
+
+See [How to Swap Infrastructure](#-how-to-swap-infrastructure-components) for code examples.
 
 ### Is my data sent to Anthropic or other third parties?
 **Only detection text goes to AWS Bedrock** for AI processing. Everything else stays on your server:
@@ -1275,10 +1606,17 @@ Currently, DetectIQ requires AWS Bedrock for AI features. **Coming soon:**
 - ⚠️ Just keep the MIT License and credit
 
 ### Can I use this at my company?
-**Absolutely!** Many companies use DetectIQ internally. The MIT License allows commercial use. Just make sure you:
-- Use your own AWS credentials (don't share across teams)
-- Review security best practices in [SECURITY.md](SECURITY.md)
-- Consider setting up auth and RLS in Supabase for team use
+**Absolutely!** DetectIQ is designed for enterprise use. The MIT License allows commercial use.
+
+**Best practices:**
+- ✅ Use company's existing cloud (Azure/AWS/GCP/On-prem)
+- ✅ Use company's existing email (Office 365/Gmail/SMTP)
+- ✅ Deploy on internal network (no internet exposure)
+- ✅ Use company's Redis/cache service
+- ✅ Integrate with company SSO (optional)
+
+See [Bring Your Own Infrastructure](#-bring-your-own-infrastructure) for using your existing services.
+See [Deploy on Your Own](#-deploy-on-your-own-companyenterprise) for step-by-step enterprise deployment.
 
 ### How do I update DetectIQ when new versions are released?
 ```bash
