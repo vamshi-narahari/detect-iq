@@ -1,0 +1,55 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    name: Scan for secrets and credentials
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Full history for secret scanning
+
+      - name: TruffleHog Secret Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --only-verified
+
+      - name: Check for AWS credentials
+        run: |
+          if grep -r "AKIA[0-9A-Z]\{16\}" . --exclude-dir=node_modules --exclude-dir=.git; then
+            echo "::error::AWS credentials detected in repository!"
+            exit 1
+          fi
+          echo "✅ No AWS credentials found"
+
+      - name: Check for GitHub tokens
+        run: |
+          if grep -r "ghp_[0-9a-zA-Z]\{36\}" . --exclude-dir=node_modules --exclude-dir=.git; then
+            echo "::error::GitHub tokens detected in repository!"
+            exit 1
+          fi
+          echo "✅ No GitHub tokens found"
+
+      - name: Check for .env files
+        run: |
+          if git ls-files | grep -E "\.env$|\.env\."; then
+            echo "::error::.env files should not be committed!"
+            exit 1
+          fi
+          echo "✅ No .env files committed"
+
+      - name: Security audit - npm
+        run: |
+          cd backend && npm audit --audit-level=high
+          cd ../frontend && npm audit --audit-level=high

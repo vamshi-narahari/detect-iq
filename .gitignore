@@ -1,23 +1,32 @@
 # Dependencies
 node_modules/
 package-lock.json
+yarn.lock
 
 # Build output
 dist/
 build/
 out/
+*.tsbuildinfo
 
 # Environment variables (NEVER commit these!)
 .env
-.env.local
-.env.production
-.env.*.local
+.env.*
+!.env.example
+*.env
+*.env.*
 
 # OS files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 *.swp
 *.swo
+*.swn
 *~
 
 # Logs
@@ -25,30 +34,69 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+lerna-debug.log*
 pm2.log
+logs/
 
 # IDE
 .vscode/
+!.vscode/settings.json.example
 .idea/
 *.sublime-project
 *.sublime-workspace
+*.iml
+.project
+.classpath
+.settings/
 
 # Cache
 .cache/
 .parcel-cache/
 .eslintcache
+.stylelintcache
+*.tgz
 
 # Temporary files
 tmp/
 temp/
 *.tmp
+*.temp
 
 # AWS credentials (extra safety)
 credentials
+aws-credentials
 config
 *.pem
 *.key
+*.p12
+*.pfx
+*-key.json
+service-account*.json
+
+# Security sensitive files
+*secret*
+*password*
+*token*
+.npmrc
+.yarnrc
 
 # Backup files
 *.bak
 *.backup
+*.old
+*.orig
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
