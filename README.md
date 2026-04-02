@@ -94,57 +94,59 @@ DetectIQ is an **open-source, self-hosted** SIEM detection engineering platform 
 
 ### Screenshots
 
+> **Note**: Screenshots below show a demo account with sample data. Your installation will start empty - you'll build your own detection library from scratch.
+
 **Dashboard - Overview & Coverage**
 ![Dashboard](docs/screenshots/dashboard.jpg)
-*Track detections (82 rules), MITRE ATT&CK coverage (9/14 tactics, 64% maturity), severity distribution, and quick-launch shortcuts.*
+*Dashboard overview showing detection library stats, MITRE ATT&CK coverage metrics, severity distribution, and quick-launch shortcuts. (Demo shows 82 rules - you'll start with 0 and build your library)*
 
 **Detection Builder - AI-Powered Rule Generation**
 ![Detection Builder](docs/screenshots/detection-builder.jpg)
-*Generate detection rules from threat scenarios across 10 SIEM platforms with the ADS framework.*
+*Generate detection rules from plain-English threat scenarios across 10 SIEM platforms with the ADS (Attack Detection Strategy) framework. Select your SIEM, describe the threat, and get production-ready queries.*
 
 **Detection Chain Builder - Multi-Stage Correlation**
 ![Detection Chain](docs/screenshots/detection-chain.jpg)
-*Build multi-stage detection chains that track attackers across the kill chain with visual playbooks.*
+*Build multi-stage detection chains that track attackers across the kill chain. Chain detections for Discovery → Collection stages with automatic correlation logic and visual playbooks.*
 
 **Autopilot - Auto-Generate from Threat Intel**
 ![Autopilot](docs/screenshots/autopilot.jpg)
-*Auto-draft detections from 4 sources: CVEs, ATT&CK TTPs, Threat Actors, Ransomware groups.*
+*Auto-draft detections from 4 threat intelligence sources: CVEs (CISA KEV), ATT&CK TTPs (20 techniques), Threat Actors (8 APT groups), and Ransomware groups (6 major families). Queue-based workflow with approval process.*
 
 **ATT&CK Coverage Heatmap**
 ![ATT&CK Map](docs/screenshots/attack-map.jpg)
-*Visualize detection coverage across MITRE ATT&CK tactics and techniques with maturity scoring.*
+*Visualize your detection coverage across MITRE ATT&CK tactics and techniques with maturity scoring. See gaps at a glance and prioritize detection development. (Demo shows 64% maturity across 9/14 tactics)*
 
 **Dashboard - Honeycomb View**
 ![Dashboard Honeycomb](docs/screenshots/dashboard-honeycomb.jpg)
-*Interactive honeycomb visualization showing coverage intensity by tactic (strong/partial/minimal/gap).*
+*Interactive honeycomb visualization showing coverage intensity by tactic. Hover over cells to see technique details. Color-coded: green (strong), yellow (partial), orange (minimal), gray (no coverage).*
 
 **Detection Library - Manage & Deploy**
 ![Library](docs/screenshots/library.jpg)
-*Centralized library with 82 rules - search, filter, export to Sigma, push to SIEM, version control.*
+*Your centralized detection library. Search, filter by tactic/severity/platform, export to Sigma, push directly to SIEM, or share with team. Each detection gets a quality score (0-100) based on 8 criteria. (Demo shows 82 rules - you start with 0)*
 
 **Query Translator - Cross-Platform**
 ![Query Translator](docs/screenshots/query-translator.jpg)
-*Translate detection queries between 10 SIEM platforms instantly (Splunk ↔ Elastic ↔ Sentinel ↔ etc.).*
+*Translate detection queries between 10 SIEM platforms instantly. Example shows Splunk SPL → Falcon LogScale translation. Supports bidirectional translation between any platform pair.*
 
 **Adversary SIEM - Red Team Simulator**
 ![Adversary SIEM](docs/screenshots/adversary-siem.jpg)
-*Generate realistic attack logs to test your detections before deployment.*
+*Generate realistic attack logs to test your detections before deployment. Select attack technique, customize parameters, and get authentic log samples. Test detection coverage without running actual attacks.*
 
 **Atomic Tests - Real Attack Procedures**
 ![Atomic Tests](docs/screenshots/atomic-tests.jpg)
-*Browse 141+ Atomic Red Team tests across all tactics with resolved commands and auto-detection generation.*
+*Browse 141+ Atomic Red Team tests across all MITRE tactics. View test commands with resolved arguments, then auto-generate matching detections. Example shows T1114.001 (Email Collection with PowerShell).*
 
 **Defend Tools - Honeytokens & Sinkhole**
 ![Defend](docs/screenshots/defend-honeytokens.jpg)
-*Generate honeytokens (fake credentials, canary files) and DNS sinkhole configs for zero-FP detection.*
+*Generate honeytokens (fake credentials, canary files, AWS keys, DNS canaries) and DNS sinkhole configs for zero-false-positive detection. Load threat context from your detection library.*
 
 **Get Started Guide**
 ![Get Started](docs/screenshots/get-started.jpg)
-*Interactive onboarding - build your first detection in under 5 minutes.*
+*Interactive onboarding walks you through building your first detection, reviewing detections in your library, and exploring key features. Complete 7 steps to go from zero to full MITRE coverage.*
 
 **Documentation**
 ![Documentation](docs/screenshots/documentation.jpg)
-*Searchable docs with 19 articles covering every feature with examples.*
+*Built-in searchable documentation with 19 articles covering every feature. Includes quick links, examples, and best practices. Categories: Getting Started, Build, Analyze, Intel, Settings.*
 
 ## Features
 
