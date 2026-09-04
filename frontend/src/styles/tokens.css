@@ -1,0 +1,126 @@
+:root {
+  --bg: #0b0f1a;
+  --bg-radial: radial-gradient(ellipse 1200px 600px at 15% -10%, rgba(79,209,197,0.06), transparent),
+               radial-gradient(ellipse 900px 500px at 100% 10%, rgba(242,169,59,0.05), transparent);
+  --panel: #141b2c;
+  --panel-2: #1a2338;
+  --panel-hover: #1e2942;
+  --border: rgba(232, 234, 240, 0.07);
+  --border-strong: rgba(232, 234, 240, 0.15);
+  --text: #edeff4;
+  --text-muted: #8891a5;
+  --text-dim: #5f6879;
+  --cyan: #4fd1c5;
+  --cyan-glow: rgba(79, 209, 197, 0.18);
+  --amber: #f2a93b;
+  --amber-glow: rgba(242, 169, 59, 0.16);
+  --red: #ef5a5f;
+  --radius: 9px;
+  --radius-sm: 6px;
+  --shadow-1: 0 1px 2px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.02) inset;
+  --shadow-2: 0 8px 24px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.03) inset;
+  --mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
+  --sans: "Inter", "IBM Plex Sans", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  background: var(--bg-radial), var(--bg);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, select, textarea { font-family: inherit; }
+h1, h2, h3 { letter-spacing: -0.01em; }
+a { color: var(--cyan); }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--panel-2); border-radius: 8px; border: 2px solid var(--bg); }
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+.mono { font-family: var(--mono); }
+
+.btn {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--panel-2);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.btn:hover { background: var(--panel-hover); border-color: rgba(232,234,240,0.22); }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-primary {
+  background: linear-gradient(180deg, #5fe0d4, var(--cyan));
+  color: #06141a;
+  border-color: transparent;
+  font-weight: 600;
+  box-shadow: 0 2px 12px var(--cyan-glow);
+}
+.btn-primary:hover { filter: brightness(1.06); box-shadow: 0 4px 18px var(--cyan-glow); }
+
+.input {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 9px 11px;
+  font-size: 13px;
+  width: 100%;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.input::placeholder { color: var(--text-dim); }
+.input:hover { border-color: var(--border-strong); }
+.input:focus-visible { outline: none; border-color: var(--cyan); background: var(--panel-hover); box-shadow: 0 0 0 3px var(--cyan-glow); }
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--panel), rgba(20,27,44,0.7));
+  box-shadow: var(--shadow-1);
+}
+
+.panel-head {
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.badge[data-tone="cyan"] { color: var(--cyan); border-color: rgba(79,209,197,0.4); background: var(--cyan-glow); }
+.badge[data-tone="amber"] { color: var(--amber); border-color: rgba(242,169,59,0.4); background: var(--amber-glow); }
+.badge[data-tone="red"] { color: var(--red); border-color: rgba(239,90,95,0.4); background: rgba(239,90,95,0.12); }
+
+/* Reusable card-lift affordance for clickable rows/cards using className="hoverable" */
+.hoverable { transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease; }
+.hoverable:hover { background: var(--panel-hover); }
