@@ -2,7 +2,7 @@ import { Router } from "express";
 import { randomUUID } from "crypto";
 import { invokeClaude } from "../ai.js";
 import { supabaseAdmin } from "../supabaseAdmin.js";
-import { tryConsumeBudget } from "../budgetLimiter.js";
+import { tryConsumeBudget, budgetLimiter } from "../budgetLimiter.js";
 
 const router = Router();
 
